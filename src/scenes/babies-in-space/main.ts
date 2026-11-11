@@ -6,7 +6,7 @@ import { houseAt, iconCanteen, iconHouse, iconNursery, launchHouse } from './bui
 import { KL, traySlots } from './canteen';
 import { Baby, tapBaby } from './characters';
 import { RL } from './nursery';
-import { LAY, dragWish, drawRoom, drawTrans, dropBaby, enterRoom, exitRoom, hitRoom, hoverTarget, moveDrag, onRoomTap, startDrag, tapRoomBaby, updateRoom, updateTrans } from './room';
+import { LAY, roomHead, dragWish, drawRoom, drawTrans, dropBaby, enterRoom, exitRoom, hitRoom, hoverTarget, moveDrag, onRoomTap, startDrag, tapRoomBaby, updateRoom, updateTrans } from './room';
 import { sfx, updLullaby } from './sounds';
 import { bgC, bigStars, btn, buildBg, drawAlien, drawPlanet, drawRinged, drawShooting, drawStars, hit, iconMoonSun, iconRocket, iconSound, launchBaby, onTap, planet, ringed, tapPlanet, updateShooting } from './space';
 import { G, MAX_BABIES, MAX_HOUSES, RB, babies, houses, picker } from './state';
@@ -102,10 +102,11 @@ function draw() {
 }
 
 let last = performance.now();
+let paused = false; // только для тестов: заморозить кадр для скриншота (__game.pause)
 
 function frame(now) {
-  const dt = Math.min(0.05, (now - last) / 1000); last = now; advance(dt);
-  update(dt); draw();
+  const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  if (!paused) { advance(dt); update(dt); } draw();
   if (pointer.moved) { pointer.moved = false; cv.style.cursor = G.drag && G.drag.moved ? 'grabbing' : (G.scene === 'space' ? hit : hitRoom)(pointer.x, pointer.y) ? 'pointer' : 'default'; }
   requestAnimationFrame(frame);
 }
@@ -170,7 +171,8 @@ requestAnimationFrame(frame);
 (window as any).__game = {
   G, babies, houses, picker, planet, btn,
   step(sec: number) { for (let i = 0; i < Math.round(sec * 60); i++) { advance(1 / 60); update(1 / 60); } draw(); },
+  pause(on = true) { paused = on; },
   start() { G.started = true; document.getElementById('start')!.classList.add('hide'); },
   api: { launchBaby, launchHouse, enterRoom, exitRoom, tapBaby, tapPlanet, tapRoomBaby, onTap, onRoomTap, hit, hitRoom,
-    startDrag, moveDrag, dropBaby, RL, KL, traySlots, houseAt },
+    startDrag, moveDrag, dropBaby, RL, KL, traySlots, houseAt, roomHead },
 };

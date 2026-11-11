@@ -10,15 +10,13 @@ import { sfx } from './sounds';
 import { btn, smallStars } from './space';
 import { G, RB } from './state';
 import { satisfy } from './wishes';
+import { riderHead } from './anim/horse';
 
 export function roomHead(b) {
   const r = RB();
   if (b.crib) { const L = RL(), c = L.cribs[b.crib.i]; return [c.x - L.cw * 0.22, c.y - 72 * S]; }
   if (b.chair) { const c = KL().chairs[b.chair.i]; return [c.x, c.y - CHAIR_SEAT() - 14 * S - r * 2.4]; }
-  if (isRider(b)) {
-    const p = RL().horse, a = horseAng(b.home), [lx, sy] = HORSE_SEAT(), ly = sy - r * 2.4;
-    return [p.x + lx * Math.cos(a) - ly * Math.sin(a), p.y + lx * Math.sin(a) + ly * Math.cos(a)];
-  }
+  if (isRider(b)) return riderHead(b);
   return [b.ix, b.iy - r * 2.4];
 }
 
@@ -273,7 +271,7 @@ export function exitRoom() {
 export function startDrag(b) {
   b.dragged = true; b.target = null; b.ifall = false;
   if (b.toy) { const z = b.toy; z.held = null; z.released = true; z.vx = rand(-60, 60) * S; z.vy = -50 * S; b.toy = null; }
-  b.crib = null; b.chair = null; b.play = null; b.eat = null; b.eatPending = false;
+  b.crib = null; b.chair = null; b.play = null; b.pose = null; b.eat = null; b.eatPending = false;
   sfx.pick();
 }
 

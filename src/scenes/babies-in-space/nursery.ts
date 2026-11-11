@@ -8,6 +8,8 @@ import { sfx } from './sounds';
 import { G, RB } from './state';
 import { drawToy } from './toys';
 import { satisfy } from './wishes';
+import { ballBegin, ballEnd, ballHeld, ballUpdate } from './anim/ball';
+import { drawHorseRider, horseBegin, horseEnd, horseUpdate } from './anim/horse';
 
 // ---------------- КОМНАТА (ЯСЛИ) ----------------
 export function RL() {
@@ -59,7 +61,7 @@ export const XTUNE = [0, 1, 2, 3, 4, 5, 4, 3, 2, 1, 0, 2, 4, 2, 0];
 export function toyBusy(h, k, except?) { return h.occupants().some(b => b !== except && b.play && b.play.k === k); }
 
 export function toyApproach(L, k, h) {
-  if (k === 'horse') return [L.horse.x + 80 * S, L.horse.y + 8 * S];
+  if (k === 'horse') return [L.horse.x - 88 * S, L.horse.y + 8 * S]; // забирается сзади (anim/horse.ts)
   if (k === 'xylo') return [L.xylo.x, L.xylo.y - 24 * S];
   if (k === 'tower') return [L.tower.x + 55 * S, L.tower.y - 2 * S];
   const B = h.room.ball, bx = B.x == null ? W * 0.63 : B.x;
@@ -96,16 +98,17 @@ export function startPlay(b, k) {
   const h = b.home, L = RL(), R = h.room, d = { horse: 6, xylo: 5, ball: 9, tower: 2.6 }[k];
   b.play = { k, phase: 'do', t: d, d, clopT: 0, noteT: 0.25, n: 0, kicks: 0, kickT: 0, done: k === 'tower' && !!R.tower };
   b.ifall = false; b.awake = 3; b.laugh = 0.8;
-  if (k === 'horse') { R.horse = 1; b.ix = L.horse.x; b.iy = L.horse.y + 2 * S; }
+  if (k === 'horse') horseBegin(b, L);
+  else if (k === 'ball') ballBegin(b, L, h);
   else if (k === 'xylo') [b.ix, b.iy] = toyApproach(L, 'xylo', h);
   if (b.visible()) sfx.pick();
   satisfy(b, 'play');
 }
 
 export function endPlay(b, L) {
-  const k = b.play.k; b.play = null;
-  if (k === 'horse') { b.ix = L.horse.x + 80 * S; b.iy = L.horse.y + 10 * S; b.bounce = 1; }
+  const P = b.play, k = P.k; b.play = null; b.pose = null;
   b.iwx = b.ix; b.iwy = b.iy; b.iwT = rand(1.5, 3);
+  if (k === 'horse') horseEnd(b, L, P); else if (k === 'ball') ballEnd(b);
 }
 
 export function updatePlay(b, dt, L) {
@@ -119,20 +122,12 @@ export function updatePlay(b, dt, L) {
     return;
   }
   if (P.k === 'horse') {
-    R.horse = 1; P.clopT -= dt; if (P.clopT <= 0) { P.clopT = 0.75; if (vis) sfx.clop(); }
+    horseUpdate(b, dt, L);
   } else if (P.k === 'xylo') {
     [b.ix, b.iy] = toyApproach(L, 'xylo', h);
     P.noteT -= dt; if (P.noteT <= 0) { P.noteT = 0.3; hitXylo(R, L, XTUNE[P.n++ % XTUNE.length], vis); }
   } else if (P.k === 'ball') {
-    const B = R.ball, [tx, ty] = toyApproach(L, 'ball', h), dx = tx - b.ix, dy = ty - b.iy, d = Math.hypot(dx, dy);
-    if (d > 4 * S) { const sp = Math.min(110 * S * dt, d); b.ix += dx / d * sp; b.iy += dy / d * sp; }
-    b.face = B.x > b.ix ? 1 : -1;
-    P.kickT -= dt;
-    if (d < 30 * S && B.z < 6 * S && P.kickT <= 0 && P.kicks < 3) {
-      P.kickT = 1.1; P.kicks++; B.vz = 520 * S; B.vx = (B.x > b.ix ? 1 : -1) * rand(170, 300) * S; b.laugh = 0.9; b.bounce = 1;
-      if (vis) { sfx.boing(); sfx.giggle(1.05); burst(B.x, B.y - 30 * S, 'spark', 8, { size: 7, speed: 140, color: '#fff7c2' }); }
-      if (P.kicks >= 3) P.t = Math.min(P.t, 1.6);
-    }
+    ballUpdate(b, dt, L);
   } else if (P.k === 'tower') {
     const [tx, ty] = toyApproach(L, 'tower', h); b.ix += (tx - b.ix) * Math.min(1, dt * 5); b.iy += (ty - b.iy) * Math.min(1, dt * 5); b.face = -1;
     if (!P.done && P.t < P.d - 0.5) { P.done = true; knockTower(R, L, vis); b.laugh = 1.6; b.bounce = 1; if (vis) sfx.giggle(); }
@@ -157,6 +152,7 @@ export function updateNursery(dt, h) {
   const B = R.ball;
   if (B.x === null) { B.x = W * 0.63; }
   B.y = H - 115 * S;
+  if (ballHeld(h)) return; // мяч в обнимку у малыша (anim/ball.ts)
   B.vz -= 1600 * S * dt; B.z += B.vz * dt;
   if (B.z < 0) { B.z = 0; if (Math.abs(B.vz) > 140 * S) { B.vz = -B.vz * 0.55; tone(180, 0.08, { vol: 0.08 }); } else B.vz = 0; }
   B.x += B.vx * dt; B.vx *= Math.pow(0.45, dt);
@@ -242,9 +238,9 @@ export function drawHorse(L, h) {
   ctx.fillStyle = '#2a1b3d'; circle(56 * k, -124 * k, 3.5 * k);
   ctx.fillStyle = '#ffb38a'; ell(36 * k, -136 * k, 5 * k, 10 * k, -0.3);
   ctx.fillStyle = 'rgba(255,110,140,0.5)'; circle(66 * k, -112 * k, 5 * k);
-  const rider = h.occupants().find(isRider);
-  if (rider) { const [sx, sy] = HORSE_SEAT(); drawRoomBabyAt(rider, sx, sy, false); }
   ctx.restore();
+  const rider = h.occupants().find(isRider);
+  if (rider) drawHorseRider(rider, L, h); // наездник со своей позой (anim/horse.ts)
 }
 
 export function drawBlock(p) {
@@ -279,6 +275,7 @@ export function drawXylo(L, h) {
 
 export function drawBall(h) {
   const k = S, B = h.room.ball;
+  if (B.hold) return; // мяч рисует малыш, который его обнимает
   ctx.fillStyle = 'rgba(80,40,20,0.18)'; ell(B.x, B.y, 24 * k * (1 - Math.min(B.z / (400 * k), 0.5)), 6 * k);
   ctx.save(); ctx.translate(B.x, B.y - 26 * k - B.z); ctx.rotate(B.rot); drawToy('ball', 37 * k); ctx.restore();
 }
