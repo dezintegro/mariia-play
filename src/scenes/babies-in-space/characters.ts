@@ -7,6 +7,8 @@ import { LAY, roomHead } from './room';
 import { sfx } from './sounds';
 import { planet } from './space';
 import { G, RB } from './state';
+import { tickBed } from './anim/crib';
+import { tickEat } from './anim/eat';
 import { satisfy } from './wishes';
 
 // ---------------- МАЛЫШИ ----------------
@@ -48,18 +50,7 @@ export class Baby {
     this.blink = Math.max(0, this.blink - dt);
     this.love = Math.max(0, this.love - dt);
     if (this.anim) { this.anim.t -= dt; if (this.anim.t <= 0) this.anim = null; }
-    if (this.eat) {
-      const E = this.eat; E.t -= dt; E.nomT -= dt;
-      if (E.nomT <= 0 && E.t > 0.2) {
-        E.nomT = 0.32;
-        if (this.visible()) { sfx.nom(); const [hx, hy] = roomHead(this); burst(hx, hy + RB() * 0.6, 'confetti', 2, { size: 4, speed: 60, g: 400, color: pick(['#f3c98b', '#fff1c9', '#ffb38a']) }); }
-      }
-      if (E.t <= 0) {
-        this.eat = null;
-        if (this.visible()) sfx.yum();
-        if (!satisfy(this, 'eat')) { this.laugh = 1; this.bounce = 1; if (this.visible()) { const [hx, hy] = roomHead(this); burst(hx, hy, 'heart', 5, { size: 8, speed: 100, up: -60, color: '#ff7aa8' }); } }
-      }
-    }
+    tickEat(this, dt); tickBed(this, dt); // «спектакли» еды и засыпания (anim/eat.ts, anim/crib.ts)
     if (this.spinLeft > 0) { const st = Math.min(this.spinLeft, dt * 9); this.spin += st; this.spinLeft -= st; if (this.spinLeft <= 0) this.spin = 0; }
     if (this.sleeping() && this.visible()) {
       this.zT -= dt;

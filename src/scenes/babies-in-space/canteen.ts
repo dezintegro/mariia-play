@@ -7,6 +7,7 @@ import { dragWish, drawBubbles, drawDark, drawDoor, drawLamp, drawRoomBg, drawWi
 import { sfx } from './sounds';
 import { G, RB } from './state';
 import { drawToy } from './toys';
+import { catchPos, startEat } from './anim/eat';
 
 export function chairOf(h, i) { return h.occupants().find(b => b.chair === h.room.chairs[i]); }
 
@@ -82,13 +83,13 @@ export function updateCanteen(dt, h) {
   for (const F of R.flying) {
     F.p += dt / 0.7;
     if (F.b.dragged || F.b.home !== h) { F.done = true; F.b.eatPending = false; const [x, y] = foodXY(F); burst(x, y, 'spark', 8, { size: 6, speed: 100, color: '#fff' }); continue; }
-    if (F.p >= 1) { F.done = true; F.b.eatPending = false; F.b.eat = { k: F.k, t: 2, d: 2, nomT: 0 }; }
+    if (F.p >= 1) { F.done = true; F.b.eatPending = false; startEat(F.b, F.k); }
   }
   R.flying = R.flying.filter(F => !F.done);
 }
 
 export function foodXY(F) {
-  const p = clamp(F.p, 0, 1), [mx, my] = mouthPos(F.b), e = p * p * (3 - 2 * p);
+  const p = clamp(F.p, 0, 1), [mx, my] = catchPos(F.b), e = p * p * (3 - 2 * p);
   return [F.x0 + (mx - F.x0) * e, F.y0 + (my - F.y0) * e - Math.sin(p * Math.PI) * 130 * S];
 }
 
@@ -184,7 +185,7 @@ export function drawCanteen(h) {
   L.chairs.forEach((c, i) => items.push({ y: c.y, d: () => drawChair(L, i, h, hv.chair === i ? 0.6 : wk === 'eat' && !chairOf(h, i) ? hintA() : 0) }));
   for (const b of h.occupants()) if (!b.chair && !b.dragged) items.push({ y: b.iy, d: () => drawRoomBaby(b) });
   items.sort((a, b) => a.y - b.y).forEach(it => it.d());
-  for (const F of R.flying) { const [x, y] = foodXY(F); ctx.save(); ctx.translate(x, y); ctx.rotate(F.p * TAU); drawFood(F.k, 22 * S); ctx.restore(); }
+  for (const F of R.flying) { const [x, y] = foodXY(F); ctx.save(); ctx.translate(x, y); ctx.rotate(F.p * TAU); drawFood(F.k, (22 - Math.min(1, F.p) * 5) * S); ctx.restore(); }
   drawBubbles(R); drawDark(L, R);
   for (const b of h.occupants()) if (b.dragged) drawRoomBaby(b);
 }

@@ -106,7 +106,9 @@ let paused = false; // только для тестов: заморозить к
 
 function frame(now) {
   const dt = Math.min(0.05, (now - last) / 1000); last = now;
-  if (!paused) { advance(dt); update(dt); } draw();
+  // paused — для тестов: замереть на нужном кадре (__game.pause(true) или __game.paused = true)
+  if (!paused && !(window as any).__game?.paused) { advance(dt); update(dt); }
+  draw();
   if (pointer.moved) { pointer.moved = false; cv.style.cursor = G.drag && G.drag.moved ? 'grabbing' : (G.scene === 'space' ? hit : hitRoom)(pointer.x, pointer.y) ? 'pointer' : 'default'; }
   requestAnimationFrame(frame);
 }
@@ -169,7 +171,7 @@ requestAnimationFrame(frame);
 
 // Ручка для автотестов (tests/*.spec.ts): шаг симуляции без реального времени и доступ к модулям.
 (window as any).__game = {
-  G, babies, houses, picker, planet, btn,
+  G, babies, houses, picker, planet, btn, paused: false,
   step(sec: number) { for (let i = 0; i < Math.round(sec * 60); i++) { advance(1 / 60); update(1 / 60); } draw(); },
   pause(on = true) { paused = on; },
   start() { G.started = true; document.getElementById('start')!.classList.add('hide'); },

@@ -50,7 +50,8 @@ test('столовая: стульчики, кормление исполняе�
     for (const i of [1, 3]) A.onRoomTap(sl[i].x, sl[i].y, A.hitRoom(sl[i].x, sl[i].y));
     for (const k of ['fridge', 'stove']) A.onRoomTap(0, 0, { k });
     g.step(1.2); out.eating = kids.filter((b: any) => b.eat).length;
-    g.step(2); out.loved = kids.filter((b: any) => b.love > 0).length; out.wishesLeft = kids.filter((b: any) => b.wish).length;
+    // еда теперь — «спектакль» ~5.5 с (поймал → 3 укуса → животик), поэтому ждём дольше
+    g.step(5.5); out.loved = kids.filter((b: any) => b.love > 0).length; out.wishesLeft = kids.filter((b: any) => b.wish).length;
     return out;
   });
   expect(r).toEqual({ scene: 'room', inChairs: 2, eating: 2, loved: 2, wishesLeft: 0 });
