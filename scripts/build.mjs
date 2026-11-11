@@ -10,7 +10,7 @@ for (const [i, page] of PAGES.entries()) {
     base: './',
     logLevel: 'warn',
     plugins: [viteSingleFile({ removeViteModuleLoader: true })],
-    build: { outDir: 'dist', emptyOutDir: i === 0, copyPublicDir: i === 0, rollupOptions: { input: page } },
+    build: { target: ['es2017', 'safari12'], outDir: 'dist', emptyOutDir: i === 0, copyPublicDir: i === 0, rollupOptions: { input: page } },
   });
   console.log('built', page);
 }

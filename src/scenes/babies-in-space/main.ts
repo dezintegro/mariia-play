@@ -149,10 +149,17 @@ cv.addEventListener('pointercancel', endDrag);
 
 cv.addEventListener('pointerleave', () => { if (!G.drag) { pointer.x = -9999; pointer.y = -9999; } });
 
-document.getElementById('start').addEventListener('pointerdown', () => {
-  G.started = true; initAudio(); sfx.yay();
-  document.getElementById('start').classList.add('hide');
-});
+// Старт: сначала убираем заставку и запускаем игру, звук — потом и «мягко» (ошибка звука не должна блокировать игру).
+// Слушаем и pointerdown, и touchend/click — на старых мобильных браузерах pointer-событий может не быть.
+function startGame(e?: Event) {
+  if (G.started) return;
+  if (e && e.cancelable) e.preventDefault();
+  G.started = true;
+  document.getElementById('start')!.classList.add('hide');
+  initAudio();
+  try { sfx.yay(); } catch (_) {}
+}
+for (const ev of ['pointerdown', 'touchend', 'click']) document.getElementById('start')!.addEventListener(ev, startGame);
 
 addEventListener('resize', resize);
 

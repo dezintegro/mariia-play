@@ -3,12 +3,23 @@ export let AC: AudioContext | null = null;
 export let master: GainNode | null = null;
 export let soundOn = true;
 export function toggleSound() { soundOn = !soundOn; return soundOn; }
+// Старые мобильные Safari: webkitAudioContext.resume() может вернуть не Promise — не полагаемся на .catch
+function wake() {
+  try { const p: any = AC && AC.state !== 'running' ? AC.resume() : null; if (p && p.catch) p.catch(() => {}); } catch (e) { /* звук не обязателен */ }
+}
+/** Создать/разбудить звук. Никогда не бросает исключений: без звука игра всё равно работает. */
 export function initAudio() {
-  if (!AC || AC.state === 'closed') {
-    AC = new (window.AudioContext || (window as any).webkitAudioContext)();
-    master = AC.createGain(); master.gain.value = 0.55; master.connect(AC.destination);
-  }
-  if (AC.state !== 'running') AC.resume().catch(() => {});
+  try {
+    if (!AC || AC.state === 'closed') {
+      const Ctor = window.AudioContext || (window as any).webkitAudioContext;
+      if (!Ctor) return;
+      AC = new Ctor();
+      master = AC.createGain(); master.gain.value = 0.55; master.connect(AC.destination);
+      // iOS: короткий беззвучный буфер «разблокирует» звук внутри жеста пользователя
+      const s = AC.createBufferSource(); s.buffer = AC.createBuffer(1, 1, 22050); s.connect(AC.destination); s.start(0);
+    }
+    wake();
+  } catch (e) { console.warn('audio', e); }
 }
 // браузер может «усыпить» звук, когда вкладка скрыта, — будим при возвращении
 document.addEventListener('visibilitychange', () => { if (!document.hidden && AC) initAudio(); });
@@ -21,7 +32,7 @@ export function tone(f: number, dur: number, o: ToneOpts = {}) {
 }
 function tone0(f: number, dur: number, o: ToneOpts) {
   if (!AC || !master || !soundOn || !isFinite(f) || !isFinite(dur)) return;
-  if (AC.state !== 'running') AC.resume().catch(() => {});
+  wake();
   const t0 = o.at != null ? o.at : AC.currentTime + (o.delay || 0);
   const osc = AC.createOscillator(), g = AC.createGain();
   osc.type = o.type || 'sine';
