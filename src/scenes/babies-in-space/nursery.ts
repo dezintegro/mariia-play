@@ -8,6 +8,8 @@ import { sfx } from './sounds';
 import { G, RB } from './state';
 import { drawToy } from './toys';
 import { satisfy } from './wishes';
+import { TDUR, drawTowerBuild, towerSpot, towerStart, towerTick, towerUpdate, towerWobble } from './anim/tower';
+import { XDUR, drawMallet, xyloSpot, xyloStart, xyloUpdate } from './anim/xylo';
 
 // ---------------- КОМНАТА (ЯСЛИ) ----------------
 export function RL() {
@@ -60,8 +62,8 @@ export function toyBusy(h, k, except?) { return h.occupants().some(b => b !== ex
 
 export function toyApproach(L, k, h) {
   if (k === 'horse') return [L.horse.x + 80 * S, L.horse.y + 8 * S];
-  if (k === 'xylo') return [L.xylo.x, L.xylo.y - 24 * S];
-  if (k === 'tower') return [L.tower.x + 55 * S, L.tower.y - 2 * S];
+  if (k === 'xylo') return xyloSpot(L);
+  if (k === 'tower') return towerSpot(L);
   const B = h.room.ball, bx = B.x == null ? W * 0.63 : B.x;
   return [bx + (bx > W * 0.5 ? -45 : 45) * S, H - 109 * S];
 }
@@ -82,6 +84,7 @@ export function toyAt(x, y, L, h) {
 }
 
 export function knockTower(R, L, vis) {
+  if (towerWobble(R, vis)) return; // башню сейчас строят — только качнётся
   R.tower = towerRest(L).map(p => ({ ...p, vx: rand(-220, 220) * S, vy: rand(-380, -120) * S, vr: rand(-7, 7), floor: L.tower.y - 18 * S + rand(-10, 25) * S }));
   R.towerT = 0; if (vis) sfx.crash();
 }
@@ -93,17 +96,18 @@ export function hitXylo(R, L, i, vis) {
 }
 
 export function startPlay(b, k) {
-  const h = b.home, L = RL(), R = h.room, d = { horse: 6, xylo: 5, ball: 9, tower: 2.6 }[k];
-  b.play = { k, phase: 'do', t: d, d, clopT: 0, noteT: 0.25, n: 0, kicks: 0, kickT: 0, done: k === 'tower' && !!R.tower };
+  const h = b.home, L = RL(), R = h.room, d = { horse: 6, xylo: XDUR, ball: 9, tower: TDUR }[k];
+  b.play = { k, phase: 'do', t: d, d, clopT: 0, noteT: 0.25, n: 0, kicks: 0, kickT: 0 };
   b.ifall = false; b.awake = 3; b.laugh = 0.8;
   if (k === 'horse') { R.horse = 1; b.ix = L.horse.x; b.iy = L.horse.y + 2 * S; }
-  else if (k === 'xylo') [b.ix, b.iy] = toyApproach(L, 'xylo', h);
+  else if (k === 'xylo') { [b.ix, b.iy] = toyApproach(L, 'xylo', h); xyloStart(b, L); }
+  else if (k === 'tower') towerStart(b, L);
   if (b.visible()) sfx.pick();
   satisfy(b, 'play');
 }
 
 export function endPlay(b, L) {
-  const k = b.play.k; b.play = null;
+  const k = b.play.k; b.play = null; b.pose = null;
   if (k === 'horse') { b.ix = L.horse.x + 80 * S; b.iy = L.horse.y + 10 * S; b.bounce = 1; }
   b.iwx = b.ix; b.iwy = b.iy; b.iwT = rand(1.5, 3);
 }
@@ -121,8 +125,7 @@ export function updatePlay(b, dt, L) {
   if (P.k === 'horse') {
     R.horse = 1; P.clopT -= dt; if (P.clopT <= 0) { P.clopT = 0.75; if (vis) sfx.clop(); }
   } else if (P.k === 'xylo') {
-    [b.ix, b.iy] = toyApproach(L, 'xylo', h);
-    P.noteT -= dt; if (P.noteT <= 0) { P.noteT = 0.3; hitXylo(R, L, XTUNE[P.n++ % XTUNE.length], vis); }
+    xyloUpdate(b, L); // anim/xylo.ts
   } else if (P.k === 'ball') {
     const B = R.ball, [tx, ty] = toyApproach(L, 'ball', h), dx = tx - b.ix, dy = ty - b.iy, d = Math.hypot(dx, dy);
     if (d > 4 * S) { const sp = Math.min(110 * S * dt, d); b.ix += dx / d * sp; b.iy += dy / d * sp; }
@@ -134,8 +137,7 @@ export function updatePlay(b, dt, L) {
       if (P.kicks >= 3) P.t = Math.min(P.t, 1.6);
     }
   } else if (P.k === 'tower') {
-    const [tx, ty] = toyApproach(L, 'tower', h); b.ix += (tx - b.ix) * Math.min(1, dt * 5); b.iy += (ty - b.iy) * Math.min(1, dt * 5); b.face = -1;
-    if (!P.done && P.t < P.d - 0.5) { P.done = true; knockTower(R, L, vis); b.laugh = 1.6; b.bounce = 1; if (vis) sfx.giggle(); }
+    towerUpdate(b, L); // anim/tower.ts
   }
   if (P.t <= 0) endPlay(b, L);
 }
@@ -144,6 +146,7 @@ export function updateNursery(dt, h) {
   const R = h.room, L = RL();
   R.horse = Math.max(0, R.horse - dt * 0.5); R.teddy = Math.max(0, R.teddy - dt * 1.2);
   for (let i = 0; i < 6; i++) R.xylo[i] = Math.max(0, R.xylo[i] - dt * 4);
+  towerTick(dt, h, L);
   for (const c of R.cribs) { c.spinV = Math.max(0, c.spinV - dt * 0.4); c.spin += (0.4 + c.spinV * 3) * dt; }
   if (R.tower) {
     R.towerT += dt;
@@ -259,6 +262,7 @@ export function drawBlock(p) {
 export function drawTower(L, h) {
   const R = h.room;
   ctx.fillStyle = 'rgba(80,40,20,0.15)'; ell(L.tower.x, L.tower.y + 2 * S, 34 * S, 7 * S);
+  if (R.tb) { drawTowerBuild(L, R); return; } // малыш строит башню (anim/tower.ts)
   (R.tower || towerRest(L)).forEach(drawBlock);
 }
 
@@ -272,9 +276,7 @@ export function drawXylo(L, h) {
     ctx.fillStyle = 'rgba(255,255,255,0.35)'; ctx.fillRect(b.x - b.w / 2 + 4 * k, b.y - b.h / 2 + pr + 4 * k, 4 * k, b.h - 8 * k);
     ctx.fillStyle = '#ddd'; circle(b.x, b.y - b.h / 2 + 8 * k + pr, 2.5 * k); circle(b.x, b.y + b.h / 2 - 8 * k + pr, 2.5 * k);
   });
-  ctx.strokeStyle = '#c98b5a'; ctx.lineWidth = 5 * k; ctx.lineCap = 'round';
-  ctx.beginPath(); ctx.moveTo(p.x + p.w / 2 + 14 * k, p.y + 30 * k); ctx.lineTo(p.x + p.w / 2 + 50 * k, p.y - 5 * k); ctx.stroke();
-  ctx.fillStyle = '#ff6b6b'; circle(p.x + p.w / 2 + 52 * k, p.y - 7 * k, 9 * k);
+  drawMallet(L, h); // палочка: на полу или в ладошке (anim/xylo.ts)
 }
 
 export function drawBall(h) {
