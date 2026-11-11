@@ -161,7 +161,12 @@ function startGame(e?: Event) {
 }
 for (const ev of ['pointerdown', 'touchend', 'click']) document.getElementById('start')!.addEventListener(ev, startGame);
 
+// размер экрана меняется: поворот телефона, появление/скрытие панелей браузера
 addEventListener('resize', resize);
+addEventListener('orientationchange', () => setTimeout(resize, 250));
+window.visualViewport?.addEventListener('resize', resize);
+// iOS игнорирует user-scalable=no: гасим жест «щипок» и двойной тап, чтобы страница не увеличивалась
+for (const ev of ['gesturestart', 'gesturechange', 'dblclick']) document.addEventListener(ev, e => e.preventDefault(), { passive: false });
 
 resize();
 

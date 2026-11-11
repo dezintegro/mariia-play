@@ -2,13 +2,14 @@
 <html lang="ru">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <title>Малыши в космосе</title>
 <link rel="icon" href="data:,">
 <style>
   html,body{margin:0;height:100%;overflow:hidden;background:#0b0a2e;touch-action:none;
     user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent}
-  canvas{display:block;width:100vw;height:100vh}
+  html,body{position:fixed;inset:0;overscroll-behavior:none}
+  canvas{display:block;position:fixed;left:0;top:0;width:100vw;height:100vh;height:100dvh;touch-action:none}
   #start{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;
     background:rgba(11,10,46,.55);cursor:pointer;transition:opacity .5s}
   #start.hide{opacity:0;pointer-events:none}

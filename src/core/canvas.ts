@@ -9,8 +9,13 @@ export let W = 0, H = 0, DPR = 1, S = 1, BR = 26;
 export let t = 0;
 export function advance(dt: number) { t += dt; }
 export function resizeCanvas() {
-  DPR = Math.min(window.devicePixelRatio || 1, 2); W = innerWidth; H = innerHeight;
-  cv.width = W * DPR; cv.height = H * DPR; ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  // На телефонах 100vh больше видимой области (панели браузера), поэтому размер берём из реально видимой
+  // области и задаём холсту явно в пикселях — тогда картинка не растягивается и не уходит под панели.
+  const vv = window.visualViewport;
+  W = Math.round(vv ? vv.width : innerWidth); H = Math.round(vv ? vv.height : innerHeight);
+  DPR = Math.min(window.devicePixelRatio || 1, 2);
+  cv.style.width = W + 'px'; cv.style.height = H + 'px';
+  cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR); ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
   S = Math.min(W, H) / 720; BR = 26 * S;
 }
 export const rand = (a: number, b: number) => a + Math.random() * (b - a);
