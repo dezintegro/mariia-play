@@ -271,7 +271,7 @@ export function exitRoom() {
 }
 
 export function startDrag(b) {
-  b.dragged = true; b.target = null; b.ifall = false;
+  b.dragged = true; b.target = null; b.ifall = false; b.pose = null;
   if (b.toy) { const z = b.toy; z.held = null; z.released = true; z.vx = rand(-60, 60) * S; z.vy = -50 * S; b.toy = null; }
   b.crib = null; b.chair = null; b.play = null; b.pose = null; b.eat = null; b.eatPending = false;
   sfx.pick();

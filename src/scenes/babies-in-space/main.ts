@@ -58,7 +58,7 @@ function update(dt) {
   if (G.scene === 'room') {
     updateRoom(dt);
     // малыши в комнате не слипаются
-    const rb = G.curHouse.occupants().filter(b => !b.dragged && !b.crib && !b.chair && !b.ifall && !(b.play && b.play.phase === 'do' && (b.play.k === 'horse' || b.play.k === 'xylo'))), Lr = LAY(G.curHouse), m = RB() * 1.9;
+    const rb = G.curHouse.occupants().filter(b => !b.dragged && !b.crib && !b.chair && !b.ifall && !(b.play && b.play.phase === 'do' && (b.play.k === 'horse' || b.play.k === 'xylo' || b.play.k === 'tower'))), Lr = LAY(G.curHouse), m = RB() * 1.9;
     for (let i = 0; i < rb.length; i++) for (let j = i + 1; j < rb.length; j++) {
       const a = rb[i], b = rb[j], dx = b.ix - a.ix, dy = (b.iy - a.iy) * 2, d = Math.hypot(dx, dy) || 1;
       if (d < m) { const f = (m - d) * 2 * dt; a.ix -= dx / d * f; b.ix += dx / d * f; a.iy -= dy / d * f * 0.5; b.iy += dy / d * f * 0.5; }
