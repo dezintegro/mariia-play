@@ -7,7 +7,7 @@ import { G, RB, babies } from './state';
 import { drawToy } from './toys';
 
 // ---------------- ЖЕЛАНИЯ МАЛЫШЕЙ ----------------
-export const WISHES = ['sleep', 'play', 'eat'], WISH_LIFE = 40, MAX_WISHES = 3;
+export const WISHES = ['sleep', 'play', 'eat'], WISH_LIFE = 90, MAX_WISHES = 2;
 
 export function headPos(b) { return b.home ? roomHead(b) : [b.x, b.y]; }
 
@@ -19,7 +19,12 @@ export function wishPos(b) {
 export function updateWishes(dt) {
   let active = babies.filter(b => b.wish && b.visible()).length;
   for (const b of babies) {
-    if (b.wish) { b.wish.t -= dt; if (b.wish.t <= 0) { b.wish = null; b.wishT = rand(15, 35); } continue; }
+    if (b.wish) {
+      // таймер желания стоит, пока малыша тащат, идёт переход или малыш не на экране
+      if (b.visible() && !b.dragged && !G.trans) b.wish.t -= dt;
+      if (b.wish.t <= 0) { b.wish = null; b.wishT = rand(45, 90); }
+      continue;
+    }
     if (!b.visible() || b.dragged || G.trans || t - b.born < 3) continue;
     b.wishT -= dt; if (b.wishT > 0) continue;
     if (active >= MAX_WISHES || b.sleeping() || b.love > 0) { b.wishT = rand(3, 7); continue; }
@@ -33,7 +38,7 @@ export function updateWishes(dt) {
 export function satisfy(b, k) {
   if (!b.wish || b.wish.k !== k) return false;
   const vis = b.visible(), [wx, wy] = wishPos(b);
-  b.wish = null; b.wishT = rand(25, 50); b.love = 2.8;
+  b.wish = null; b.wishT = rand(60, 100); b.love = 2.8;
   const seated = b.crib || b.chair || (b.play && b.play.phase === 'do' && (b.play.k === 'horse' || b.play.k === 'xylo'));
   if (!seated) b.anim = { k: 'joy', t: 2.4, d: 2.4 };
   if (!vis) return true;

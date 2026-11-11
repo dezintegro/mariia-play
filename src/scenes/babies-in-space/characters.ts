@@ -30,7 +30,7 @@ export class Baby {
     this.home = null; this.dragged = false; this.crib = null;
     this.ix = 0; this.iy = 0; this.iwx = 0; this.iwy = 0; this.iwT = 0; this.ifall = false; this.ivy = 0; this.ifloor = 0;
     // анимации по тапу, желания, игра, еда
-    this.tapN = 0; this.anim = null; this.love = 0; this.wish = null; this.wishT = rand(8, 30);
+    this.tapN = 0; this.anim = null; this.love = 0; this.wish = null; this.wishT = rand(15, 45);
     this.chair = null; this.play = null; this.eat = null; this.eatPending = false;
   }
   hitR() { return BR * ({ rocket: 2.3, ufo: 2.4, bubble: 2.2, moon: 2.7, suit: 2.0 }[this.type]); }
@@ -184,6 +184,7 @@ export function drawHead(r, b, mood, look, o: any = {}) {
   ctx.fillStyle = g; circle(0, 0, r);
   ctx.lineCap = 'round';
   if (!o.noHair) { ctx.strokeStyle = b.hair; ctx.lineWidth = r * 0.11; ctx.beginPath(); ctx.arc(r * 0.1, -r * 1.0, r * 0.16, Math.PI * 0.6, Math.PI * 2.2); ctx.stroke(); }
+  if (o.cheeks) { const q = o.cheeks; ctx.fillStyle = b.skin; for (const s of [-1, 1]) circle(s * r * (0.5 + q * 0.08), r * 0.3, r * (0.2 + q * 0.12)); }
   ctx.fillStyle = 'rgba(255,110,140,0.45)';
   ell(-r * 0.55, r * 0.32, r * 0.19, r * 0.13); ell(r * 0.55, r * 0.32, r * 0.19, r * 0.13);
   const ex = r * 0.36, ey = -r * 0.02;
@@ -207,6 +208,8 @@ export function drawHead(r, b, mood, look, o: any = {}) {
     if (Math.sin(t * 16) > 0) { ctx.fillStyle = '#c93d5c'; ell(0, r * 0.4, r * 0.15, r * 0.13); }
     else { ctx.strokeStyle = '#3a2540'; ctx.beginPath(); ctx.arc(0, r * 0.3, r * 0.14, 0.15 * Math.PI, 0.85 * Math.PI); ctx.stroke(); }
     ctx.fillStyle = 'rgba(255,110,140,0.35)'; ell(-r * 0.5, r * 0.36, r * 0.22, r * 0.16); ell(r * 0.5, r * 0.36, r * 0.22, r * 0.16);
+  } else if (o.yawn) {
+    ctx.fillStyle = '#c93d5c'; ell(0, r * 0.38, r * 0.13 + o.yawn * r * 0.05, r * 0.08 + o.yawn * r * 0.16);
   } else if (o.paci) {
     ctx.fillStyle = '#7ec8ff'; ell(0, r * 0.45, r * 0.27, r * 0.15);
     ctx.strokeStyle = '#ffd66b'; ctx.lineWidth = r * 0.06; ctx.beginPath(); ctx.arc(0, r * 0.62, r * 0.11, 0, TAU); ctx.stroke();
@@ -218,11 +221,20 @@ export function drawHead(r, b, mood, look, o: any = {}) {
   }
 }
 
-export function drawBody(r, b, waveL, waveR, suit) {
+/**
+ * Тело малыша в координатах головы (центр головы = 0,0; ноги вниз до ~2.4r).
+ * waveL/waveR — подъём рук (0 — вдоль тела, ~1.6 — в стороны, ~2.6 — вверх).
+ * legs: { legL, legR } — поворот ног от бедра (рад, + = вперёд/вверх для правой... см. armHand/legFoot).
+ */
+export function drawBody(r, b, waveL, waveR, suit, legs: any = {}) {
   const c = suit ? '#eef1fb' : b.color, hand = suit ? '#aab3d6' : b.skin;
-  ctx.fillStyle = c;
-  ell(-r * 0.36, r * 2.0, r * 0.27, r * 0.38, 0.25); ell(r * 0.36, r * 2.0, r * 0.27, r * 0.38, -0.25);
-  ctx.fillStyle = hand; ell(-r * 0.46, r * 2.33, r * 0.22, r * 0.15); ell(r * 0.46, r * 2.33, r * 0.22, r * 0.15);
+  for (const s of [-1, 1]) {
+    const a = (s < 0 ? legs.legL : legs.legR) || 0;
+    ctx.save(); ctx.translate(s * r * 0.3, r * 1.75); ctx.rotate(-s * a);
+    ctx.fillStyle = c; ell(s * r * 0.06, r * 0.25, r * 0.27, r * 0.38, s * -0.25);
+    ctx.fillStyle = hand; ell(s * r * 0.16, r * 0.58, r * 0.22, r * 0.15);
+    ctx.restore();
+  }
   for (const s of [-1, 1]) {
     ctx.save(); ctx.translate(s * r * 0.55, r * 1.05); ctx.rotate(-s * (0.55 + (s < 0 ? waveL : waveR)));
     ctx.fillStyle = c; ell(0, r * 0.35, r * 0.2, r * 0.38);
@@ -391,11 +403,40 @@ export function drawRoomBabyAt(b, ox, oy, shadow) {
   ctx.save(); ctx.translate(ox, oy + X.dy); ctx.scale(bnc * X.sx, bnc * X.sy);
   ctx.translate(0, -r * 1.2); ctx.rotate(X.rot); ctx.translate(0, r * 1.2);
   ctx.translate(0, -r * 2.4 - crawl); ctx.rotate(b.dragged ? Math.sin(t * 6) * 0.15 : 0);
-  drawBody(r, b, wl, wr, false);
-  drawHead(r, b, mood, look, { noHair: b.type === 'rocket' || b.type === 'moon', paci: b.type === 'bubble' && mood !== 'laugh' });
+  const P = b.pose; // поза от «спектакля» игры (см. ниже POSE)
+  if (P) {
+    if (P.armL != null) wl = P.armL; if (P.armR != null) wr = P.armR;
+    ctx.translate(P.dx || 0, P.dy || 0); ctx.rotate(P.lean || 0);
+  }
+  if (P && P.back) P.back(r);
+  drawBody(r, b, wl, wr, false, P || {});
+  if (P && P.front) P.front(r); // перед телом, но за головой (например, предмет в руках у груди)
+  ctx.save(); if (P && P.headTilt) ctx.rotate(P.headTilt);
+  drawHead(r, b, (P && P.mood) || mood, look, { noHair: b.type === 'rocket' || b.type === 'moon', paci: b.type === 'bubble' && mood !== 'laugh', ...(P && P.face) });
   drawAccessory(r, b);
-  if (b.eat) { const pr = 1 - b.eat.t / b.eat.d; ctx.save(); ctx.translate(0, r * 0.7); const q = Math.max(0.05, 1 - pr * 0.85); ctx.scale(q, q); drawFood(b.eat.k, r * 0.42); ctx.restore(); }
   ctx.restore();
+  if (P && P.top) P.top(r); // поверх всего (предмет у рта, ладошки на глазах)
+  if (b.eat && !(P && P.ownsFood)) { const pr = 1 - b.eat.t / b.eat.d; ctx.save(); ctx.translate(0, r * 0.7); const q = Math.max(0.05, 1 - pr * 0.85); ctx.scale(q, q); drawFood(b.eat.k, r * 0.42); ctx.restore(); }
+  ctx.restore();
+}
+
+/*
+ * POSE — как управлять малышом в комнате из логики игры (b.pose = {...} каждый кадр, null — обычное поведение):
+ *   armL/armR  подъём рук (см. drawBody), legL/legR поворот ног,
+ *   dx/dy      сдвиг всего малыша (в координатах головы, px), lean — наклон тела, headTilt — наклон головы,
+ *   mood       'open'|'blink'|'laugh'|'sleep'|'love'|'eat' — выражение лица,
+ *   face       доп. опции drawHead: { cheeks: 0..1 (надутые щёки), yawn: 0..1 (зевок) },
+ *   back(r)/front(r)/top(r) — дорисовать предмет за телом / перед телом / поверх головы,
+ *   ownsFood   true — еду в руках рисует сама поза (через front/top), а не стандартный код.
+ * Координаты рук/ног для предметов: armHand(r, side, wave), legFoot(r, side, a).
+ */
+export function armHand(r, side: -1 | 1, wave: number): [number, number] {
+  const a = -side * (0.55 + wave);
+  return [side * r * 0.55 - Math.sin(a) * r * 0.72, r * 1.05 + Math.cos(a) * r * 0.72];
+}
+export function legFoot(r, side: -1 | 1, legA = 0): [number, number] {
+  const a = -side * legA, fx = side * r * 0.16, fy = r * 0.58;
+  return [side * r * 0.3 + fx * Math.cos(a) - fy * Math.sin(a), r * 1.75 + fx * Math.sin(a) + fy * Math.cos(a)];
 }
 
 // три разные реакции малыша на тап — по кругу: кувырок, танец, прыжок

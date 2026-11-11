@@ -30,7 +30,7 @@ test('космос: выбор здания, 3 реакции малыша и п
     g.step(1);
     return out;
   });
-  expect(r).toMatchObject({ pickerOpen: true, firstKind: 'canteen', pickerAfter: false, babies: 16, anims: ['spin', 'dance', 'jump'], planetHop: true, wishes: 3 });
+  expect(r).toMatchObject({ pickerOpen: true, firstKind: 'canteen', pickerAfter: false, babies: 16, anims: ['spin', 'dance', 'jump'], planetHop: true, wishes: 2 });
   await shot(page, 'space');
   noErrors(errors);
 });
