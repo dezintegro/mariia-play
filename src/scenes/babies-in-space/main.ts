@@ -104,8 +104,9 @@ function draw() {
 let last = performance.now();
 
 function frame(now) {
-  const dt = Math.min(0.05, (now - last) / 1000); last = now; advance(dt);
-  update(dt); draw();
+  const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  if (!(window as any).__game?.paused) { advance(dt); update(dt); } // paused — для тестов: замереть на нужном кадре
+  draw();
   if (pointer.moved) { pointer.moved = false; cv.style.cursor = G.drag && G.drag.moved ? 'grabbing' : (G.scene === 'space' ? hit : hitRoom)(pointer.x, pointer.y) ? 'pointer' : 'default'; }
   requestAnimationFrame(frame);
 }
@@ -168,7 +169,7 @@ requestAnimationFrame(frame);
 
 // Ручка для автотестов (tests/*.spec.ts): шаг симуляции без реального времени и доступ к модулям.
 (window as any).__game = {
-  G, babies, houses, picker, planet, btn,
+  G, babies, houses, picker, planet, btn, paused: false,
   step(sec: number) { for (let i = 0; i < Math.round(sec * 60); i++) { advance(1 / 60); update(1 / 60); } draw(); },
   start() { G.started = true; document.getElementById('start')!.classList.add('hide'); },
   api: { launchBaby, launchHouse, enterRoom, exitRoom, tapBaby, tapPlanet, tapRoomBaby, onTap, onRoomTap, hit, hitRoom,

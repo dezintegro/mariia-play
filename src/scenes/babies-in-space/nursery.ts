@@ -7,6 +7,7 @@ import { roomHead } from './room';
 import { sfx } from './sounds';
 import { G, RB } from './state';
 import { drawToy } from './toys';
+import { drawBedtime } from './anim/crib';
 import { satisfy } from './wishes';
 
 // ---------------- КОМНАТА (ЯСЛИ) ----------------
@@ -204,7 +205,8 @@ export function drawCrib(L, i, h, hover) {
   for (let x = x0 + 22 * k; x < x0 + cw - 12 * k; x += 18 * k) { ctx.beginPath(); ctx.moveTo(x, top + 10 * k); ctx.lineTo(x, mat); ctx.stroke(); }
   ctx.fillStyle = '#d7f0ff'; ctx.beginPath(); ctx.roundRect(x0 + 8 * k, mat - 14 * k, cw - 16 * k, 24 * k, 8 * k); ctx.fill();
   const b = cribOf(h, i);
-  if (b) {
+  if (b && b.bed) drawBedtime(b); // засыпает (anim/crib.ts)
+  else if (b) {
     const [hx, hy] = roomHead(b), r = RB() * 0.8;
     ctx.fillStyle = '#fff'; ell(hx, mat - 12 * k, r * 1.1, r * 0.45);
     if (b.love > 0) halo(hx, hy, r * 2.4, b.love);

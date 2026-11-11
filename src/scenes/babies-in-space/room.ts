@@ -10,9 +10,11 @@ import { sfx } from './sounds';
 import { btn, smallStars } from './space';
 import { G, RB } from './state';
 import { satisfy } from './wishes';
+import { bedHead, startBedtime } from './anim/crib';
 
 export function roomHead(b) {
   const r = RB();
+  if (b.crib && b.bed) return bedHead(b);
   if (b.crib) { const L = RL(), c = L.cribs[b.crib.i]; return [c.x - L.cw * 0.22, c.y - 72 * S]; }
   if (b.chair) { const c = KL().chairs[b.chair.i]; return [c.x, c.y - CHAIR_SEAT() - 14 * S - r * 2.4]; }
   if (isRider(b)) {
@@ -301,7 +303,7 @@ export function dropBaby(b, x, y) {
     h.room.doorOpen = 1; whoosh(0.7, 0.2); sfx.yay(); burst(d.x + d.w / 2, d.y + d.h / 2, 'spark', 18, { size: 8, speed: 200, color: '#fff7c2' });
     return;
   }
-  if (tg.crib != null) { const i = tg.crib; b.crib = h.room.cribs[i]; b.awake = 0; b.laugh = 0; h.room.cribs[i].spinV = 1.5; sfx.musicBox(); satisfy(b, 'sleep'); return; }
+  if (tg.crib != null) { const i = tg.crib; b.crib = h.room.cribs[i]; startBedtime(b); h.room.cribs[i].spinV = 1.5; sfx.musicBox(); satisfy(b, 'sleep'); return; }
   if (tg.chair != null) {
     const i = tg.chair, c = L.chairs[i]; b.chair = h.room.chairs[i]; b.ix = c.x; b.iy = c.y; h.room.chairs[i].wob = 0.6;
     b.laugh = 0.8; b.bounce = 1; sfx.pick(); tone(880, 0.2, { type: 'triangle', vol: 0.1, delay: 0.12 }); return;
