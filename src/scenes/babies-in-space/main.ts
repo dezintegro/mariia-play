@@ -1,4 +1,4 @@
-import { initAudio } from '../../core/audio';
+import { AC, initAudio } from '../../core/audio';
 import { H, S, TAU, W, advance, clamp, ctx, cv, dist, easeOutBack, pick, pointer, rand, resizeCanvas, t } from '../../core/canvas';
 import { circle, drawButton } from '../../core/draw';
 import { addP, drawParticles, updateParticles } from '../../core/particles';
@@ -186,6 +186,8 @@ requestAnimationFrame(frame);
   G, babies, houses, picker, planet, btn, paused: false,
   step(sec: number) { for (let i = 0; i < Math.round(sec * 60); i++) { advance(1 / 60); update(1 / 60); } draw(); },
   pause(on = true) { paused = on; },
+  audio() { return AC ? AC.state : 'none'; },
+  suspendAudio() { AC && AC.suspend(); },
   start() { G.started = true; document.getElementById('start')!.classList.add('hide'); },
   api: { launchBaby, launchHouse, enterRoom, exitRoom, tapBaby, tapPlanet, tapRoomBaby, onTap, onRoomTap, hit, hitRoom,
     startDrag, moveDrag, dropBaby, RL, KL, traySlots, houseAt, roomHead },

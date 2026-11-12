@@ -20,7 +20,7 @@ export let lulI = 0, lulNext = 0;
 export function updLullaby() {
   if (!AC || !soundOn || G.nightTarget < 1) { lulNext = 0; lulI = 0; return; }
   const now = AC.currentTime;
-  if (lulNext < now) lulNext = now + 0.4;
+  if (lulNext < now || lulNext > now + 5) lulNext = now + 0.4; // > now+5: звук пересоздан, время пошло с нуля
   while (lulNext < now + 0.3) {
     const [n, len] = MEL[lulI], dur = len * 0.55;
     if (n !== null) {
