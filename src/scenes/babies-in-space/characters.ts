@@ -366,10 +366,8 @@ export function drawAccessory(r, b) {
     ctx.strokeStyle = '#7be08a'; ctx.lineWidth = r * 0.1; ctx.lineCap = 'round';
     for (const s of [-1, 1]) { ctx.beginPath(); ctx.moveTo(s * r * 0.4, -r * 0.85); ctx.lineTo(s * r * 0.65, -r * 1.45); ctx.stroke(); }
     ctx.fillStyle = '#ffd66b'; circle(-r * 0.65, -r * 1.45, r * 0.15); circle(r * 0.65, -r * 1.45, r * 0.15);
-  } else if (b.type === 'suit') {
-    ctx.strokeStyle = '#e4ecff'; ctx.lineWidth = r * 0.08; ctx.beginPath(); ctx.moveTo(r * 0.5, -r * 0.85); ctx.lineTo(r * 0.75, -r * 1.4); ctx.stroke();
-    ctx.fillStyle = Math.sin(t * 5 + b.phase) > 0 ? '#ff5d73' : '#ffd66b'; circle(r * 0.75, -r * 1.4, r * 0.14);
   }
+  // suit: в комнате шлем снят — антенна была на шлеме, поэтому на голове её нет
 }
 
 export function babyMood(b) { return b.love > 0 ? 'love' : b.laugh > 0 || b.dragged ? 'laugh' : b.eat ? 'eat' : b.sleeping() ? 'sleep' : b.blink > 0 ? 'blink' : 'open'; }

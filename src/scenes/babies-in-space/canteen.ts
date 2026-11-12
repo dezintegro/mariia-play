@@ -23,12 +23,12 @@ export function KL() {
     chairs: [0, 1, 2].map(i => ({ x: x0 + (x1 - x0) * (i + 0.5) / 3, y: cy })),
     fridge: { x: W - 75 * k, y: fy + 20 * k, w: 115 * k, h: 215 * k },
     stove: { x: door.x + doorW + 72 * k, y: fy + 18 * k },
-    tray: { x: W * 0.55, y: H - 48 * k, w: Math.min(360 * k, W - 2 * (door.x + doorW * 0.5)) },
+    tray: { x: W * 0.55, y: H - 48 * k, w: Math.min(450 * k, W - 2 * (door.x + doorW * 0.5)) },
     bx0: door.x + doorW + 40 * k, bx1: W - 50 * k, by0: fy + 70 * k, by1: H - 30 * k,
   };
 }
 
-export function traySlots(L) { const p = L.tray, n = FOODS.length, sw = p.w / n; return FOODS.map((_, i) => ({ x: p.x - p.w / 2 + sw * (i + 0.5), y: p.y - 34 * S })); }
+export function traySlots(L) { const p = L.tray, n = FOODS.length, sw = p.w / n; return FOODS.map((_, i) => ({ x: p.x - p.w / 2 + sw * (i + 0.5), y: p.y - 44 * S })); }
 
 export function drawFood(kind, s) {
   if (kind === 'bottle') { drawToy('bottle', s * 0.8); return; }
@@ -166,15 +166,15 @@ export function drawChair(L, i, h, glow) {
 export function drawTray(L, h) {
   const k = S, p = L.tray, R = h.room;
   ctx.fillStyle = 'rgba(80,40,20,0.15)'; ell(p.x, p.y + 30 * k, p.w * 0.55, 9 * k);
-  ctx.fillStyle = '#a66f45'; for (const dx of [-0.42, 0.42]) ctx.fillRect(p.x + p.w * dx - 6 * k, p.y, 12 * k, 30 * k);
-  ctx.fillStyle = '#c98b5a'; ctx.beginPath(); ctx.roundRect(p.x - p.w / 2 - 10 * k, p.y - 12 * k, p.w + 20 * k, 18 * k, 8 * k); ctx.fill();
+  ctx.fillStyle = '#a66f45'; for (const dx of [-0.42, 0.42]) ctx.fillRect(p.x + p.w * dx - 7 * k, p.y, 14 * k, 30 * k);
+  ctx.fillStyle = '#c98b5a'; ctx.beginPath(); ctx.roundRect(p.x - p.w / 2 - 12 * k, p.y - 14 * k, p.w + 24 * k, 22 * k, 9 * k); ctx.fill();
   ctx.fillStyle = 'rgba(255,255,255,0.25)'; ctx.fillRect(p.x - p.w / 2, p.y - 10 * k, p.w, 4 * k);
   traySlots(L).forEach((sl, i) => {
     const f = R.foods[i];
-    ctx.fillStyle = '#fff'; ell(sl.x, p.y - 14 * k, 30 * k, 8 * k);
+    ctx.fillStyle = '#fff'; ell(sl.x, p.y - 15 * k, Math.min(38 * k, p.w / 10.5), 10 * k);
     if (f.gone > 0.4) return;
-    const sc = f.gone > 0 ? Math.max(0.01, easeOutBack(1 - f.gone / 0.4)) : 1, hop = f.hop > 0 ? Math.abs(Math.sin(f.hop * Math.PI * 3)) * 22 * k : 0;
-    ctx.save(); ctx.translate(sl.x, sl.y - hop + Math.sin(t * 2 + i) * 2 * k); ctx.rotate(f.hop > 0 ? Math.sin(t * 20) * 0.2 : 0); ctx.scale(sc, sc); drawFood(f.k, 24 * k); ctx.restore();
+    const sc = f.gone > 0 ? Math.max(0.01, easeOutBack(1 - f.gone / 0.4)) : 1, hop = f.hop > 0 ? Math.abs(Math.sin(f.hop * Math.PI * 3)) * 26 * k : 0;
+    ctx.save(); ctx.translate(sl.x, sl.y - hop + Math.sin(t * 2 + i) * 2 * k); ctx.rotate(f.hop > 0 ? Math.sin(t * 20) * 0.2 : 0); ctx.scale(sc, sc); drawFood(f.k, 32 * k); ctx.restore();
   });
 }
 
@@ -185,7 +185,7 @@ export function drawCanteen(h) {
   L.chairs.forEach((c, i) => items.push({ y: c.y, d: () => drawChair(L, i, h, hv.chair === i ? 0.6 : wk === 'eat' && !chairOf(h, i) ? hintA() : 0) }));
   for (const b of h.occupants()) if (!b.chair && !b.dragged) items.push({ y: b.iy, d: () => drawRoomBaby(b) });
   items.sort((a, b) => a.y - b.y).forEach(it => it.d());
-  for (const F of R.flying) { const [x, y] = foodXY(F); ctx.save(); ctx.translate(x, y); ctx.rotate(F.p * TAU); drawFood(F.k, (22 - Math.min(1, F.p) * 5) * S); ctx.restore(); }
+  for (const F of R.flying) { const [x, y] = foodXY(F); ctx.save(); ctx.translate(x, y); ctx.rotate(F.p * TAU); drawFood(F.k, (30 - Math.min(1, F.p) * 8) * S); ctx.restore(); }
   drawBubbles(R); drawDark(L, R);
   for (const b of h.occupants()) if (b.dragged) drawRoomBaby(b);
 }
@@ -194,7 +194,7 @@ export function hitCanteen(x, y) {
   const h = G.curHouse, R = h.room, L = KL(), k = S;
   for (let i = R.bubbles.length - 1; i >= 0; i--) { const q = R.bubbles[i]; if (dist(x, y, q.x, q.y) < q.r + 10 * k) return { k: 'bubble', o: i }; }
   const d = L.door; if (x > d.x && x < d.x + d.w && y > d.y && y < d.y + d.h) return { k: 'door' };
-  const sl = traySlots(L); for (let i = 0; i < sl.length; i++) if (dist(x, y, sl[i].x, sl[i].y) < 38 * k) return { k: 'food', o: i };
+  const sl = traySlots(L); for (let i = 0; i < sl.length; i++) if (dist(x, y, sl[i].x, sl[i].y) < Math.max(50 * k, 32)) return { k: 'food', o: i };
   for (let i = 0; i < 3; i++) { const c = L.chairs[i]; if (Math.abs(x - c.x) < 58 * k && y > c.y - 210 * k && y < c.y + 5 * k) return { k: 'chair', o: i }; }
   const f = L.fridge; if (Math.abs(x - f.x) < f.w / 2 && y > f.y - f.h && y < f.y) return { k: 'fridge' };
   const st = L.stove; if (Math.abs(x - st.x) < 60 * k && y > st.y - 150 * k && y < st.y) return { k: 'stove' };
