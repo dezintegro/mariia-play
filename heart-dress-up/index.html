@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>Сердечко-модница</title>
+<link rel="icon" href="data:,">
+<style>
+  html,body{margin:0;height:100%;overflow:hidden;background:#ffd6ea;touch-action:none;
+    user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent}
+  html,body{position:fixed;inset:0;overscroll-behavior:none}
+  canvas{display:block;position:fixed;left:0;top:0;width:100vw;height:100vh;height:100dvh;touch-action:none}
+  #start{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;
+    background:rgba(255,190,220,.45);cursor:pointer;transition:opacity .5s}
+  #start.hide{opacity:0;pointer-events:none}
+  #play{width:min(34vmin,220px);height:min(34vmin,220px);border-radius:50%;
+    background:radial-gradient(circle at 35% 30%,#ffd0e4,#ff7aa8 60%,#e8437a);
+    border:8px solid #fff;box-shadow:0 0 60px rgba(255,120,170,.6);
+    display:flex;align-items:center;justify-content:center;animation:pulse 1.4s ease-in-out infinite}
+  #play::after{content:"";margin-left:12%;border-style:solid;border-color:transparent transparent transparent #fff;
+    border-width:calc(min(34vmin,220px)*.18) 0 calc(min(34vmin,220px)*.18) calc(min(34vmin,220px)*.3)}
+  @keyframes pulse{50%{transform:scale(1.08)}}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="start"><div id="play"></div></div>
+<script type="module" src="/src/scenes/heart-dress-up/main.ts"></script>
+</body>
+</html>
