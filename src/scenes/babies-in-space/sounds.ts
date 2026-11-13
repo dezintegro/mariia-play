@@ -1,4 +1,4 @@
-import { AC, soundOn, tone } from '../../core/audio';
+import { AC, soundOn, tone, whoosh } from '../../core/audio';
 import { pick, rand } from '../../core/canvas';
 import { G } from './state';
 
@@ -42,6 +42,9 @@ Object.assign(sfx, {
   tada() { [523, 659, 784, 1047, 1319, 1568].forEach((f, i) => tone(f, 0.35, { type: 'triangle', vol: 0.12, delay: i * 0.07 })); tone(1047, 1.0, { vol: 0.08, delay: 0.45 }); tone(1319, 1.0, { vol: 0.06, delay: 0.45 }); tone(1568, 1.0, { vol: 0.05, delay: 0.45 }); },
   wish() { tone(660, 0.18, { type: 'triangle', vol: 0.08 }); tone(880, 0.3, { type: 'triangle', vol: 0.08, delay: 0.16 }); },
   dance() { [784, 659, 784, 988, 880, 1047].forEach((f, i) => tone(f, 0.16, { type: 'triangle', vol: 0.12, delay: i * 0.13 })); },
+  splash() { whoosh(0.35, 0.14); for (let i = 0; i < 4; i++) tone(rand(700, 1300), 0.09, { type: 'sine', slide: rand(300, 500), vol: 0.07, delay: i * 0.05 }); },
+  hmm() { tone(196, 0.32, { type: 'triangle', slide: 175, vol: 0.06, attack: 0.05 }); },
+  tinkle() { [1568, 1319, 1568, 2093].forEach((f, i) => tone(f, 0.25, { type: 'sine', vol: 0.08, delay: i * 0.09 })); },
   wheee() { tone(300, 0.6, { type: 'triangle', slide: 1200, vol: 0.13 }); },
   nom() { tone(230, 0.09, { type: 'triangle', slide: 160, vol: 0.16 }); },
   yum() { tone(392, 0.35, { type: 'triangle', slide: 523, vol: 0.13 }); tone(523, 0.5, { type: 'triangle', slide: 659, vol: 0.11, delay: 0.3 }); },

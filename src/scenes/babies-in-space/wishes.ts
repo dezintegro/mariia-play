@@ -3,11 +3,14 @@ import { circle, starPath } from '../../core/draw';
 import { addP, burst } from '../../core/particles';
 import { roomHead } from './room';
 import { sfx } from './sounds';
-import { G, RB, babies } from './state';
+import { G, RB, babies, builtKind } from './state';
+import { drawBathIcon, drawPottyIcon } from './bath';
 import { drawToy } from './toys';
 
 // ---------------- ЖЕЛАНИЯ МАЛЫШЕЙ ----------------
-export const WISHES = ['sleep', 'play', 'eat'], WISH_LIFE = 90, MAX_WISHES = 2;
+export const WISHES = ['sleep', 'play', 'eat', 'potty', 'bath'], WISH_LIFE = 90, MAX_WISHES = 2;
+// какое здание исполняет желание
+export const WISH_HOUSE = { sleep: 'nursery', play: 'nursery', eat: 'canteen', potty: 'bath', bath: 'bath' };
 
 export function headPos(b) { return b.home ? roomHead(b) : [b.x, b.y]; }
 
@@ -28,7 +31,8 @@ export function updateWishes(dt) {
     if (!b.visible() || b.dragged || G.trans || t - b.born < 3) continue;
     b.wishT -= dt; if (b.wishT > 0) continue;
     if (active >= MAX_WISHES || b.sleeping() || b.love > 0) { b.wishT = rand(3, 7); continue; }
-    const opts = WISHES.filter(k => !(k === 'play' && b.play) && !(k === 'eat' && b.eat));
+    // горшок и купание появляются, только когда построена ванная
+    const opts = WISHES.filter(k => !(k === 'play' && b.play) && !(k === 'eat' && b.eat) && !(k === 'bath' && b.tub) && !(k === 'potty' && b.potty) && (WISH_HOUSE[k] !== 'bath' || builtKind('bath')));
     b.wish = { k: pick(opts), t: WISH_LIFE, life: WISH_LIFE }; active++;
     sfx.wish();
   }
@@ -39,7 +43,7 @@ export function satisfy(b, k) {
   if (!b.wish || b.wish.k !== k) return false;
   const vis = b.visible(), [wx, wy] = wishPos(b);
   b.wish = null; b.wishT = rand(60, 100); b.love = 2.8;
-  const seated = b.crib || b.chair || (b.play && b.play.phase === 'do' && (b.play.k === 'horse' || b.play.k === 'xylo'));
+  const seated = b.crib || b.chair || b.tub || b.potty || (b.play && b.play.phase === 'do' && (b.play.k === 'horse' || b.play.k === 'xylo'));
   if (!seated) b.anim = { k: 'joy', t: 2.4, d: 2.4 };
   if (!vis) return true;
   sfx.tada(); setTimeout(() => sfx.giggle(1.1), 500);
@@ -52,7 +56,9 @@ export function satisfy(b, k) {
 }
 
 export function drawWishIcon(k, s) {
-  ctx.fillStyle = { sleep: '#3b2b80', eat: '#ffc98f', play: '#bfeaff' }[k]; circle(0, 0, s * 0.8);
+  ctx.fillStyle = { sleep: '#3b2b80', eat: '#ffc98f', play: '#bfeaff', potty: '#ffe3f0', bath: '#c6ecff' }[k]; circle(0, 0, s * 0.8);
+  if (k === 'potty') { drawPottyIcon(s * 0.85); return; }
+  if (k === 'bath') { drawBathIcon(s * 0.78); return; }
   if (k === 'sleep') {
     ctx.save(); ctx.beginPath(); ctx.rect(-s, -s, s * 2, s * 2); ctx.arc(s * 0.28, -s * 0.22, s * 0.48, 0, TAU, true); ctx.clip('evenodd');
     ctx.fillStyle = '#ffc93d'; circle(-s * 0.08, 0, s * 0.6); ctx.restore();

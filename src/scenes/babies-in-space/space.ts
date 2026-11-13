@@ -2,11 +2,11 @@ import { soundOn, toggleSound, tone, whoosh } from '../../core/audio';
 import { DPR, H, S, TAU, W, clamp, ctx, dist, pick, pointer, rand, t } from '../../core/canvas';
 import { circle, ell, starPath } from '../../core/draw';
 import { addP, burst } from '../../core/particles';
-import { houseAt, launchHouse } from './buildings';
+import { flyHouse, houseAt } from './buildings';
 import { Baby } from './characters';
 import { enterRoom } from './room';
 import { PENTA, sfx } from './sounds';
-import { G, MAX_BABIES, MAX_HOUSES, babies, houses, picker } from './state';
+import { G, MAX_BABIES, MAX_HOUSES, availPicks, babies, houses, picker } from './state';
 import { spawnToy } from './toys';
 
 // ---------------- МИР ----------------
@@ -232,7 +232,7 @@ export function launchBaby() {
 }
 
 export function hit(x, y) {
-  if (picker.open) for (const o of picker.opts) if (dist(x, y, o.x, o.y) < o.r0 * 1.1) return { k: 'pick', o: o.k };
+  if (picker.open) for (const o of availPicks()) if (dist(x, y, o.x, o.y) < o.r0 * 1.1) return { k: 'pick', o };
   for (const k of ['sound', 'night', 'house', 'launch']) { const b = btn[k]; if (dist(x, y, b.x, b.y) < b.r * 1.1) return { k: 'btn', o: k }; }
   for (let i = babies.length - 1; i >= 0; i--) { const b = babies[i]; if (b.home) continue; if (dist(x, y, b.x, b.y) < b.hitR()) return { k: 'baby', o: b }; }
   const h = houseAt(x, y); if (h) return { k: 'house', o: h };
@@ -249,7 +249,7 @@ export function onTap(x, y, h) {
     if (h.o === 'launch') launchBaby();
     else if (h.o === 'house') {
       btn.house.press = 1;
-      if (houses.length >= MAX_HOUSES) { btn.house.shake = 1; sfx.boop(); }
+      if (houses.length >= MAX_HOUSES || picker.fly || !availPicks().length) { btn.house.shake = 1; sfx.boop(); }
       else { picker.open = !picker.open; picker.t = 0; if (picker.open) { sfx.pop(); tone(660, 0.2, { type: 'triangle', vol: 0.1, delay: 0.08 }); } else sfx.boop(); }
     }
     else if (h.o === 'night') {
@@ -266,7 +266,7 @@ export function onTap(x, y, h) {
   } else if (h.k === 'ringed') {
     ringed.hue = (ringed.hue + rand(70, 140)) % 360; ringed.spinT = 1; sfx.boing(); burst(ringed.x, ringed.y, 'spark', 12, { size: 7, speed: 140, color: `hsl(${ringed.hue},90%,80%)` });
   } else if (h.k === 'pick') {
-    picker.open = false; launchHouse(h.o);
+    flyHouse(h.o);
   } else if (h.k === 'planet') tapPlanet();
 }
 

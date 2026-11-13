@@ -6,7 +6,8 @@ import { FOODS, drawFood } from './canteen';
 import { drawHead, wanderPoint } from './characters';
 import { sfx } from './sounds';
 import { btn, planet } from './space';
-import { G, MAX_HOUSES, babies, houses } from './state';
+import { G, MAX_HOUSES, babies, builtKind, houses, picker } from './state';
+import { drawBathIcon, newBathRoom } from './bath';
 import { drawToy } from './toys';
 import { drawWish } from './wishes';
 
@@ -27,6 +28,7 @@ export class House {
       chairs: [0, 1, 2].map(i => ({ i, wob: 0 })), foods: FOODS.map(k => ({ k, gone: 0, hop: 0 })), flying: [],
       fridge: 0, pot: 0, steamT: 0, light: true, starT: 0, bubbles: [], doorOpen: 0, lampSwing: 0,
     };
+    else if (kind === 'bath') this.room = newBathRoom();
     else this.room = {
       cribs: [{ i: 0, spin: 0, spinV: 0 }, { i: 1, spin: 0, spinV: 0 }], tower: null, towerT: 0, horse: 0,
       ball: { x: null, y: 0, z: 0, vx: 0, vz: 0, rot: 0 }, teddy: 0, light: true, starT: 0,
@@ -82,6 +84,17 @@ export class House {
       ctx.fillStyle = '#fff'; circle(0, -92 * k, 24 * k);
       ctx.strokeStyle = this.roof; ctx.lineWidth = 5 * k; ctx.beginPath(); ctx.arc(0, -92 * k, 24 * k, 0, TAU); ctx.stroke();
       ctx.save(); ctx.translate(0, -92 * k); ctx.rotate(Math.sin(t * 2 + this.phase) * 0.1); drawFood('bowl', 15 * k); ctx.restore();
+    } else if (this.kind === 'bath') {
+      // круглая крыша-пена с пузырями и вывеска с уточкой
+      ctx.fillStyle = this.roof; ctx.beginPath(); ctx.arc(0, -38 * k, 68 * k, Math.PI, 0); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,0.85)';
+      for (let i = 0; i < 7; i++) circle(-60 * k + i * 20 * k, -40 * k + Math.sin(t * 2 + i) * 1.5 * k, (9 + (i % 2) * 3) * k);
+      ctx.fillStyle = 'rgba(255,255,255,0.5)'; circle(-30 * k, -78 * k, 6 * k); circle(36 * k, -70 * k, 4 * k);
+      ctx.fillStyle = '#fff'; circle(0, -88 * k, 24 * k);
+      ctx.strokeStyle = this.roof; ctx.lineWidth = 5 * k; ctx.beginPath(); ctx.arc(0, -88 * k, 24 * k, 0, TAU); ctx.stroke();
+      ctx.save(); ctx.translate(0, -88 * k); ctx.rotate(Math.sin(t * 2 + this.phase) * 0.12); drawToy('duck', 13 * k); ctx.restore();
+      for (let i = 0; i < 3; i++) { const p = (t * 0.4 + i / 3) % 1; ctx.globalAlpha = 1 - p; ctx.strokeStyle = '#fff'; ctx.lineWidth = 2 * k; ctx.beginPath(); ctx.arc(50 * k + Math.sin(p * 9 + i) * 6 * k, -60 * k - p * 70 * k, (4 + i * 2) * k, 0, TAU); ctx.stroke(); }
+      ctx.globalAlpha = 1;
     } else {
       ctx.fillStyle = this.roof; ctx.strokeStyle = this.roof; ctx.lineWidth = 12 * k; ctx.lineJoin = 'round';
       ctx.beginPath(); ctx.moveTo(-66 * k, -36 * k); ctx.lineTo(0, -102 * k); ctx.lineTo(66 * k, -36 * k); ctx.closePath(); ctx.fill(); ctx.stroke();
@@ -124,7 +137,7 @@ export function houseAt(x, y) {
 
 export function launchHouse(kind) {
   const b0 = btn.house; b0.press = 1;
-  if (houses.length >= MAX_HOUSES) { b0.shake = 1; sfx.boop(); return; }
+  if (houses.length >= MAX_HOUSES || builtKind(kind)) { b0.shake = 1; sfx.boop(); return; }
   const a = rand(-Math.PI * 0.85, -Math.PI * 0.15);
   const x = planet.x + Math.cos(a) * planet.r, y = planet.y + Math.sin(a) * planet.r;
   const h = new House(x, y, kind);
@@ -136,6 +149,46 @@ export function launchHouse(kind) {
   for (let i = 0; i < 16; i++) addP({ kind: 'smoke', x, y, vx: rand(-90, 90) * S, vy: rand(-90, 20) * S, life: rand(0.6, 1.2), size: rand(10, 20) * S, color: '#fff', rot: 0, vr: 0, g: 0 });
   burst(x, y, 'confetti', 24, { size: 7, speed: 260, g: 260 });
 }
+
+// кнопка выбранного здания улетает в космос и там превращается в здание
+export function flyHouse(o) {
+  if (builtKind(o.k) || picker.fly) return;
+  // место для здания: над планетой, подальше от уже построенных
+  let best = null, bd = -1;
+  for (let i = 0; i < 10; i++) {
+    const a = rand(-Math.PI * 0.85, -Math.PI * 0.15), d = planet.r + rand(150, 230) * S;
+    const x = clamp(planet.x + Math.cos(a) * d, 100 * S, W - 100 * S), y = clamp(planet.y + Math.sin(a) * d, 150 * S, H - 120 * S);
+    const md = houses.reduce((m, h) => Math.min(m, dist(x, y, h.x, h.y)), 1e9);
+    if (md > bd) { bd = md; best = [x, y]; }
+  }
+  picker.fly = { k: o.k, x0: o.x, y0: o.y, x1: best[0], y1: best[1], r: o.r0, t: 0, d: 1.1 };
+  picker.open = false; btn.house.press = 1;
+  whoosh(1.0, 0.22); [523, 659, 784].forEach((f, i) => tone(f, 0.25, { type: 'triangle', vol: 0.11, delay: i * 0.1 }));
+}
+
+export function flyPos(F) {
+  const p = clamp(F.t / F.d, 0, 1), e = p * p * (3 - 2 * p);
+  const cx = (F.x0 + F.x1) / 2, cy = Math.min(F.y0, F.y1) - 160 * S; // дуга вверх
+  const x = (1 - e) * (1 - e) * F.x0 + 2 * (1 - e) * e * cx + e * e * F.x1, y = (1 - e) * (1 - e) * F.y0 + 2 * (1 - e) * e * cy + e * e * F.y1;
+  return [x, y, p];
+}
+
+export function updateFly(dt) {
+  const F = picker.fly; if (!F) return;
+  F.t += dt;
+  const [x, y, p] = flyPos(F);
+  if (G.scene === 'space' && Math.random() < 0.8) addP({ kind: 'spark', x: x + rand(-8, 8) * S, y: y + rand(-8, 8) * S, vx: rand(-30, 30) * S, vy: rand(-30, 30) * S, life: rand(0.4, 0.8), size: rand(4, 8) * S, color: pick(['#fff', '#ffe27a', '#c9e8ff', '#ffc4e1']), rot: rand(0, TAU), vr: rand(-4, 4), g: 0 });
+  if (p < 1) return;
+  picker.fly = null;
+  const h = new House(F.x1, F.y1, F.k); h.wTimer = 3;
+  houses.push(h);
+  sfx.tada(); burst(F.x1, F.y1, 'confetti', 30, { size: 8, speed: 300, g: 260 }); burst(F.x1, F.y1, 'spark', 18, { size: 9, speed: 240, color: '#ffe27a' });
+  for (let i = 0; i < 12; i++) addP({ kind: 'smoke', x: F.x1, y: F.y1, vx: rand(-90, 90) * S, vy: rand(-90, 60) * S, life: rand(0.6, 1.1), size: rand(10, 20) * S, color: '#fff', rot: 0, vr: 0, g: 0 });
+}
+
+export const PICK_COLOR = { nursery: '#2ec4b6', canteen: '#ff9f43', bath: '#4fb3ff' };
+export const pickIcon = k => k === 'canteen' ? iconCanteen : k === 'bath' ? iconBath : iconNursery;
+export function iconBath(R) { ctx.translate(0, R * 0.05); drawBathIcon(R * 0.95); }
 
 export function iconNursery(R) { ctx.translate(0, R * 0.05); drawToy('teddy', R * 0.95); }
 

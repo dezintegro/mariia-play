@@ -2,16 +2,17 @@ import { AC, initAudio } from '../../core/audio';
 import { H, S, TAU, W, advance, clamp, ctx, cv, dist, easeOutBack, pick, pointer, rand, resizeCanvas, t } from '../../core/canvas';
 import { circle, drawButton } from '../../core/draw';
 import { addP, drawParticles, updateParticles } from '../../core/particles';
-import { houseAt, iconCanteen, iconHouse, iconNursery, launchHouse } from './buildings';
+import { PICK_COLOR, flyHouse, flyPos, houseAt, iconHouse, launchHouse, pickIcon, updateFly } from './buildings';
+import { BL } from './bath';
 import { KL, traySlots } from './canteen';
 import { Baby, tapBaby } from './characters';
 import { RL } from './nursery';
 import { LAY, roomHead, dragWish, drawRoom, drawTrans, dropBaby, enterRoom, exitRoom, hitRoom, hoverTarget, moveDrag, onRoomTap, startDrag, tapRoomBaby, updateRoom, updateTrans } from './room';
 import { sfx, updLullaby } from './sounds';
 import { bgC, bigStars, btn, buildBg, drawAlien, drawPlanet, drawRinged, drawShooting, drawStars, hit, iconMoonSun, iconRocket, iconSound, launchBaby, onTap, planet, ringed, tapPlanet, updateShooting } from './space';
-import { G, MAX_BABIES, MAX_HOUSES, RB, babies, houses, picker } from './state';
+import { G, MAX_BABIES, MAX_HOUSES, RB, availPicks, babies, houses, picker } from './state';
 import { drawToys, updateToys } from './toys';
-import { drawWish, updateWishes, wishPos } from './wishes';
+import { WISH_HOUSE, drawWish, updateWishes, wishPos } from './wishes';
 
 // ---------------- ЦИКЛ ----------------
 function layout() {
@@ -21,7 +22,7 @@ function layout() {
   Object.assign(btn.launch, { x: W - br - 24, y: H - br - 24, r: br });
   Object.assign(btn.house, { x: W - br * 3.4 - 24, y: H - br - 24, r: br });
   Object.assign(btn.night, { x: br + 24, y: H - br - 24, r: br });
-  picker.opts.forEach((o, i) => Object.assign(o, { x: btn.house.x + (i ? 1 : -1) * br * 1.05, y: btn.house.y - br * 2.35, r0: br * 0.92 }));
+  placePicks();
   const sr = br * 0.55; Object.assign(btn.sound, { x: W - sr - 18, y: sr + 18, r: sr });
   for (const s of bigStars) { s.x = s.fx * W; s.y = s.fy * H; }
   for (const b of babies) {
@@ -29,6 +30,13 @@ function layout() {
     if (b.home) { const L = LAY(b.home); b.ix = clamp(b.ix, L.bx0, L.bx1); b.iy = clamp(b.iy, L.by0, L.by1); b.iwT = 0; }
   }
   for (const h of houses) { h.x = clamp(h.x, 0, W); h.y = clamp(h.y, 0, H); h.wTimer = 0; }
+}
+
+// кнопки выбора здания — дугой над кнопкой домика (только ещё не построенные)
+function placePicks() {
+  const br = btn.house.r, av = availPicks(), n = av.length;
+  for (const o of picker.opts) o.r0 = br * 0.92;
+  av.forEach((o, i) => { const u = i - (n - 1) / 2; Object.assign(o, { x: btn.house.x + u * br * 2.1, y: btn.house.y - br * 2.35 - (n === 3 && u === 0 ? br * 0.45 : 0) }); });
 }
 
 function resize() { resizeCanvas(); layout(); buildBg(); }
@@ -52,13 +60,14 @@ function update(dt) {
   if (planet.fount > 0 && G.scene === 'space') for (let i = 0; i < 2; i++) addP({ kind: Math.random() < 0.3 ? 'heart' : 'spark', x: planet.x + rand(-0.15, 0.15) * planet.r, y: planet.y - planet.r * 0.95,
     vx: rand(-150, 150) * S, vy: -rand(280, 460) * S, life: rand(1.2, 1.8), size: rand(7, 11) * S, color: `hsl(${(t * 300 + rand(0, 60)) % 360},90%,72%)`, rot: rand(0, TAU), vr: rand(-5, 5), g: 420 });
   updateWishes(dt);
-  if (picker.open) { picker.t += dt; if (picker.t > 8) picker.open = false; }
+  if (picker.open) { picker.t += dt; if (picker.t > 8 || !availPicks().length) picker.open = false; }
+  placePicks(); updateFly(dt);
   planet.blinkT -= dt; if (planet.blinkT <= 0) { planet.blink = 0.18; planet.blinkT = rand(2.5, 5); } planet.blink = Math.max(0, planet.blink - dt);
   ringed.spinT = Math.max(0, ringed.spinT - dt * 0.8);
   if (G.scene === 'room') {
     updateRoom(dt);
     // малыши в комнате не слипаются
-    const rb = G.curHouse.occupants().filter(b => !b.dragged && !b.crib && !b.chair && !b.ifall && !(b.play && b.play.phase === 'do' && (b.play.k === 'horse' || b.play.k === 'xylo' || b.play.k === 'tower'))), Lr = LAY(G.curHouse), m = RB() * 1.9;
+    const rb = G.curHouse.occupants().filter(b => !b.dragged && !b.crib && !b.chair && !b.tub && !b.potty && !b.ifall && !(b.play && b.play.phase === 'do' && (b.play.k === 'horse' || b.play.k === 'xylo' || b.play.k === 'tower'))), Lr = LAY(G.curHouse), m = RB() * 1.9;
     for (let i = 0; i < rb.length; i++) for (let j = i + 1; j < rb.length; j++) {
       const a = rb[i], b = rb[j], dx = b.ix - a.ix, dy = (b.iy - a.iy) * 2, d = Math.hypot(dx, dy) || 1;
       if (d < m) { const f = (m - d) * 2 * dt; a.ix -= dx / d * f; b.ix += dx / d * f; a.iy -= dy / d * f * 0.5; b.iy += dy / d * f * 0.5; }
@@ -76,21 +85,27 @@ function draw() {
     if (G.night > 0.01) { ctx.fillStyle = `rgba(5,3,25,${G.night * 0.45})`; ctx.fillRect(0, 0, W, H); }
     drawStars(); drawShooting(); drawRinged(); drawAlien(); drawPlanet();
     const hv = hoverTarget().house, wk = dragWish();
-    for (const h of houses) h.draw(h === hv, wk && (wk === 'eat') === (h.kind === 'canteen'));
+    for (const h of houses) h.draw(h === hv, wk && WISH_HOUSE[wk] === h.kind);
     for (const b of babies) if (!b.home && !b.dragged) b.draw();
     drawToys(); drawParticles();
     for (const b of babies) if (!b.home && b.dragged) b.draw();
     for (const b of babies) if (!b.home && b.wish) drawWish(b, ...(wishPos(b) as [number, number]));
     drawButton(btn.night, G.nightTarget ? '#ffb84d' : '#5b4bb7', iconMoonSun, false);
-    drawButton(btn.house, '#2ec4b6', iconHouse, houses.length < MAX_HOUSES && !picker.open);
+    drawButton(btn.house, houses.length < MAX_HOUSES ? '#2ec4b6' : '#5f7d8c', iconHouse, houses.length < MAX_HOUSES && !picker.open && !picker.fly);
     if (picker.open) {
       const ap = easeOutBack(clamp(picker.t * 4, 0.01, 1));
-      picker.opts.forEach(o => {
+      availPicks().forEach(o => {
         o.r = o.r0 * Math.max(0.01, ap);
         ctx.fillStyle = 'rgba(255,255,255,0.6)';
         for (let j = 1; j <= 2; j++) circle(btn.house.x + (o.x - btn.house.x) * j / 3.2, btn.house.y - btn.house.r * 0.9 + (o.y + o.r0 - btn.house.y + btn.house.r * 0.9) * j / 3.2, 5 * S * ap);
-        drawButton(o, o.k === 'canteen' ? '#ff9f43' : '#2ec4b6', o.k === 'canteen' ? iconCanteen : iconNursery, true);
+        drawButton(o, PICK_COLOR[o.k], pickIcon(o.k), true);
       });
+    }
+    if (picker.fly) { // улетающая кнопка: крутится, уменьшается, в конце вспыхивает
+      const F = picker.fly, [x, y, p] = flyPos(F), o = picker.opts.find(q => q.k === F.k);
+      if (p > 0.75) { ctx.fillStyle = `rgba(255,245,190,${(p - 0.75) * 3})`; circle(x, y, F.r * (1 + (p - 0.75) * 8)); }
+      Object.assign(o, { x, y, r: F.r * (1 - p * 0.45) });
+      ctx.save(); ctx.translate(x, y); ctx.rotate(p * TAU * 1.5); ctx.translate(-x, -y); drawButton(o, PICK_COLOR[F.k], pickIcon(F.k), false); ctx.restore();
     }
     drawButton(btn.launch, '#ff7aa8', iconRocket, babies.length < MAX_BABIES);
   } else {
@@ -189,6 +204,6 @@ requestAnimationFrame(frame);
   audio() { return AC ? AC.state : 'none'; },
   suspendAudio() { AC && AC.suspend(); },
   start() { G.started = true; document.getElementById('start')!.classList.add('hide'); },
-  api: { launchBaby, launchHouse, enterRoom, exitRoom, tapBaby, tapPlanet, tapRoomBaby, onTap, onRoomTap, hit, hitRoom,
+  api: { launchBaby, launchHouse, flyHouse, BL, enterRoom, exitRoom, tapBaby, tapPlanet, tapRoomBaby, onTap, onRoomTap, hit, hitRoom,
     startDrag, moveDrag, dropBaby, RL, KL, traySlots, houseAt, roomHead },
 };

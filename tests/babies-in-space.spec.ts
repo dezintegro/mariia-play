@@ -19,7 +19,14 @@ test('космос: выбор здания, 3 реакции малыша и п
     A.onTap(g.btn.house.x, g.btn.house.y, A.hit(g.btn.house.x, g.btn.house.y));
     g.step(0.3); out.pickerOpen = g.picker.open;
     const o = g.picker.opts[1]; A.onTap(o.x, o.y, A.hit(o.x, o.y));
-    out.firstKind = g.houses[0]?.kind; out.pickerAfter = g.picker.open;
+    out.flying = g.picker.fly?.k; out.pickerAfter = g.picker.open;
+    g.step(1.3); out.firstKind = g.houses[0]?.kind;
+    // построенное здание пропадает из выбора, второе такое же не строится
+    A.onTap(g.btn.house.x, g.btn.house.y, A.hit(g.btn.house.x, g.btn.house.y)); g.step(0.3);
+    out.left = g.picker.opts.filter((q: any) => !g.houses.some((h: any) => h.kind === q.k)).map((q: any) => q.k);
+    out.hitCanteen = A.hit(o.x, o.y)?.o?.k === 'canteen';
+    A.launchHouse('canteen'); out.houses1 = g.houses.length;
+    g.picker.open = false;
     A.launchHouse('nursery'); for (let i = 0; i < 10; i++) A.launchBaby(); g.step(2);
     out.babies = g.babies.length;
     const b = g.babies[2]; out.anims = [];
@@ -30,7 +37,7 @@ test('космос: выбор здания, 3 реакции малыша и п
     g.step(1);
     return out;
   });
-  expect(r).toMatchObject({ pickerOpen: true, firstKind: 'canteen', pickerAfter: false, babies: 16, anims: ['spin', 'dance', 'jump'], planetHop: true, wishes: 2 });
+  expect(r).toMatchObject({ pickerOpen: true, flying: 'canteen', firstKind: 'canteen', pickerAfter: false, left: ['nursery', 'bath'], hitCanteen: false, houses1: 1, babies: 16, anims: ['spin', 'dance', 'jump'], planetHop: true, wishes: 2 });
   await shot(page, 'space');
   noErrors(errors);
 });

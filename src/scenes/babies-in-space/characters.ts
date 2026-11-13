@@ -10,6 +10,7 @@ import { G, RB } from './state';
 import { tickBed } from './anim/crib';
 import { tickEat } from './anim/eat';
 import { satisfy } from './wishes';
+import { tickPotty, tickTub } from './bath';
 
 // ---------------- МАЛЫШИ ----------------
 export const SKINS = ['#ffdcbf', '#f6c7a0', '#e5ad7f', '#c98d62', '#ffe6d1'];
@@ -68,6 +69,8 @@ export class Baby {
     const h = this.home, L = LAY(h);
     if (this.crib) { const c = L.cribs[this.crib.i]; this.ix = c.x - L.cw * 0.18; this.iy = c.y - 38 * S; return; }
     if (this.chair) { const c = L.chairs[this.chair.i]; this.ix = c.x; this.iy = c.y; return; }
+    if (this.tub) { tickTub(this, dt, L); return; }
+    if (this.potty) { tickPotty(this, dt, L); return; }
     if (this.ifall) {
       this.ivy += 1500 * S * dt; this.iy += this.ivy * dt;
       if (this.iy >= this.ifloor) { this.iy = this.ifloor; this.ifall = false; this.bounce = 1; if (this.visible()) sfx.boop(); }
@@ -79,7 +82,7 @@ export class Baby {
     if (this.iwT <= 0) {
       this.iwx = rand(L.bx0, L.bx1); this.iwy = rand(L.by0, L.by1); this.iwT = rand(3, 7);
       // сам иногда ползёт поиграть с большой игрушкой (если ничего не просит)
-      if (h.kind !== 'canteen' && !this.wish && this.visible() && !this.sleeping() && Math.random() < 0.3) {
+      if (h.kind === 'nursery' && !this.wish && this.visible() && !this.sleeping() && Math.random() < 0.3) {
         const free = TOYS4.filter(k => !toyBusy(h, k)); if (free.length) this.play = { k: pick(free), phase: 'go', t: 9 };
       }
     }
@@ -385,7 +388,7 @@ export function drawRoomBabyAt(b, ox, oy, shadow) {
   else if (sleep) { wl = wr = 0.15; }
   else { const near = dist(pointer.x, pointer.y, ox, hy) < 150 * S; wr = near ? 1.7 + Math.sin(t * 11) * 0.5 : 0.3 + Math.sin(t * 2 + b.phase) * 0.2; wl = 0.3 + Math.sin(t * 2 + b.phase + 1) * 0.2; }
   if (shadow) { ctx.fillStyle = 'rgba(80,40,20,0.18)'; ell(ox, oy, r * 0.9, r * 0.22); }
-  const still = sleep || b.dragged || b.chair || b.eat || isRider(b);
+  const still = sleep || b.dragged || b.chair || b.tub || b.potty || b.eat || isRider(b);
   const crawl = !still ? Math.abs(Math.sin(t * 5 + b.phase)) * 3 * S : 0;
   if (b.love > 0) halo(ox, hy + r * 0.6, r * 2.6, b.love);
   const X = animXf(b);
