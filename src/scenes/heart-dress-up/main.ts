@@ -145,12 +145,23 @@ function drawRing(back: boolean) {
 }
 
 // ---------------- ЦИКЛ ----------------
+const HAIR_TOP: Record<string, number> = { bunny: 1.75, unicorn: 1.3, afro: 1.35, bun: 1.18, cat: 1.2, long: 1.12, crown: 1.05, bow: 1.1, flowers: 1.08 };
+const HAIR_SIDE: Record<string, number> = { long: 1.32, pigtails: 1.6, afro: 1.42 };
+/** Насколько сердце с украшениями выходит за R: [вверх, вбок] */
+function heartExtent(c: Record<string, any>): [number, number] {
+  return [HAIR_TOP[c.hair] || 1.02, Math.max(HAIR_SIDE[c.hair] || 1.04, c.earrings ? 1.12 : 1.04)];
+}
 function placeHeart(dt: number) {
   const T = UI.hrTarget, k = G.snap ? 1 : Math.min(1, dt * 5);
   for (const key of ['x', 'y', 'w', 'h'] as const) G.HR[key] += (T[key] - G.HR[key]) * k;
   let tx: number, ty: number, tR: number;
   if (G.finale) { tR = Math.min(W, H) * 0.28; tx = W / 2; ty = H * 0.46; }
-  else { const A = G.HR; tR = Math.min(A.w / 3.3, A.h / 3.0); tx = A.x + A.w / 2; ty = A.y + A.h * 0.53; }
+  else {
+    // габарит зависит от причёски: уши зайчика торчат вверх, хвостики — вбок; сердце берёт всё свободное место
+    const A = G.HR, [top, side] = heartExtent(G.cfg), bot = 1.12;
+    tR = Math.min(A.w / (2 * side + 0.25), A.h / (top + bot + 0.12));
+    tx = A.x + A.w / 2; ty = A.y + (A.h - (top + bot) * tR) / 2 + top * tR;
+  }
   G.heart.x += (tx - G.heart.x) * k; G.heart.y += (ty - G.heart.y) * k; G.heart.R += (tR - G.heart.R) * k;
   G.snap = false;
 }

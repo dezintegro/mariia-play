@@ -27,45 +27,68 @@ export const UI = {
 
 // ---------------- РАСКЛАДКА ----------------
 export function layout() {
-  const pad = UI.pad = Math.max(8, 12 * S);
+  const pad = UI.pad = Math.max(6, 10 * S);
   const sr = Math.max(22, 26 * S); Object.assign(UI.sound, { x: W - sr - 12, y: sr + 12, r: sr });
   const wide = W > H * 1.2;
-  // лента этапов: одна строка по низу; на ноутбуке влезает целиком, на телефоне листается
-  const n = STAGES.length, sc = clamp(80 * S, 72, 88);
-  const ss = UI.stripS, sw = W - 2 * pad;
-  ss.cw = n * sc; ss.w = sw; ss.x = pad; ss.h = sc; ss.y = H - pad * 0.6 - sc - (ss.cw > sw ? 12 : 0);
-  ss.bar = ss.cw > sw ? { x: pad + sw * 0.15, y: ss.y + sc + 3, w: sw * 0.7, h: 6 } : null;
-  const shiftS = ss.cw <= sw ? (sw - ss.cw) / 2 : -ss.off;
-  UI.cells = STAGES.map((_, i) => ({ x: ss.x + shiftS + (i + 0.5) * sc, y: ss.y + sc / 2, r: sc * 0.42, i }));
-  // панель вариантов: фиксированные 2 ряда (узкий экран, под сердцем) или 3 ряда (широкий, справа от сердца)
-  const its = stageItems(G.stage), m = its.length, bh = Math.max(12, 14 * S);
+  const its = stageItems(G.stage), m = its.length;
   if (UI.itemsStage !== G.stage) { UI.items = its.map(it => ({ ...it, x: 0, y: 0, r: 0, press: 0 })); UI.itemsStage = G.stage; }
-  const is = UI.itemsS, top = ss.y - pad * 0.8;
-  let rows: number, ic: number;
+  const ss = UI.stripS, is = UI.itemsS, n = STAGES.length;
+  // Порядок сверху вниз: лента разделов, под ней варианты раздела.
+  // Широкий экран: лента — строкой сверху, варианты — 3 ряда справа от сердца.
+  // Узкий (телефон стоя): обе панели внизу, варианты — 2 ряда у самого края.
+  const sc = wide ? clamp(80 * S, 70, 88) : clamp(72 * S, 64, 80);
+  const barH = 8, barGap = 6; // скроллбар тонкий на вид, но ловится с запасом (см. hitUI)
+  let rows: number, icMax: number, icMin = 66;
   if (wide) {
+    ss.x = pad; ss.w = UI.sound.x - UI.sound.r - pad * 1.5 - pad; ss.h = sc; ss.y = pad * 0.6;
+    ss.cw = n * sc;
+    const sTop = ss.y + sc + (ss.cw > ss.w ? barGap + barH : 0) + pad;
     rows = 3;
-    const colW = Math.min(W * 0.44, 560), y0 = UI.sound.y + UI.sound.r + pad, avail = top - y0 - bh - pad;
-    ic = Math.max(64, Math.min(avail / rows, 124 * S, 130));
-    is.w = colW; is.x = W - pad - colW; is.h = rows * ic; is.y = y0 + Math.max(0, (avail - is.h) / 2);
-    UI.hrTarget = { x: 0, y: 0, w: is.x - pad * 0.5, h: top };
+    const colW = Math.min(W * 0.44, 560), avail = H - pad - sTop - barGap - barH;
+    icMax = Math.min(avail / rows, 124 * S, 130);
+    const ic = fitCell(m, rows, colW, Math.max(icMin, icMax), icMin);
+    is.w = colW; is.x = W - pad - colW; is.h = rows * ic; is.y = sTop + Math.max(0, (avail - is.h) / 2);
+    placeItems(rows, ic);
+    UI.hrTarget = { x: 0, y: sTop - pad * 0.5, w: is.x - pad * 0.5, h: H - sTop + pad * 0.5 };
   } else {
-    rows = 2; ic = clamp(Math.min(W / 4.5, 120 * S), 72, 124);
-    is.w = W - 2 * pad; is.x = pad; is.h = rows * ic; is.y = top - bh - pad * 0.4 - is.h;
-    UI.hrTarget = { x: 0, y: 0, w: W, h: is.y - pad * 0.6 };
+    rows = 2;
+    const ic = fitCell(m, rows, W - 2 * pad, clamp(Math.min(W / 4.6, 112 * S), icMin, 116), icMin);
+    is.w = W - 2 * pad; is.x = pad; is.h = rows * ic;
+    is.cw = Math.ceil(m / rows) * ic;
+    is.y = H - pad * 0.6 - (is.cw > is.w + 1 ? barGap + barH : 0) - is.h;
+    placeItems(rows, ic);
+    ss.x = pad; ss.w = W - 2 * pad; ss.h = sc; ss.cw = n * sc;
+    ss.y = is.y - pad * 1.2 - (ss.cw > ss.w ? barGap * 0.5 + 4 : 0) - sc;
+    UI.hrTarget = { x: 0, y: 0, w: W, h: ss.y - pad * 0.4 };
   }
-  is.cw = Math.ceil(m / rows) * ic;
-  is.bar = is.cw > is.w ? { x: is.x + is.w * 0.1, y: is.y + is.h + pad * 0.4, w: is.w * 0.8, h: bh } : null;
-  const shiftI = is.cw <= is.w ? (is.w - is.cw) / 2 : -is.off;
-  UI.items.forEach((it, i) => {
-    const col = Math.floor(i / rows), row = i % rows; // по столбцам: прокрутка вбок открывает новые столбцы
-    Object.assign(it, { x: is.x + shiftI + (col + 0.5) * ic, y: is.y + (row + 0.5) * ic, r: ic * 0.42 });
-  });
+  ss.bar = ss.cw > ss.w + 1 ? { x: ss.x + ss.w * 0.15, y: ss.y + sc + barGap * 0.5, w: ss.w * 0.7, h: wide ? barH : 4 } : null;
+  const shiftS = ss.cw <= ss.w ? (ss.w - ss.cw) / 2 : -ss.off;
+  UI.cells = STAGES.map((_, i) => ({ x: ss.x + shiftS + (i + 0.5) * sc, y: ss.y + sc / 2, r: sc * 0.46, i }));
   if (G.finale) UI.hrTarget = { x: 0, y: 0, w: W, h: H };
   const HR = UI.hrTarget, pr = clamp(46 * S, 34, 56);
   Object.assign(UI.party, { x: HR.x + HR.w - pr - pad, y: HR.y + HR.h - pr - pad * 0.5, r: pr });
   const fr = clamp(60 * S, 40, 72);
   Object.assign(UI.again, { x: fr + 24, y: H - fr - 24, r: fr });
   Object.assign(UI.cont, { x: W - fr - 24, y: H - fr - 24, r: fr });
+
+  function placeItems(rws: number, ic: number) {
+    is.cw = Math.ceil(m / rws) * ic;
+    is.bar = is.cw > is.w + 1 ? { x: is.x + is.w * 0.1, y: is.y + is.h + barGap, w: is.w * 0.8, h: barH } : null;
+    const shiftI = is.cw <= is.w + 1 ? (is.w - is.cw) / 2 : -is.off;
+    if (!is.bar) is.off = 0;
+    UI.items.forEach((it, i) => {
+      const col = Math.floor(i / rws), row = i % rws; // по столбцам: прокрутка вбок открывает новые столбцы
+      Object.assign(it, { x: is.x + shiftI + (col + 0.5) * ic, y: is.y + (row + 0.5) * ic, r: ic * 0.45 });
+    });
+  }
+}
+
+/** Размер ячейки: если всё почти влезает — чуть ужать, чтобы не было прокрутки «ради пары пикселей» */
+function fitCell(m: number, rows: number, w: number, ic: number, icMin: number) {
+  const cols = Math.ceil(m / rows);
+  if (cols * ic <= w) return ic;
+  const fit = w / cols;
+  return fit >= icMin ? fit : ic;
 }
 
 /** Инерция и мягкий возврат к краям, когда ленту не держат */
@@ -223,8 +246,8 @@ export function hitUI(x: number, y: number): any {
   }
   if (inBtn(UI.party, x, y)) return { k: 'party' };
   const ss = UI.stripS, is = UI.itemsS, pad = UI.pad;
-  if (ss.bar && inRect(ss.bar, x, y, 10)) return { k: 'bar', s: ss };
-  if (is.bar && inRect(is.bar, x, y, 12)) return { k: 'bar', s: is };
+  if (ss.bar && inRect(ss.bar, x, y, 9)) return { k: 'bar', s: ss };
+  if (is.bar && inRect(is.bar, x, y, 14)) return { k: 'bar', s: is };
   if (inRect(ss, x, y, pad * 0.4)) {
     for (const c of UI.cells) if (Math.hypot(x - c.x, y - c.y) < c.r * 1.1) return { k: 'stage', i: c.i, s: ss };
     return { k: 'panel', s: ss };

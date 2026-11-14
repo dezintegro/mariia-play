@@ -50,7 +50,7 @@ export function drawHeart(cfg: Record<string, any>, R: number, L: Live = STILL) 
   if (cfg.nose) popped(L, 'nose', 0, 0.06 * R, () => nose(cfg.nose, R));
   mouth(R, L);
   if (cfg.hair) popped(L, 'hair', 0, -0.7 * R, () => hairFront(cfg.hair, R, L));
-  if (cfg.earrings) popped(L, 'earrings', 0, -0.2 * R, () => earrings(cfg.earrings, R, L));
+  if (cfg.earrings) popped(L, 'earrings', 0, 0.05 * R, () => earrings(cfg.earrings, R, L));
   if (cfg.necklace) popped(L, 'necklace', 0, 0.55 * R, () => necklace(cfg.necklace, R));
 }
 
@@ -509,7 +509,7 @@ function hairFront(kind: string, R: number, L: Live) {
 // ---------------- СЕРЁЖКИ ----------------
 function earrings(kind: string, R: number, L: Live) {
   for (const s of [-1, 1]) {
-    ctx.save(); ctx.translate(s * 1.02 * R, -0.22 * R);
+    ctx.save(); ctx.translate(s * 0.9 * R, 0.04 * R); // мочка — на уровне между глазами и ртом
     ctx.rotate(s * 0.08 + L.swing + (L.live ? Math.sin(t * 2.3 + s) * 0.08 : 0));
     ctx.scale(1.3, 1.3);
     ctx.strokeStyle = '#d9a400'; ctx.lineWidth = 0.02 * R; ctx.lineCap = 'round'; ctx.lineJoin = 'round';

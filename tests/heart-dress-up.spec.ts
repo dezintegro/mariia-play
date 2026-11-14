@@ -114,7 +114,7 @@ test('узкий экран (портрет телефона): 2 ряда вар
     out.rows = new Set(U.items.map((i: any) => Math.round(i.y))).size;
     out.scrollable = is.cw > is.w && !!is.bar;
     out.minR = Math.min(...[...U.items, ...U.cells].map((b: any) => b.r));
-    const h = g.G.heart; out.heartAbovePanel = h.y + h.R < is.y;
+    const h = g.G.heart; out.heartAbovePanel = h.y + h.R < U.stripS.y && U.stripS.y + U.stripS.h < is.y;
     out.stripScroll = U.stripS.cw > U.stripS.w && !!U.stripS.bar;
     // свайп по панели листает и ничего не выбирает
     const bg = g.G.cfg.bg, first = U.items[0];
@@ -134,4 +134,26 @@ test('узкий экран (портрет телефона): 2 ряда вар
   expect(r.minR).toBeGreaterThanOrEqual(28);
   await shot(page, 'heart-portrait');
   noErrors(errors);
+});
+
+test('прокрутка вариантов — только когда они правда не влезают', async ({ page }) => {
+  const sizes = [[1280, 800], [1440, 900], [1512, 982], [390, 844], [390, 760], [820, 1180], [1180, 820], [844, 390]];
+  const out: any[] = [];
+  for (const [w, h] of sizes) {
+    await page.setViewportSize({ width: w, height: h });
+    const errors = await openScene(page, PAGE);
+    const r = await page.evaluate(() => {
+      const g = window.__game, U = g.UI, res: any[] = [];
+      for (let s = 0; s < 10; s++) {
+        g.api.goStage(s); g.step(0.1);
+        const is = U.itemsS, vis = U.items.every((it: any) => it.x - it.r >= is.x - 1 && it.x + it.r <= is.x + is.w + 1);
+        res.push({ s, n: U.items.length, bar: !!is.bar, vis, minR: Math.min(...U.items.map((i: any) => i.r)) });
+      }
+      return res;
+    });
+    for (const x of r) { expect(x.bar, `${w}x${h} этап ${x.s}`).toBe(!x.vis); expect(x.minR).toBeGreaterThanOrEqual(29); }
+    out.push(`${w}x${h}: прокрутка на этапах [${r.filter((x: any) => x.bar).map((x: any) => x.s).join(',')}]`);
+    noErrors(errors);
+  }
+  console.log(out.join('\n'));
 });
