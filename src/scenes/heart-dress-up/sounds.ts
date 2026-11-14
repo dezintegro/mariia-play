@@ -21,6 +21,13 @@ export const sfx = {
   flutter() { for (let i = 0; i < 6; i++) tone(rand(1800, 2500), 0.05, { vol: 0.05, delay: i * 0.05 }); },
   boop() { tone(300, 0.12, { slide: 200, vol: 0.14 }); },
   arp() { [523, 659, 784, 1047, 1319, 1568].forEach((f, i) => tone(f, 0.3, { type: 'triangle', vol: 0.09, delay: i * 0.06 })); },
+  meow() { tone(620, 0.18, { type: 'triangle', slide: 950, vol: 0.12 }); tone(950, 0.32, { type: 'triangle', slide: 560, vol: 0.12, delay: 0.16 }); },
+  quack() { for (const d of [0, 0.2]) { tone(520, 0.13, { type: 'sawtooth', slide: 380, vol: 0.05, delay: d }); tone(260, 0.13, { type: 'square', slide: 200, vol: 0.03, delay: d }); } },
+  blub() { [0, 0.09, 0.2].forEach((d, i) => tone(320 + i * 140, 0.08, { slide: 800 + i * 200, vol: 0.12, delay: d })); },
+  splash() { whoosh(0.45, 0.14); [0, 0.06, 0.13].forEach((d, i) => tone(rand(900, 1500), 0.07, { slide: rand(300, 600), vol: 0.06, delay: d + i * 0.02 })); },
+  fanfare() { [523, 659, 784].forEach((f, i) => tone(f, 0.14, { type: 'triangle', vol: 0.12, delay: i * 0.12 })); tone(1047, 0.6, { type: 'triangle', vol: 0.12, delay: 0.36 }); tone(784, 0.6, { vol: 0.06, delay: 0.36 }); },
+  rustle() { whoosh(0.5, 0.12); for (let i = 0; i < 4; i++) tone(rand(1200, 2000), 0.05, { vol: 0.03, delay: i * 0.08 }); },
+  plop() { tone(500, 0.12, { slide: 180, vol: 0.16 }); },
   tada() { [523, 659, 784, 1047, 1319, 1568].forEach((f, i) => tone(f, 0.35, { type: 'triangle', vol: 0.12, delay: i * 0.07 })); tone(1047, 1.0, { vol: 0.08, delay: 0.45 }); tone(1319, 1.0, { vol: 0.06, delay: 0.45 }); tone(1568, 1.0, { vol: 0.05, delay: 0.45 }); },
 };
 

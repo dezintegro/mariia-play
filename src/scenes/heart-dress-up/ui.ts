@@ -1,60 +1,98 @@
-// Интерфейс без текста: лента этапов внизу, панель вариантов, стрелка «дальше», кнопки праздника.
+// Интерфейс без текста: лента этапов (одна строка) и панель вариантов (2–3 ряда) — обе листаются вбок,
+// под панелью виден скроллбар. Кнопка праздника, кнопки «заново»/«украшать дальше», звук.
 import { H, S, TAU, W, clamp, ctx, t } from '../../core/canvas';
 import { circle, drawButton, starPath } from '../../core/draw';
 import { clamp01, ease } from '../../core/tween';
-import { itemIcon, stageIcon } from './icons';
-import { BG_COLORS, G, Item, STAGES, stageHas, stageItems } from './state';
+import { itemIcon } from './icons';
+import { stageIcon } from './stageicons';
+import { G, Item, STAGES, stageHas, stageItems } from './state';
 import { smallHeart } from './things';
 
 type Btn = { x: number; y: number; r: number; press: number; shake: number };
 const mk = (): Btn => ({ x: 0, y: 0, r: 40, press: 0, shake: 0 });
+/** Горизонтальная лента с прокруткой: окно (x,y,w,h), ширина содержимого cw, сдвиг off */
+export type Scroller = { x: number; y: number; w: number; h: number; cw: number; off: number; vel: number; held: boolean; bar: { x: number; y: number; w: number; h: number } | null };
+const mkS = (): Scroller => ({ x: 0, y: 0, w: 0, h: 0, cw: 0, off: 0, vel: 0, held: false, bar: null });
+export const maxOff = (s: Scroller) => Math.max(0, s.cw - s.w);
+
 export const UI = {
-  strip: { x: 0, y: 0, w: 0, h: 0, cells: [] as { x: number; y: number; r: number; i: number }[] },
-  panel: { x: 0, y: 0, w: 0, h: 0 },
+  stripS: mkS(), itemsS: mkS(),
+  cells: [] as { x: number; y: number; r: number; i: number }[],
   items: [] as (Item & { x: number; y: number; r: number; press: number })[],
   itemsStage: -1,
-  arrow: mk(), sound: mk(), again: mk(), cont: mk(),
+  party: mk(), sound: mk(), again: mk(), cont: mk(),
   hrTarget: { x: 0, y: 0, w: 0, h: 0 },
+  pad: 10,
 };
 
 // ---------------- РАСКЛАДКА ----------------
 export function layout() {
-  const pad = Math.max(8, 14 * S);
-  // лента этапов: в один ряд, а на узком экране — в два
-  const n = STAGES.length, aw = W - 2 * pad, cmax = Math.max(92 * S, 70);
-  const rows = aw / n >= 64 ? 1 : 2, per = Math.ceil(n / rows), cell = Math.min(cmax, aw / per);
-  const sh = rows * cell + pad * 0.6;
-  const st = UI.strip;
-  Object.assign(st, { x: W / 2 - per * cell / 2, y: H - sh - pad * 0.5, w: per * cell, h: sh });
-  st.cells = [];
-  for (let i = 0; i < n; i++) { const row = Math.floor(i / per), col = i % per, inRow = row < rows - 1 ? per : n - per * (rows - 1); st.cells.push({ x: W / 2 + (col - (inRow - 1) / 2) * cell, y: st.y + pad * 0.3 + (row + 0.5) * cell, r: cell * 0.42, i }); }
-  // панель вариантов: справа (широкий экран) или под сердцем (узкий)
-  const A = { w: W, h: st.y - pad * 0.3 };
-  const its = stageItems(G.stage), m = its.length, cap = Math.max(130 * S, 84);
-  const wide = A.w > A.h * 1.25;
-  const reg = wide ? { w: A.w * 0.4 - pad, h: A.h - 2 * pad } : { w: A.w - 2 * pad, h: A.h * 0.42 };
-  let best = { c: 0, cols: 1, rows: m };
-  for (let cols = 1; cols <= m; cols++) {
-    const rws = Math.ceil(m / cols), c = Math.min(reg.w / cols, reg.h / rws, cap);
-    if (c > best.c + 0.5 || (Math.abs(c - best.c) <= 0.5 && rws < best.rows)) best = { c, cols, rows: rws };
-  }
-  const pw = best.cols * best.c, ph = best.rows * best.c;
-  const p = UI.panel;
-  if (wide) { Object.assign(p, { x: A.w * 0.6 + (A.w * 0.4 - pad) / 2 - pw / 2, y: A.h / 2 - ph / 2, w: pw, h: ph }); UI.hrTarget = { x: 0, y: 0, w: A.w * 0.6, h: A.h }; }
-  else { Object.assign(p, { x: W / 2 - pw / 2, y: A.h - pad * 0.5 - ph, w: pw, h: ph }); UI.hrTarget = { x: 0, y: 0, w: W, h: p.y - pad * 0.5 }; }
+  const pad = UI.pad = Math.max(8, 12 * S);
+  const sr = Math.max(22, 26 * S); Object.assign(UI.sound, { x: W - sr - 12, y: sr + 12, r: sr });
+  const wide = W > H * 1.2;
+  // лента этапов: одна строка по низу; на ноутбуке влезает целиком, на телефоне листается
+  const n = STAGES.length, sc = clamp(80 * S, 72, 88);
+  const ss = UI.stripS, sw = W - 2 * pad;
+  ss.cw = n * sc; ss.w = sw; ss.x = pad; ss.h = sc; ss.y = H - pad * 0.6 - sc - (ss.cw > sw ? 12 : 0);
+  ss.bar = ss.cw > sw ? { x: pad + sw * 0.15, y: ss.y + sc + 3, w: sw * 0.7, h: 6 } : null;
+  const shiftS = ss.cw <= sw ? (sw - ss.cw) / 2 : -ss.off;
+  UI.cells = STAGES.map((_, i) => ({ x: ss.x + shiftS + (i + 0.5) * sc, y: ss.y + sc / 2, r: sc * 0.42, i }));
+  // панель вариантов: фиксированные 2 ряда (узкий экран, под сердцем) или 3 ряда (широкий, справа от сердца)
+  const its = stageItems(G.stage), m = its.length, bh = Math.max(12, 14 * S);
   if (UI.itemsStage !== G.stage) { UI.items = its.map(it => ({ ...it, x: 0, y: 0, r: 0, press: 0 })); UI.itemsStage = G.stage; }
+  const is = UI.itemsS, top = ss.y - pad * 0.8;
+  let rows: number, ic: number;
+  if (wide) {
+    rows = 3;
+    const colW = Math.min(W * 0.44, 560), y0 = UI.sound.y + UI.sound.r + pad, avail = top - y0 - bh - pad;
+    ic = Math.max(64, Math.min(avail / rows, 124 * S, 130));
+    is.w = colW; is.x = W - pad - colW; is.h = rows * ic; is.y = y0 + Math.max(0, (avail - is.h) / 2);
+    UI.hrTarget = { x: 0, y: 0, w: is.x - pad * 0.5, h: top };
+  } else {
+    rows = 2; ic = clamp(Math.min(W / 4.5, 120 * S), 72, 124);
+    is.w = W - 2 * pad; is.x = pad; is.h = rows * ic; is.y = top - bh - pad * 0.4 - is.h;
+    UI.hrTarget = { x: 0, y: 0, w: W, h: is.y - pad * 0.6 };
+  }
+  is.cw = Math.ceil(m / rows) * ic;
+  is.bar = is.cw > is.w ? { x: is.x + is.w * 0.1, y: is.y + is.h + pad * 0.4, w: is.w * 0.8, h: bh } : null;
+  const shiftI = is.cw <= is.w ? (is.w - is.cw) / 2 : -is.off;
   UI.items.forEach((it, i) => {
-    const row = Math.floor(i / best.cols), col = i % best.cols, inRow = row < best.rows - 1 ? best.cols : m - best.cols * (best.rows - 1);
-    Object.assign(it, { x: p.x + pw / 2 + (col - (inRow - 1) / 2) * best.c, y: p.y + (row + 0.5) * best.c, r: best.c * 0.42 });
+    const col = Math.floor(i / rows), row = i % rows; // по столбцам: прокрутка вбок открывает новые столбцы
+    Object.assign(it, { x: is.x + shiftI + (col + 0.5) * ic, y: is.y + (row + 0.5) * ic, r: ic * 0.42 });
   });
   if (G.finale) UI.hrTarget = { x: 0, y: 0, w: W, h: H };
-  const HR = UI.hrTarget;
-  const ar = clamp(52 * S, 36, 64);
-  Object.assign(UI.arrow, { x: HR.x + HR.w - ar - pad, y: HR.y + HR.h - ar - pad, r: ar });
-  const sr = Math.max(22, 26 * S); Object.assign(UI.sound, { x: W - sr - 12, y: sr + 12, r: sr });
+  const HR = UI.hrTarget, pr = clamp(46 * S, 34, 56);
+  Object.assign(UI.party, { x: HR.x + HR.w - pr - pad, y: HR.y + HR.h - pr - pad * 0.5, r: pr });
   const fr = clamp(60 * S, 40, 72);
   Object.assign(UI.again, { x: fr + 24, y: H - fr - 24, r: fr });
   Object.assign(UI.cont, { x: W - fr - 24, y: H - fr - 24, r: fr });
+}
+
+/** Инерция и мягкий возврат к краям, когда ленту не держат */
+export function updateScroll(dt: number) {
+  for (const s of [UI.stripS, UI.itemsS]) {
+    const mx = maxOff(s);
+    if (s.held) continue;
+    s.off += s.vel * dt; s.vel *= Math.exp(-dt * 4);
+    if (s.off < 0) { s.off += (0 - s.off) * Math.min(1, dt * 12); s.vel = 0; }
+    if (s.off > mx) { s.off += (mx - s.off) * Math.min(1, dt * 12); s.vel = 0; }
+    if (Math.abs(s.vel) < 5) s.vel = 0;
+  }
+}
+
+/** Прокрутить панель так, чтобы вариант i был виден (например, выбранный при смене этапа) */
+export function revealItem(i: number) {
+  layout();
+  const is = UI.itemsS, it = UI.items[i]; if (!it) return;
+  const x = it.x - is.x, pad = it.r * 1.3;
+  if (x - pad < 0) is.off = clamp(is.off + x - pad, 0, maxOff(is));
+  else if (x + pad > is.w) is.off = clamp(is.off + x + pad - is.w, 0, maxOff(is));
+  is.vel = 0; layout();
+}
+export function revealStage(i: number) {
+  const ss = UI.stripS, sc = ss.h, x = (i + 0.5) * sc - ss.off;
+  if (x - sc < 0) ss.off = clamp((i - 0.5) * sc, 0, maxOff(ss));
+  else if (x + sc > ss.w) ss.off = clamp((i + 1.5) * sc - ss.w, 0, maxOff(ss));
 }
 
 // ---------------- ВЫБРАНО ЛИ ----------------
@@ -79,25 +117,49 @@ function iconCircle(x: number, y: number, r: number, s: number, ring: string, ri
   ctx.restore();
 }
 
+/** Скроллбар: дорожка и бегунок — видно, что есть ещё и где мы сейчас */
+function drawBar(s: Scroller, col: string) {
+  const b = s.bar; if (!b) return;
+  ctx.fillStyle = 'rgba(255,255,255,0.65)'; roundRect(b.x, b.y, b.w, b.h, b.h / 2); ctx.fill();
+  const k = s.w / s.cw, tw = Math.max(b.h * 2, b.w * k), p = clamp(s.off / maxOff(s), 0, 1);
+  ctx.fillStyle = col; roundRect(b.x + (b.w - tw) * p, b.y, tw, b.h, b.h / 2); ctx.fill();
+}
+
+/** Подсказка «там ещё есть»: мягкая стрелочка-уголок у края ленты */
+function edgeHint(s: Scroller) {
+  if (s.cw <= s.w) return;
+  const a = 0.5 + 0.3 * Math.sin(t * 4), r = Math.min(14, s.h * 0.15);
+  ctx.fillStyle = `rgba(255,90,150,${a})`;
+  const tri = (x: number, dir: number) => { ctx.beginPath(); ctx.moveTo(x, s.y + s.h / 2 - r); ctx.lineTo(x + dir * r, s.y + s.h / 2); ctx.lineTo(x, s.y + s.h / 2 + r); ctx.closePath(); ctx.fill(); };
+  if (s.off < maxOff(s) - 4) tri(s.x + s.w - r - 2 + Math.sin(t * 4) * 3, 1);
+  if (s.off > 4) tri(s.x + r + 2 - Math.sin(t * 4) * 3, -1);
+}
+
 export function drawUI() {
   if (G.uiA < 0.01) return;
   ctx.save(); ctx.globalAlpha = G.uiA;
-  const night = G.cfg.bg === 'night';
+  const night = G.cfg.bg === 'night', pad = UI.pad, plate = night ? 'rgba(20,10,60,0.5)' : 'rgba(255,255,255,0.72)';
   // лента этапов
-  const st = UI.strip, pad = Math.max(8, 14 * S);
-  ctx.fillStyle = night ? 'rgba(255,255,255,0.18)' : 'rgba(255,255,255,0.55)'; roundRect(st.x - pad * 0.4, st.y, st.w + pad * 0.8, st.h, Math.min(st.h / 2, 40 * S + 10)); ctx.fill();
-  for (const c of st.cells) {
-    const cur = c.i === G.stage, s = cur ? 1.1 + Math.sin(t * 4) * 0.03 : 0.9;
+  const ss = UI.stripS;
+  ctx.fillStyle = plate; roundRect(ss.x - pad * 0.3, ss.y - pad * 0.2, ss.w + pad * 0.6, ss.h + pad * 0.4, ss.h / 2); ctx.fill();
+  ctx.save(); ctx.beginPath(); ctx.rect(ss.x, ss.y - pad, ss.w, ss.h + pad * 2); ctx.clip();
+  for (const c of UI.cells) {
+    if (c.x < ss.x - c.r * 1.3 || c.x > ss.x + ss.w + c.r * 1.3) continue;
+    const cur = c.i === G.stage, s = cur ? 1.08 + Math.sin(t * 4) * 0.03 : 0.98;
     iconCircle(c.x, c.y, c.r, s, cur ? '#ffcf3f' : '#ffffff', c.r * (cur ? 0.14 : 0.08), r => stageIcon(c.i, r));
-    if (stageHas(c.i) && STAGES[c.i].optional) { smallHeart(c.x + c.r * 0.72 * s, c.y - c.r * 0.68 * s, c.r * 0.22, '#ff3f8a'); }
+    if (stageHas(c.i) && STAGES[c.i].optional) smallHeart(c.x + c.r * 0.72 * s, c.y - c.r * 0.62 * s, c.r * 0.22, '#ff3f8a');
   }
+  ctx.restore();
+  edgeHint(ss); drawBar(ss, '#ffb3d1');
   // панель вариантов
-  const p = UI.panel;
-  ctx.fillStyle = night ? 'rgba(255,255,255,0.16)' : 'rgba(255,255,255,0.5)'; roundRect(p.x - pad * 0.5, p.y - pad * 0.5, p.w + pad, p.h + pad, 28 * S + 8); ctx.fill();
+  const is = UI.itemsS;
+  ctx.fillStyle = plate; roundRect(is.x - pad * 0.4, is.y - pad * 0.4, is.w + pad * 0.8, is.h + pad * 0.8, 26 * S + 8); ctx.fill();
   const id = STAGES[G.stage].id;
+  ctx.save(); ctx.beginPath(); ctx.rect(is.x, is.y - pad * 0.4, is.w, is.h + pad * 0.8); ctx.clip();
   UI.items.forEach((it, i) => {
-    const ap = ease.outBack(clamp01((G.stageT - i * 0.035) / 0.3)), sel = isSel(it);
     it.press = Math.max(0, it.press - 0.06);
+    if (it.x < is.x - it.r * 1.3 || it.x > is.x + is.w + it.r * 1.3) return;
+    const ap = ease.outBack(clamp01((G.stageT - i * 0.03) / 0.3)), sel = isSel(it);
     const s = Math.max(0.01, ap) * (1 - it.press * 0.15) * (sel ? 1.04 : 0.94), y = it.y + (sel ? Math.sin(t * 4 + i) * 2 * S : 0);
     iconCircle(it.x, y, it.r, s, sel ? '#ffcf3f' : '#ffffff', it.r * (sel ? 0.13 : 0.07), r => itemIcon(id, it, r));
     if (sel && it.kind !== 'none') { // значок «выбрано» — сердечко
@@ -105,20 +167,26 @@ export function drawUI() {
       ctx.fillStyle = '#fff'; circle(0, 0, it.r * 0.24); smallHeart(0, it.r * 0.02, it.r * 0.17, '#ff3f8a'); ctx.restore();
     }
   });
-  // стрелка «дальше» (на последнем этапе — галочка праздника)
-  const last = G.stage === STAGES.length - 1;
-  drawButton(UI.arrow, last ? '#2ec46b' : '#ff7aa8', last ? iconCheck : iconArrow, true);
+  ctx.restore();
+  edgeHint(is); drawBar(is, '#ff7aa8');
+  // праздник
+  drawButton(UI.party, '#ffb928', iconParty, true);
   ctx.restore();
 }
 
-export function iconArrow(R: number) {
-  ctx.fillStyle = '#fff'; ctx.beginPath();
-  ctx.moveTo(-R * 0.45, -R * 0.16); ctx.lineTo(R * 0.05, -R * 0.16); ctx.lineTo(R * 0.05, -R * 0.42); ctx.lineTo(R * 0.5, 0);
-  ctx.lineTo(R * 0.05, R * 0.42); ctx.lineTo(R * 0.05, R * 0.16); ctx.lineTo(-R * 0.45, R * 0.16); ctx.closePath(); ctx.fill();
-}
-export function iconCheck(R: number) {
-  ctx.strokeStyle = '#fff'; ctx.lineWidth = R * 0.2; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-  ctx.beginPath(); ctx.moveTo(-R * 0.4, 0); ctx.lineTo(-R * 0.1, R * 0.3); ctx.lineTo(R * 0.42, -R * 0.3); ctx.stroke();
+/** Праздник: хлопушка с конфетти */
+export function iconParty(R: number) {
+  ctx.save(); ctx.rotate(-0.5);
+  ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.moveTo(0, R * 0.5); ctx.lineTo(-R * 0.26, -R * 0.12); ctx.lineTo(R * 0.26, -R * 0.12); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#ff5c9a'; ctx.fillRect(-R * 0.2, R * 0.0, R * 0.4, R * 0.08); ctx.fillRect(-R * 0.13, R * 0.18, R * 0.26, R * 0.08);
+  ctx.restore();
+  const cols = ['#ff5c9a', '#fff', '#5ab4ff', '#fff6a0'];
+  for (let i = 0; i < 6; i++) {
+    const a = -Math.PI * 0.85 + i * 0.3, d = R * (0.45 + 0.06 * Math.sin(t * 6 + i));
+    ctx.fillStyle = cols[i % 4]; ctx.save(); ctx.translate(Math.cos(a) * d + R * 0.12, Math.sin(a) * d + R * 0.05); ctx.rotate(t * 3 + i);
+    if (i % 2) ctx.fillRect(-R * 0.06, -R * 0.03, R * 0.12, R * 0.06); else { starPath(4, R * 0.09, R * 0.03); ctx.fill(); }
+    ctx.restore();
+  }
 }
 export function iconAgain(R: number) {
   ctx.strokeStyle = '#fff'; ctx.lineWidth = R * 0.16; ctx.lineCap = 'round';
@@ -145,18 +213,25 @@ export function iconSound(R: number, on: boolean) {
 
 // ---------------- ПОПАДАНИЕ ----------------
 const inBtn = (b: Btn, x: number, y: number, k = 1.1) => Math.hypot(x - b.x, y - b.y) < Math.max(b.r * k, 30);
+const inRect = (r: { x: number; y: number; w: number; h: number }, x: number, y: number, m = 0) => x > r.x - m && x < r.x + r.w + m && y > r.y - m && y < r.y + r.h + m;
+/** s — лента, которую можно потянуть из этой точки; bar — тянем за бегунок скроллбара */
 export function hitUI(x: number, y: number): any {
   if (inBtn(UI.sound, x, y, 1.2)) return { k: 'sound' };
   if (G.finale) {
     if (G.finale.t > 1.2) { if (inBtn(UI.again, x, y)) return { k: 'again' }; if (inBtn(UI.cont, x, y)) return { k: 'cont' }; }
     return null;
   }
-  if (inBtn(UI.arrow, x, y)) return { k: 'arrow' };
-  for (const c of UI.strip.cells) if (Math.hypot(x - c.x, y - c.y) < c.r * 1.1) return { k: 'stage', i: c.i };
-  for (const it of UI.items) if (Math.hypot(x - it.x, y - it.y) < it.r * 1.08) return { k: 'item', it };
-  // промахнулся мимо кнопок, но попал в саму ленту/панель — ничего не делаем в мире под ней
-  const st = UI.strip, p = UI.panel, pad = Math.max(8, 14 * S);
-  if (y > st.y && x > st.x - pad && x < st.x + st.w + pad) return { k: 'panel' };
-  if (x > p.x - pad && x < p.x + p.w + pad && y > p.y - pad && y < p.y + p.h + pad) return { k: 'panel' };
+  if (inBtn(UI.party, x, y)) return { k: 'party' };
+  const ss = UI.stripS, is = UI.itemsS, pad = UI.pad;
+  if (ss.bar && inRect(ss.bar, x, y, 10)) return { k: 'bar', s: ss };
+  if (is.bar && inRect(is.bar, x, y, 12)) return { k: 'bar', s: is };
+  if (inRect(ss, x, y, pad * 0.4)) {
+    for (const c of UI.cells) if (Math.hypot(x - c.x, y - c.y) < c.r * 1.1) return { k: 'stage', i: c.i, s: ss };
+    return { k: 'panel', s: ss };
+  }
+  if (inRect(is, x, y, pad * 0.5)) {
+    for (const it of UI.items) if (Math.hypot(x - it.x, y - it.y) < it.r * 1.08) return { k: 'item', it, s: is };
+    return { k: 'panel', s: is };
+  }
   return null;
 }

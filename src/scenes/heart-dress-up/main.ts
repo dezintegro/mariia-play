@@ -7,7 +7,7 @@ import { Live, drawHeart } from './heart';
 import { PENTA, musicBeat, sfx, updMusic } from './sounds';
 import { G, Item, STAGES, defaultCfg, load, save } from './state';
 import { MINI_COLORS, miniHeart } from './things';
-import { UI, drawUI, hitUI, iconAgain, iconBrush, iconSound, layout } from './ui';
+import { UI, drawUI, hitUI, iconAgain, iconBrush, iconSound, isSel, layout, maxOff, revealItem, revealStage, updateScroll } from './ui';
 import { drawBg, drawEnvBack, drawEnvFront, env, hitWorld, tapWorld, updateWorld } from './world';
 
 const hs = G.hs;
@@ -103,12 +103,14 @@ function wiggleOnly() { hs.wgT = 0; hs.mouth = 0.7; sfx.giggle(1.2); }
 
 export function goStage(i: number) {
   if (i === G.stage) { sfx.boop(); return; }
-  G.stage = i; G.stageT = 0; sfx.stage(i); save();
+  G.stage = i; G.stageT = 0; sfx.stage(i); hs.swingV += 2; save();
+  showSelected(); revealStage(i);
 }
-export function next() {
-  UI.arrow.press = 1;
-  if (G.stage >= STAGES.length - 1) { startFinale(); return; }
-  G.stage++; G.stageT = 0; sfx.next(); hs.swingV += 2; save();
+/** Прокрутить панель к выбранному варианту (или в начало) */
+function showSelected() {
+  UI.itemsS.off = 0; UI.itemsS.vel = 0; layout();
+  const i = UI.items.findIndex(it => it.kind !== 'none' && isSel(it));
+  if (i >= 0) revealItem(i);
 }
 
 // ---------------- ПРАЗДНИК ----------------
@@ -121,6 +123,7 @@ export function restart() {
   burst(G.heart.x, G.heart.y, 'smoke', 12, { color: '#ffffff', speed: 200, size: 26 }); sfx.poof(); sfx.wheee(); happy(true); save();
 }
 export function cont() { G.finale = null; G.stageT = 0; sfx.next(); happy(); }
+export function party() { UI.party.press = 1; startFinale(); }
 
 function updateFinale(dt: number) {
   const F = G.finale; if (!F) return;
@@ -147,7 +150,7 @@ function placeHeart(dt: number) {
   for (const key of ['x', 'y', 'w', 'h'] as const) G.HR[key] += (T[key] - G.HR[key]) * k;
   let tx: number, ty: number, tR: number;
   if (G.finale) { tR = Math.min(W, H) * 0.28; tx = W / 2; ty = H * 0.46; }
-  else { const A = G.HR; tR = Math.min(A.w / 2.9, A.h / 3.0); tx = A.x + A.w / 2; ty = A.y + A.h * 0.53; }
+  else { const A = G.HR; tR = Math.min(A.w / 3.3, A.h / 3.0); tx = A.x + A.w / 2; ty = A.y + A.h * 0.53; }
   G.heart.x += (tx - G.heart.x) * k; G.heart.y += (ty - G.heart.y) * k; G.heart.R += (tR - G.heart.R) * k;
   G.snap = false;
 }
@@ -155,7 +158,7 @@ function placeHeart(dt: number) {
 function update(dt: number) {
   G.stageT += dt;
   G.uiA += ((G.finale ? 0 : 1) - G.uiA) * Math.min(1, dt * 6);
-  layout(); placeHeart(dt);
+  updateScroll(dt); layout(); placeHeart(dt);
   updateHeart(dt); updateWorld(dt); updateFinale(dt); updateParticles(dt);
   updMusic(!!G.finale && G.started);
 }
@@ -200,32 +203,77 @@ export function hitAt(x: number, y: number): any {
   if (inHeart(x, y)) return { k: 'heart' };
   return hitWorld(x, y, false);
 }
-export function tapAt(x: number, y: number) {
-  const h = hitAt(x, y);
+/** Мгновенное действие по точке (тап по миру, кнопкам). Варианты и этапы выбираются на отпускании — см. ввод ниже. */
+export function act(h: any, x: number, y: number) {
   if (!h) { // пустое место: сердечки и нотка
     burst(x, y, 'heart', 5, { up: -60, speed: 110 }); sfx.chime(pick(PENTA)); hs.swingV += 1; return;
   }
   switch (h.k) {
     case 'sound': toggleSound(); UI.sound.press = 1; break;
-    case 'arrow': next(); break;
+    case 'party': party(); break;
     case 'stage': goStage(h.i); break;
     case 'item': choose(h.it); break;
     case 'again': UI.again.press = 1; restart(); break;
     case 'cont': UI.cont.press = 1; cont(); break;
-    case 'panel': burst(x, y, 'spark', 4, { speed: 80 }); sfx.boop(); break;
+    case 'panel': case 'bar': burst(x, y, 'spark', 4, { speed: 80 }); sfx.boop(); break;
     case 'heart': tapHeart(); break;
     default: tapWorld(h, x, y);
   }
 }
 
+// Ленты (этапы, варианты) можно тянуть вбок; выбор срабатывает на отпускании, если палец почти не двигался.
+let drag: null | { h: any; s: any; sx: number; so: number; moved: boolean; lx: number; lt: number } = null;
+function down(x: number, y: number) {
+  const h = hitAt(x, y);
+  if (h && h.s) { drag = { h, s: h.s, sx: x, so: h.s.off, moved: false, lx: x, lt: performance.now() }; h.s.held = true; h.s.vel = 0; if (h.k === 'bar') moveDrag(x); return; }
+  act(h, x, y);
+}
+function moveDrag(x: number) {
+  const d = drag!, s = d.s, dx = x - d.sx;
+  if (!d.moved && Math.abs(dx) > 10) d.moved = true;
+  if (d.h.k === 'bar') { // бегунок скроллбара: позиция пальца на дорожке = позиция в ленте
+    const b = s.bar; s.off = Math.max(0, Math.min(maxOff(s), (x - b.x) / b.w * s.cw - s.w / 2)); d.moved = true; return;
+  }
+  if (d.moved) {
+    let o = d.so - dx; const mx = maxOff(s);
+    if (o < 0) o *= 0.35; else if (o > mx) o = mx + (o - mx) * 0.35; // «резинка» у краёв
+    s.off = o;
+    const now = performance.now(), dt = Math.max(1, now - d.lt);
+    s.vel = s.vel * 0.6 + (-(x - d.lx) / dt * 1000) * 0.4; d.lx = x; d.lt = now;
+  }
+}
+function up(x: number, y: number) {
+  if (!drag) return;
+  const d = drag; drag = null; d.s.held = false;
+  if (d.moved) { if (d.h.k === 'bar') d.s.vel = 0; return; }
+  d.s.vel = 0;
+  if (d.h.k === 'item') choose(d.h.it);
+  else if (d.h.k === 'stage') goStage(d.h.i);
+  else act(d.h, x, y);
+}
+/** Для тестов и программного тапа: нажать и отпустить в одной точке */
+export function tapAt(x: number, y: number) { down(x, y); up(x, y); }
+/** Для тестов: потянуть ленту из точки (x,y) на dx */
+export function swipe(x: number, y: number, dx: number) { down(x, y); for (let i = 1; i <= 5; i++) moveDrag(x + dx * i / 5); up(x + dx, y); }
+
 cv.addEventListener('pointerdown', e => {
   if (!G.started) return;
   initAudio();
   pointer.x = e.clientX; pointer.y = e.clientY;
-  tapAt(e.clientX, e.clientY);
+  down(e.clientX, e.clientY);
+  if (drag) try { cv.setPointerCapture(e.pointerId); } catch (_) {}
 });
+cv.addEventListener('pointerup', e => up(e.clientX, e.clientY));
+cv.addEventListener('pointercancel', e => { if (drag) { drag.moved = true; up(e.clientX, e.clientY); } });
+// тачпад/колёсико: двумя пальцами вбок (или вверх-вниз) листает ленту под курсором
+cv.addEventListener('wheel', e => {
+  e.preventDefault();
+  const h = hitUI(e.clientX, e.clientY), s = h && h.s; if (!s) return;
+  s.off = Math.max(0, Math.min(maxOff(s), s.off + (Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY))); s.vel = 0;
+}, { passive: false });
 cv.addEventListener('pointermove', e => {
   pointer.x = e.clientX; pointer.y = e.clientY; pointer.moved = true;
+  if (drag) moveDrag(e.clientX);
   if (G.started && performance.now() - pointer.lastSpark > 35) {
     pointer.lastSpark = performance.now();
     addP({ kind: Math.random() < 0.3 ? 'heart' : 'spark', x: e.clientX + rand(-4, 4), y: e.clientY + rand(-4, 4), vx: rand(-20, 20) * S, vy: rand(10, 40) * S, life: rand(0.4, 0.8), size: rand(3, 6) * S, color: pick(['#fff', '#ffe27a', '#ffc4e1', '#ff8fc8']), rot: rand(0, TAU), vr: rand(-4, 4), g: 0 });
@@ -251,6 +299,7 @@ for (const ev of ['gesturestart', 'gesturechange', 'dblclick']) document.addEven
 
 load();
 resize();
+showSelected(); revealStage(G.stage);
 requestAnimationFrame(frame);
 
 // Ручка для автотестов (tests/heart-dress-up.spec.ts)
@@ -260,5 +309,5 @@ requestAnimationFrame(frame);
   pause(on = true) { paused = on; },
   audio() { return AC ? AC.state : 'none'; },
   start() { G.started = true; document.getElementById('start')!.classList.add('hide'); },
-  api: { tapAt, hitAt, choose, next, goStage, startFinale, restart, cont, tapHeart, layout },
+  api: { tapAt, swipe, hitAt, choose, party, goStage, revealItem, startFinale, restart, cont, tapHeart, layout },
 };

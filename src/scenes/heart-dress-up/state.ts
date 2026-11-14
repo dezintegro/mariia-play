@@ -2,15 +2,15 @@
 
 /** Этапы по порядку. optional — можно «без этого»; multi — можно выбрать несколько сразу. */
 export const STAGES = [
-  { id: 'color', opts: ['red', 'pink', 'purple', 'blue', 'teal', 'green', 'yellow', 'orange', 'rainbow'] },
-  { id: 'eyes', opts: ['round', 'sparkle', 'happy', 'star', 'heart', 'button', 'wink'] },
-  { id: 'lashes', optional: true, opts: ['short', 'long', 'flutter', 'color'] },
-  { id: 'nose', optional: true, opts: ['dot', 'heart', 'button', 'clown', 'bunny'] },
-  { id: 'cheeks', optional: true, opts: ['blush', 'hearts', 'freckles', 'stars', 'swirl'] },
-  { id: 'hair', optional: true, opts: ['bow', 'long', 'pigtails', 'curl', 'crown', 'flowers', 'unicorn', 'bun'] },
-  { id: 'earrings', optional: true, opts: ['pearl', 'heart', 'star', 'hoop', 'cherry', 'drop'] },
-  { id: 'necklace', optional: true, opts: ['pearls', 'hearts', 'flowers', 'beads', 'locket', 'star'] },
-  { id: 'env', optional: true, multi: true, opts: ['babies', 'bubbles', 'butterflies', 'balloons', 'sparkles', 'flowers'] },
+  { id: 'color', opts: ['red', 'pink', 'purple', 'blue', 'green', 'yellow', 'rainbow', 'dots', 'stripes', 'sunset'] },
+  { id: 'eyes', opts: ['round', 'sparkle', 'happy', 'sleepy', 'cat', 'rainbow', 'glasses', 'sunglasses', 'wink', 'button'] },
+  { id: 'lashes', optional: true, opts: ['short', 'long', 'flutter', 'color', 'lower', 'wing', 'glitter', 'brows'] },
+  { id: 'nose', optional: true, opts: ['dot', 'heart', 'button', 'clown', 'cat', 'pig', 'strawberry', 'dog', 'mustache'] },
+  { id: 'cheeks', optional: true, opts: ['blush', 'doll', 'freckles', 'swirl', 'rainbow', 'daisy', 'candy', 'paw'] },
+  { id: 'hair', optional: true, opts: ['bow', 'long', 'pigtails', 'crown', 'flowers', 'unicorn', 'bun', 'cat', 'bunny', 'afro'] },
+  { id: 'earrings', optional: true, opts: ['pearl', 'hoop', 'cherry', 'drop', 'icecream', 'butterfly', 'bell', 'feather', 'star'] },
+  { id: 'necklace', optional: true, opts: ['pearls', 'beads', 'flowers', 'locket', 'bowtie', 'scarf', 'key', 'shells', 'candy'] },
+  { id: 'env', optional: true, multi: true, opts: ['babies', 'bubbles', 'butterflies', 'balloons', 'sparkles', 'flowers', 'kitten', 'fish', 'duck'] },
   { id: 'bg', opts: [] as string[] },
 ] as { id: string; optional?: boolean; multi?: boolean; opts: string[] }[];
 
@@ -22,8 +22,10 @@ export const BG_COLORS: Record<string, [string, string]> = {
   mint: ['#defcf0', '#a9ecd2'],
   peach: ['#fff0dc', '#ffc79f'],
   night: ['#231c5c', '#4a3a92'],
+  sunset: ['#ffc46b', '#d98ad8'],
+  lemon: ['#fffbd8', '#ffe27a'],
 };
-export const BG_DETAILS = ['clouds', 'rainbow', 'sun', 'hills', 'hearts', 'moon'];
+export const BG_DETAILS = ['clouds', 'rainbow', 'sun', 'hills', 'moon', 'garland', 'tree', 'castle', 'sea'];
 
 export type Item = { kind: 'single' | 'none' | 'toggle' | 'bgcolor' | 'bgd'; k: string | null };
 

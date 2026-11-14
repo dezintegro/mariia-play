@@ -3,11 +3,12 @@ import { TAU, ctx, t } from '../../core/canvas';
 import { circle } from '../../core/draw';
 import { STILL, drawHeart } from './heart';
 import { BG_COLORS, G, Item, STAGES } from './state';
-import { MINI_COLORS, balloon, bubble, butterfly, cloud, hillsPath, miniHeart, moon, rainbowArc, smallHeart, sparkleStar, stemFlower, sun } from './things';
+import { MINI_COLORS, balloon, bubble, butterfly, castle, cloud, duck, fish, garland, hillsPath, kitten, miniHeart, moon, rainbowArc, sea, smallHeart, sparkleStar, stemFlower, sun, tree } from './things';
+import { FISH_COLS } from './world';
 // ---------------- ЗНАЧКИ ----------------
 const ZOOM: Record<string, [number, number, number]> = {
-  color: [0, -0.05, 0.52], eyes: [0, -0.12, 1.3], lashes: [0, -0.22, 1.15], nose: [0, 0.08, 1.9], cheeks: [0, 0.06, 0.95],
-  hair: [0, -0.3, 0.48], earrings: [-0.72, -0.02, 0.85], necklace: [0, 0.5, 0.95],
+  color: [0, -0.05, 0.52], eyes: [0, -0.12, 1.3], lashes: [0, -0.22, 1.15], nose: [0, 0.08, 1.9], cheeks: [0, 0.02, 1.3],
+  hair: [0, -0.5, 0.68], earrings: [-0.85, -0.02, 1.1], necklace: [0, 0.5, 0.95],
 };
 function heartIcon(id: string, cfg: Record<string, any>, r: number) {
   const [fx, fy, z] = ZOOM[id], R = r * z;
@@ -30,6 +31,9 @@ function envIcon(k: string, r: number) {
   else if (k === 'balloons') { balloon(-r * 0.25, -r * 0.2, r * 0.3, '#ff5c8a', 1.6); balloon(r * 0.3, -r * 0.35, r * 0.28, '#6ec3ff', 1.9); }
   else if (k === 'sparkles') { sparkleStar(-r * 0.3, -r * 0.2, r * 0.32, 0); sparkleStar(r * 0.35, r * 0.1, r * 0.25, 0.4); sparkleStar(-r * 0.05, r * 0.45, r * 0.18, 0.2); }
   else if (k === 'flowers') { stemFlower(-r * 0.35, r * 0.75, r * 0.2, '#ff7aa8', 0); stemFlower(r * 0.05, r * 0.8, r * 0.24, '#ffd23f', 0.3); stemFlower(r * 0.42, r * 0.75, r * 0.18, '#c9a7ff', -0.2); }
+  else if (k === 'kitten') kitten(-r * 0.05, r * 0.82, r * 0.38, { look: 0.5 });
+  else if (k === 'fish') { bubble(r * 0.5, -r * 0.45, r * 0.1); bubble(r * 0.62, -r * 0.2, r * 0.07); fish(-r * 0.05, r * 0.05, r * 0.42, FISH_COLS[0], 1, -0.1); }
+  else if (k === 'duck') duck(-r * 0.12, r * 0.6, r * 0.62, 1, 0.5);
 }
 function bgIcon(it: Item, r: number) {
   if (it.kind === 'bgcolor') {
@@ -44,7 +48,10 @@ function bgIcon(it: Item, r: number) {
   else if (k === 'rainbow') rainbowArc(0, r * 0.45, r * 0.85, r * 0.45, 1);
   else if (k === 'sun') sun(0, 0, r * 0.45, t * 0.3, 0);
   else if (k === 'hills') { ctx.fillStyle = '#9fe08a'; hillsPath(-r, r, r * 0.05, r, r * 0.12, 0.8); ctx.fill(); ctx.fillStyle = '#7fd16c'; hillsPath(-r, r, r * 0.4, r, r * 0.08, 2.6); ctx.fill(); }
-  else if (k === 'hearts') { smallHeart(-r * 0.35, -r * 0.25, r * 0.2, '#fff'); smallHeart(r * 0.3, -r * 0.05, r * 0.26, '#fff'); smallHeart(-r * 0.1, r * 0.4, r * 0.16, '#fff'); }
+  else if (k === 'castle') castle(0, r * 0.82, r * 0.5, 0, 0);
+  else if (k === 'tree') { ctx.fillStyle = '#9fe08a'; hillsPath(-r, r, r * 0.7, r, r * 0.05, 0.8); ctx.fill(); tree(0, r * 0.78, r * 0.48, 0, [1, 1, 1, 1, 1]); }
+  else if (k === 'sea') { sea(-r, r, r * 0.05, r, r * 0.07, 0.6); ctx.fillStyle = '#fff'; }
+  else if (k === 'garland') garland(-r, r, -r * 0.35, r * 0.18, r * 0.26, 0);
   else if (k === 'moon') { moon(-r * 0.1, r * 0.05, r * 0.42, 0); ctx.fillStyle = '#fff6c0'; circle(r * 0.5, -r * 0.45, r * 0.06); circle(r * 0.55, r * 0.35, r * 0.05); }
 }
 function colorIcon(k: string, r: number) { iconBgFill(r); heartIcon('color', { ...G.cfg, color: k, hair: null, earrings: null, necklace: null }, r); }
@@ -60,7 +67,7 @@ export function itemIcon(id: string, it: Item, r: number) {
 }
 
 /** Значок этапа на ленте: показывает, ЧТО украшаем на этом шаге */
-const REP: Record<string, string> = { eyes: 'sparkle', lashes: 'long', nose: 'clown', cheeks: 'blush', hair: 'bow', earrings: 'heart', necklace: 'pearls' };
+const REP: Record<string, string> = { eyes: 'sparkle', lashes: 'long', nose: 'clown', cheeks: 'blush', hair: 'bow', earrings: 'cherry', necklace: 'pearls' };
 export function stageIcon(i: number, r: number) {
   const id = STAGES[i].id;
   if (id === 'color') {
