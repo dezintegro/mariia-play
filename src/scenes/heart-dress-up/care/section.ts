@@ -87,6 +87,15 @@ export function tickLeaving(obj: Record<string, any>, keys: string[], dt: number
   for (const key of keys) { const o = obj[key] as Leaving | null; if (o && o.out != null) { o.out += dt; if (o.out > OUT) obj[key] = null; } }
 }
 
+/** Следы ухода: переживают смену раздела. Раздел пишет свой след, другие только читают. */
+export const traces = {
+  /** «выспалось» (сон): сколько секунд ещё бодрое, глаза блестят */
+  rested: 0,
+  /** Картинки для снов — что было в этот заход: ключ → рисовалка в (0,0) радиусом r.
+   *  Сон показывает их по кругу в порядке DREAM_ORDER (sleep.ts): food — любимая еда, duck — уточка, teddy, stars. */
+  dreams: {} as Record<string, (r: number) => void>,
+};
+
 /** Номер дня (по местному времени) — для «еды дня» и будущих секретов дня */
 export const dayNo = () => Math.floor((Date.now() - new Date().getTimezoneOffset() * 60000) / 86400000);
 

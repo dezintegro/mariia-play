@@ -9,7 +9,7 @@ import { Live } from '../heart';
 import { Xf } from '../reactions';
 import { bath } from './bath';
 import { food } from './food';
-import { CareSection, shared } from './section';
+import { CareSection, shared, traces } from './section';
 import { sleep } from './sleep';
 
 export type { CareSection } from './section';
@@ -20,6 +20,7 @@ const byId = (id: string) => SECTIONS.find(s => s.id === id);
 
 // для автотестов: window.__care.food / .bath / .sleep — состояние разделов
 (window as any).__care = Object.fromEntries(SECTIONS.map(s => [s.id, s.state]));
+(window as any).__traces = traces;
 
 /** Значок варианта ухода: рисуется в (0,0) радиусом r, уже обрезан кругом */
 export function careIcon(stage: string, k: string, r: number) { byId(stage)?.optIcon(k, r); }
