@@ -25,6 +25,49 @@ export const darkOf = (c: string) => (COLORS[c] || COLORS.red)[2];
 const baseOf = (c: string) => (COLORS[c] || COLORS.red)[0];
 const INK = '#45182e';
 
+// ---------------- ПАЛИТРА «В ТОН» ----------------
+// Для каждого цвета сердца — роли: акцент (банты, ленты, бусы), камень (кулоны, гвоздики), металл, румянец.
+// Металл — золото, на жёлтом сердце — серебро (иначе пропадает). [светлый, основной, тёмный]
+type RGBA = [number, number, number, number];
+export type Pal = { acc: [string, string]; gem: [string, string]; metal: [string, string, string]; blush: RGBA };
+const GOLD: [string, string, string] = ['#fff3a0', '#ffd23f', '#b07d00'];
+const SILVER: [string, string, string] = ['#ffffff', '#ece6f2', '#8f7f9e'];
+// на радуге щёчки ложатся на зелёно-голубое — нужен плотный розовый
+const PATTERN: Pal = { acc: ['#ffffff', '#c27aa3'], gem: ['#ffffff', '#c27aa3'], metal: GOLD, blush: [255, 120, 170, 0.8] };
+// на зелёном полупрозрачный розовый буреет — румянец почти непрозрачный
+const TO_PINK: Pal = { acc: ['#ffc2de', '#d94f97'], gem: ['#ff8cc6', '#c2387f'], metal: GOLD, blush: [255, 160, 190, 0.92] };
+export const PALS: Record<string, Pal> = {
+  red: { acc: ['#ffd9e2', '#e87a98'], gem: ['#ffffff', '#c47a9b'], metal: GOLD, blush: [255, 196, 208, 0.62] },
+  pink: { acc: ['#c9a2ff', '#7a3fd0'], gem: ['#b57cff', '#7a3fd0'], metal: GOLD, blush: [255, 60, 135, 0.5] },
+  purple: { acc: ['#ffb0da', '#d94f97'], gem: ['#ff8cc6', '#c2387f'], metal: GOLD, blush: [255, 130, 200, 0.6] },
+  blue: { ...TO_PINK, blush: [255, 179, 214, 0.85] },
+  green: TO_PINK,
+  yellow: { acc: ['#ff9cc4', '#d94f97'], gem: ['#ff6fa8', '#cf3479'], metal: SILVER, blush: [255, 120, 120, 0.5] },
+  rainbow: PATTERN, sunset: PATTERN,
+  // на горошке и полосках много белого — белые детали в нём теряются, берём розовое/сиреневое
+  dots: { acc: ['#d9b8ff', '#7a3fd0'], gem: ['#b57cff', '#7a3fd0'], metal: GOLD, blush: [255, 60, 135, 0.5] },
+  stripes: { ...TO_PINK, blush: [255, 160, 200, 0.85] },
+  teal: { ...TO_PINK, blush: [255, 160, 200, 0.85] },
+  orange: { acc: ['#ffd9e2', '#e87a98'], gem: ['#ffffff', '#c47a9b'], metal: GOLD, blush: [255, 90, 110, 0.5] },
+};
+export const palOf = (c: string) => PALS[c] || PALS.red;
+const rgba = (c: RGBA, a = c[3]) => `rgba(${c[0]},${c[1]},${c[2]},${a})`;
+/** Сердце тёплого красно-розового тона — красным и розовым деталям нужна светлая обводка, иначе сливаются */
+const warm = (c: string) => c === 'red' || c === 'pink' || c === 'dots' || c === 'orange' || c === 'sunset';
+/** Светлая подложка-обводка вокруг текущего пути (ставится перед основной заливкой) */
+function halo(w: number) { ctx.save(); ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.lineWidth = w; ctx.lineJoin = 'round'; ctx.stroke(); ctx.restore(); }
+/** Сердечко-камушек: заливка, обводка, блик */
+function gemHeart(x: number, y: number, s: number, col: string, dk: string, R: number, rot = 0) {
+  ctx.save(); ctx.translate(x, y); ctx.rotate(rot); heartShape(s); ctx.fillStyle = col; ctx.fill();
+  ctx.strokeStyle = dk; ctx.lineWidth = 0.014 * R; ctx.lineJoin = 'round'; ctx.stroke();
+  ctx.fillStyle = 'rgba(255,255,255,0.85)'; ell(-0.4 * s, -0.45 * s, 0.17 * s, 0.12 * s, -0.6); ctx.restore();
+}
+/** Бусина с бликом */
+function bead(x: number, y: number, r: number, col: string, dk: string, R: number) {
+  ctx.fillStyle = col; circle(x, y, r); ctx.strokeStyle = dk; ctx.lineWidth = 0.012 * R; ctx.stroke();
+  ctx.fillStyle = 'rgba(255,255,255,0.85)'; circle(x - r * 0.33, y - r * 0.33, r * 0.28);
+}
+
 /** Живое состояние: куда смотрит, моргание, открытый рот, «влюблённость», качание серёжек, появление деталей */
 export interface Live { lx: number; ly: number; blink: number; mouth: number; love: number; swing: number; pop: Record<string, number>; live?: boolean;
   /** идёт своя реакция на деталь (reactions.ts): id этапа, вариант, время с начала, с */
@@ -61,6 +104,12 @@ const MOVE: Record<string, (x: number) => Mv> = {
   'nose:clown': x => { const h = hump(x, 0.25) + hump(x - 0.35, 0.25); return { sx: 1 + 0.4 * h + 0.1 * wob(x - 0.6, 3), sy: 1 - 0.35 * h - 0.1 * wob(x - 0.6, 3) }; },
   'nose:cat': x => ({ dy: 0.012 * Math.sin(x * TAU * 5) * on(x) }),
   'nose:pig': x => { const h = hump(x, 0.18) + hump(x - 0.32, 0.18); return { dy: -0.06 * h, sx: 1 + 0.2 * h, sy: 1 - 0.1 * h, rot: 0.15 * Math.sin(x * TAU * 6) * hump(x - 0.6, 0.8) }; },
+  'nose:tone': x => ({ dy: -0.03 * hump(x, 0.3), sx: 1 + 0.25 * hump(x - 0.3, 0.25), sy: 1 - 0.2 * hump(x - 0.3, 0.25) }),
+  'nose:soft': x => { const h = hump(x, 0.2) + hump(x - 0.3, 0.2) + hump(x - 0.6, 0.2); return { sx: 1 + 0.35 * h, sy: 1 - 0.3 * h }; },
+  'nose:tri': x => ({ dy: 0.015 * Math.sin(x * TAU * 6) * on(x), sx: 1 + 0.15 * Math.abs(Math.sin(x * TAU * 6)) * on(x) }),
+  'nose:line': x => ({ sx: 1 + 0.6 * hump(x, 0.9), sy: 1 + 0.4 * hump(x, 0.9), dy: -0.02 * hump(x, 0.9) }),
+  'necklace:heartchain': x => ({ rot: 0.45 * wob(x, 1.6, 1.6) }),
+  'necklace:gem': x => ({ rot: 0.35 * wob(x, 2.2, 1.8), sy: 1 + 0.15 * hump(x, 0.5) }),
   'nose:strawberry': x => ({ dy: -0.08 * Math.abs(Math.sin(x * TAU * 1.6)) * fade(x), rot: 0.4 * wob(x, 3) }),
   'nose:dog': x => ({ dx: 0.04 * Math.sin(x * TAU * 5) * on(x), sy: 1 + 0.1 * Math.abs(Math.sin(x * TAU * 5)) * on(x) }),
   'nose:mustache': x => ({ dy: -0.02 * Math.abs(Math.sin(x * TAU * 3)) * on(x) }),
@@ -90,17 +139,19 @@ export function drawHeart(cfg: Record<string, any>, R: number, L: Live = STILL) 
   const hairPiv = cfg.hair === 'long' ? -0.95 * R : -0.7 * R;
   if (cfg.hair) popped(L, 'hair', 0, -0.7 * R, () => mv(L, 'hair', cfg.hair, R, 0, hairPiv, () => hairBack(cfg.hair, R, L, cfg.color)));
   body(cfg.color, R, L);
-  if (cfg.hair) popped(L, 'hair', 0, -0.7 * R, () => hairBangs(cfg.hair, R));
-  if (cfg.cheeks) popped(L, 'cheeks', 0, 0.1 * R, () => cheeks(cfg.cheeks, R, L));
-  if (L.love > 0) { ctx.fillStyle = `rgba(255,70,130,${0.45 * clamp01(L.love)})`; ell(-0.55 * R, 0.1 * R, 0.14 * R, 0.08 * R); ell(0.55 * R, 0.1 * R, 0.14 * R, 0.08 * R); }
+  if (cfg.hair) popped(L, 'hair', 0, -0.7 * R, () => hairBangs(cfg.hair, R, cfg.color));
+  if (cfg.cheeks) popped(L, 'cheeks', 0, 0.1 * R, () => cheeks(cfg.cheeks, R, L, cfg.color));
+  if (L.love > 0) { const bl = palOf(cfg.color).blush; ctx.fillStyle = rgba(bl, Math.max(0.5, bl[3]) * clamp01(L.love)); // «влюблённый» румянец — в тон сердцу
+    ell(-0.55 * R, 0.1 * R, 0.14 * R, 0.08 * R); ell(0.55 * R, 0.1 * R, 0.14 * R, 0.08 * R); }
   popped(L, 'eyes', 0, -0.12 * R, () => { drawEye(eyes, -1, R, L, cfg.color); drawEye(eyes, 1, R, L, cfg.color); });
-  if (cfg.lashes) popped(L, 'lashes', 0, -0.25 * R, () => lashes(cfg.lashes, eyes, R, L));
+  // ресницы и брови уходят под чёлку (а не рисуются поверх волос)
+  if (cfg.lashes) popped(L, 'lashes', 0, -0.25 * R, () => { ctx.save(); if (HAIR[cfg.hair]) bangsClip(R, cfg.hair === 'afro'); lashes(cfg.lashes, eyes, R, L, cfg.color); ctx.restore(); });
   popped(L, 'eyes', 0, -0.12 * R, () => eyewear(cfg.eyes, R, L));
-  if (cfg.nose) popped(L, 'nose', 0, 0.06 * R, () => mv(L, 'nose', cfg.nose, R, 0, 0.06 * R, () => nose(cfg.nose, R, L)));
+  if (cfg.nose) popped(L, 'nose', 0, 0.06 * R, () => mv(L, 'nose', cfg.nose, R, 0, 0.06 * R, () => nose(cfg.nose, R, L, cfg.color)));
   mouth(R, L);
-  if (cfg.hair) popped(L, 'hair', 0, -0.7 * R, () => mv(L, 'hair', cfg.hair, R, 0, hairPiv, () => hairFront(cfg.hair, R, L)));
-  if (cfg.earrings) popped(L, 'earrings', 0, 0.05 * R, () => earrings(cfg.earrings, R, L));
-  if (cfg.necklace) popped(L, 'necklace', 0, 0.55 * R, () => necklace(cfg.necklace, R, L));
+  if (cfg.hair) popped(L, 'hair', 0, -0.7 * R, () => mv(L, 'hair', cfg.hair, R, 0, hairPiv, () => hairFront(cfg.hair, R, L, cfg.color)));
+  if (cfg.earrings) popped(L, 'earrings', 0, 0.05 * R, () => earrings(cfg.earrings, R, L, cfg.color));
+  if (cfg.necklace) popped(L, 'necklace', 0, 0.55 * R, () => necklace(cfg.necklace, R, L, cfg.color));
 }
 
 // ---------------- ТЕЛО ----------------
@@ -214,6 +265,9 @@ function eyeFx(L: Live, kind: string, side: number): { sc: number; dy: number; s
   else if (kind === 'cat') r.sc = 1 + 0.08 * hump(x, 1.2);
   return r;
 }
+/** Насколько глаз сейчас моргает (0..1). Пока реакция сама открывает/зажмуривает глаз (подмигивание),
+ *  обычное моргание не вмешивается — иначе подмигивание и моргание идут одновременно */
+function eyeBlink(L: Live, kind: string, side: number) { return eyeFx(L, kind, side).shut != null ? 0 : L.blink; }
 /** Закрыт ли глаз сейчас (то же решение для глаза и ресничек) */
 function eyeClosed(L: Live, kind: string, side: number) {
   const f = eyeFx(L, kind, side).shut;
@@ -229,13 +283,14 @@ function drawEye(kind: string, side: number, R: number, L: Live, color: string) 
     return;
   }
   const fx = eyeFx(L, kind, side), x = side * EX * R, y = EY * R + fx.dy * R, sp = eyeSpec(kind, side);
-  if (eyeClosed(L, kind, side) || L.blink > 0.85) {
+  const bk = eyeBlink(L, kind, side);
+  if (eyeClosed(L, kind, side) || bk > 0.85) {
     ctx.strokeStyle = INK; ctx.lineWidth = 0.045 * R; ctx.lineCap = 'round';
     ctx.beginPath(); ctx.arc(x, y + 0.05 * R, 0.11 * R, Math.PI * 1.12, Math.PI * 1.88); ctx.stroke(); return;
   }
   const k = kind === 'wink' || kind === 'happy' ? 'round' : (EYES[kind] ? kind : 'round');
   const lx = L.lx * 0.05 * R, ly = L.ly * 0.05 * R, rx = (kind === 'happy' ? EYES.round.rx : sp.rx) * R, ry = (kind === 'happy' ? EYES.round.ry : sp.ry) * R;
-  ctx.save(); ctx.translate(x, y); ctx.scale(fx.sc, Math.max(0.1, 1 - L.blink) * fx.sc);
+  ctx.save(); ctx.translate(x, y); ctx.scale(fx.sc, Math.max(0.1, 1 - bk) * fx.sc);
   const white = () => { ctx.fillStyle = '#fff'; ell(0, 0, rx, ry); ctx.strokeStyle = INK; ctx.lineWidth = 0.022 * R; ctx.stroke(); };
   if (k === 'round' || k === 'glasses') {
     white(); ctx.fillStyle = '#2b1420'; ell(lx, ly, rx * 0.66, ry * 0.66); shine(lx, ly, R);
@@ -335,14 +390,19 @@ function eyewear(kind: string, R: number, L: Live) {
 }
 
 // ---------------- РЕСНИЧКИ ----------------
-function lashes(type: string, eyes: string, R: number, L: Live) {
+function lashes(type: string, eyes: string, R: number, L: Live, color: string) {
   const shades = eyes === 'sunglasses';
-  const ax = actT(L, 'lashes', type), lg = 1 + (type === 'long' ? 0.5 * hump(ax, 1.3) : type === 'flutter' ? 0.25 * Math.abs(Math.sin(ax * TAU * 4)) * fade(ax) : type === 'lower' ? 0.3 * hump(ax, 1) : type === 'short' ? 0.6 * Math.abs(Math.sin(ax * TAU * 2.5)) * fade(ax) : 0);
+  const ax = actT(L, 'lashes', type), lg = 1 + (type === 'one' ? 0.5 * Math.abs(wob(ax, 2.5, 2)) : type === 'long' ? 0.5 * hump(ax, 1.3) : type === 'flutter' ? 0.25 * Math.abs(Math.sin(ax * TAU * 4)) * fade(ax) : type === 'lower' ? 0.3 * hump(ax, 1) : type === 'short' ? 0.6 * Math.abs(Math.sin(ax * TAU * 2.5)) * fade(ax) : 0);
   ctx.lineCap = 'round'; ctx.lineJoin = 'round';
   for (const side of [-1, 1]) {
-    const sp = eyeSpec(eyes, side), closed = eyeClosed(L, eyes, side) || (L.blink > 0.85 && !shades), efx = eyeFx(L, eyes, side);
-    const bl = closed || shades ? 1 : Math.max(0.1, 1 - L.blink);
-    const cx = side * EX * R, cy = EY * R + efx.dy * R + (closed ? 0.05 * R : 0), rx = (closed ? 0.11 : sp.rx * efx.sc) * R, ry = (closed ? 0.11 : sp.ry * efx.sc) * R * bl;
+    // ресницы закрываются вместе с веком: то же решение «закрыт/моргает», что и у глаза (eyeBlink)
+    // в очках ресницы растут из-за оправы (иначе оправа их перечёркивает); оправа не моргает — и ресницы на ней не прыгают
+    const gl = eyes === 'glasses';
+    const sp = eyeSpec(eyes, side), efx = eyeFx(L, eyes, side), b = eyeBlink(L, eyes, side), closed = !shades && !gl && (eyeClosed(L, eyes, side) || b > 0.85);
+    const bl = closed || shades ? 1 : Math.max(0.1, 1 - b);
+    const gy = gl ? -0.04 * R * hump(actT(L, 'eyes', 'glasses'), 0.5) : 0;
+    const cx = side * EX * R, cy = EY * R + efx.dy * R + gy + (closed ? 0.05 * R : 0);
+    const rx = (closed ? 0.11 : gl ? 0.225 : sp.rx * efx.sc) * R, ry = (closed ? 0.11 : gl ? 0.225 : sp.ry * efx.sc) * R * (gl ? 1 : bl);
     /** точка на краю глаза: a — угол для левого глаза (−π — внешний уголок, −π/2 — верх), правый зеркально */
     const pt = (a: number) => { const A = side < 0 ? a : -Math.PI - a; return { x: cx + Math.cos(A) * rx, y: cy + Math.sin(A) * ry, dx: Math.cos(A), dy: Math.sin(A) }; };
     const one = (a: number, len: number, curl: number, col = INK, w = 0.024, tip = 0) => {
@@ -352,7 +412,8 @@ function lashes(type: string, eyes: string, R: number, L: Live) {
       if (tip) { ctx.fillStyle = col; circle(ex, ey, tip * R); }
       return [ex, ey];
     };
-    if (type === 'short') [-2.7, -2.3, -1.9].forEach((a, i) => one(a, [0.06, 0.065, 0.055][i], 0.15));
+    if (type === 'one') one(-2.85, 0.12, 0.5, INK, 0.03);
+    else if (type === 'short') [-2.7, -2.3, -1.9].forEach((a, i) => one(a, [0.06, 0.065, 0.055][i], 0.15));
     else if (type === 'long') [-2.7, -2.3, -1.9].forEach((a, i) => one(a, [0.12, 0.13, 0.11][i], 0.5));
     else if (type === 'flutter') [-2.95, -2.6, -2.25, -1.9, -1.55].forEach((a, i) => one(a, [0.14, 0.17, 0.17, 0.15, 0.11][i], 0.6, INK, 0.03));
     else if (type === 'color') { // реакция: цвета бегут по ресничкам
@@ -373,19 +434,20 @@ function lashes(type: string, eyes: string, R: number, L: Live) {
       [-2.4, -2.0].forEach(a => one(a, 0.1, 0.5));
     } else if (type === 'glitter') {
       // перламутровые тени с блёстками над глазом
-      const g = ctx.createLinearGradient(0, cy - ry * 1.7, 0, cy); g.addColorStop(0, 'rgba(120,200,255,0.9)'); g.addColorStop(1, 'rgba(210,150,255,0.9)');
+      const [ga, gd] = palOf(color).acc, g = ctx.createLinearGradient(0, cy - ry * 1.7, 0, cy); g.addColorStop(0, ga === '#ffffff' ? '#e9dcff' : ga); g.addColorStop(1, gd);
       ctx.fillStyle = g; ctx.beginPath();
       for (let i = 0; i <= 16; i++) { const a = Math.PI + i / 16 * Math.PI; ctx.lineTo(cx + Math.cos(a) * rx * 1.02, cy + Math.sin(a) * ry * 1.02); }
       for (let i = 16; i >= 0; i--) { const a = Math.PI + i / 16 * Math.PI; ctx.lineTo(cx + Math.cos(a) * rx * 1.18, cy - 0.03 * R + Math.sin(a) * (ry * 1.25 + 0.06 * R)); }
-      ctx.closePath(); ctx.fill(); ctx.strokeStyle = 'rgba(110,70,180,0.6)'; ctx.lineWidth = 0.01 * R; ctx.stroke();
+      ctx.closePath(); ctx.globalAlpha = 0.9; ctx.fill(); ctx.globalAlpha = 1; ctx.strokeStyle = 'rgba(90,40,90,0.5)'; ctx.lineWidth = 0.012 * R; ctx.stroke();
       for (let i = 0; i < 6; i++) {
         const a = Math.PI * (1.15 + i * 0.14), rr = 1.1 + (i % 2) * 0.1, tw = 0.5 + 0.5 * Math.sin(t * 5 + i * 1.7 + side) + 2.2 * hump(ax - i * 0.1, 0.5);
         ctx.fillStyle = i % 2 ? '#fff' : '#fff2a0'; circle(cx + Math.cos(a) * rx * rr, cy + Math.sin(a) * (ry * rr + 0.02 * R), (0.008 + 0.01 * tw) * R);
       }
       [-2.75, -2.4].forEach(a => one(a, 0.06, 0.3));
     } else if (type === 'brows') {
-      const by = cy - ry - 0.09 * R - L.mouth * 0.04 * R - 0.11 * R * Math.abs(Math.sin(ax * TAU * 2.5 + (side > 0 ? 0.6 : 0))) * fade(ax); // реакция: бровки скачут
-      ctx.strokeStyle = '#6b3a22'; ctx.lineWidth = 0.055 * R;
+      const so = eyeSpec(eyes, side), oy = EY * R + efx.dy * R + gy + (so.closed ? 0.05 * R : 0), ory = (gl ? 0.225 : so.closed ? 0.11 : so.ry * efx.sc) * R; // брови не прыгают при моргании
+      const by = oy - ory - 0.09 * R - L.mouth * 0.04 * R - 0.11 * R * Math.abs(Math.sin(ax * TAU * 2.5 + (side > 0 ? 0.6 : 0))) * fade(ax); // реакция: бровки скачут
+      ctx.strokeStyle = INK; ctx.lineWidth = 0.04 * R;
       ctx.beginPath(); ctx.arc(cx, by + 0.12 * R, 0.15 * R, Math.PI * (side < 0 ? 1.22 : 1.3), Math.PI * (side < 0 ? 1.7 : 1.78)); ctx.stroke();
     }
   }
@@ -404,37 +466,58 @@ function mouth(R: number, L: Live) {
   }
 }
 
-function nose(kind: string, R: number, L: Live) {
-  const y = 0.06 * R, ax = actT(L, 'nose', kind);
+function nose(kind: string, R: number, L: Live, color: string) {
+  const y = 0.06 * R, ax = actT(L, 'nose', kind), P = palOf(color);
   ctx.lineJoin = 'round'; ctx.lineCap = 'round';
   if (kind === 'dot') { ctx.fillStyle = INK; ell(0, y, 0.045 * R, 0.035 * R); }
-  else if (kind === 'heart') { smallHeart(0, y, 0.075 * R, '#ff2f78'); ctx.fillStyle = 'rgba(255,255,255,0.8)'; circle(-0.03 * R, y - 0.035 * R, 0.014 * R); }
-  else if (kind === 'button') { // пуговка с дырочками
+  else if (kind === 'tone') { // овал в тон сердцу (тёмный оттенок), с бликом
+    ctx.fillStyle = color === 'yellow' ? '#a87300' : darkOf(color); ell(0, y, 0.05 * R, 0.036 * R);
+    const k = hump(ax, 0.5) + hump(ax - 0.6, 0.5); // реакция: блик вспыхивает
+    ctx.fillStyle = `rgba(255,255,255,${0.6 + 0.4 * Math.min(1, k)})`; ell(-0.015 * R, y - 0.014 * R, 0.016 * R * (1 + 0.5 * k), 0.008 * R * (1 + 0.5 * k), -0.3);
+  } else if (kind === 'soft') { // розовая «кнопочка»
+    const lt = warm(color), col = lt ? '#ffd3e0' : '#ff9fc0', dk = lt ? '#e87a98' : '#d9608f';
+    ctx.fillStyle = col; ell(0, y, 0.06 * R, 0.045 * R); ctx.strokeStyle = dk; ctx.lineWidth = 0.012 * R; ctx.stroke();
+    ctx.fillStyle = 'rgba(255,255,255,0.85)'; ell(-0.02 * R, y - 0.017 * R, 0.018 * R, 0.009 * R, -0.3);
+  } else if (kind === 'tri') { // треугольничек «как у зверька», без усов
+    ctx.fillStyle = INK; ctx.strokeStyle = INK; ctx.lineWidth = 0.03 * R;
+    ctx.beginPath(); ctx.moveTo(-0.035 * R, y - 0.018 * R); ctx.lineTo(0.035 * R, y - 0.018 * R); ctx.lineTo(0, y + 0.025 * R); ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = 'rgba(255,255,255,0.7)'; ell(-0.012 * R, y - 0.016 * R, 0.014 * R, 0.007 * R);
+  } else if (kind === 'line') { // крошечная дужка
+    ctx.strokeStyle = INK; ctx.lineWidth = 0.028 * R;
+    ctx.beginPath(); ctx.arc(0, y - 0.02 * R, 0.035 * R, 0.25 * Math.PI, 0.75 * Math.PI); ctx.stroke();
+  } else if (kind === 'heart') { // сердечко цвета «камня» — на красном светлое
+    gemHeart(0, y + 0.005 * R, 0.08 * R, P.gem[0] === '#ffffff' ? '#ffe3ec' : P.gem[0], P.gem[1], R);
+  } else if (kind === 'button') { // пуговка с дырочками (старый вариант из сохранений)
     ctx.fillStyle = '#ffcf3f'; circle(0, y, 0.085 * R); ctx.strokeStyle = '#b07d00'; ctx.lineWidth = 0.014 * R; ctx.stroke();
     ctx.lineWidth = 0.009 * R; ctx.beginPath(); ctx.arc(0, y, 0.062 * R, 0, TAU); ctx.stroke();
     ctx.fillStyle = '#8a5a00'; for (const [dx, dy] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) circle(dx * 0.022 * R, y + dy * 0.022 * R, 0.012 * R);
   } else if (kind === 'clown') {
     const g = ctx.createRadialGradient(-0.03 * R, y - 0.03 * R, 0.01 * R, 0, y, 0.095 * R); g.addColorStop(0, '#ff9a9a'); g.addColorStop(1, '#e0102f');
-    ctx.fillStyle = g; circle(0, y, 0.095 * R); ctx.strokeStyle = '#a0001c'; ctx.lineWidth = 0.01 * R; ctx.stroke(); ctx.fillStyle = '#fff'; circle(-0.035 * R, y - 0.035 * R, 0.022 * R);
-  } else if (kind === 'cat' || kind === 'bunny') { // кошачий носик с усиками
+    ctx.beginPath(); ctx.arc(0, y, 0.095 * R, 0, TAU); if (warm(color)) halo(0.05 * R);
+    ctx.fillStyle = g; ctx.fill(); ctx.strokeStyle = '#a0001c'; ctx.lineWidth = 0.012 * R; ctx.stroke(); ctx.fillStyle = '#fff'; circle(-0.035 * R, y - 0.035 * R, 0.026 * R);
+  } else if (kind === 'cat' || kind === 'bunny') { // кошачий носик с короткими усиками (не заходят на глаза и щёчки)
     ctx.strokeStyle = INK; ctx.lineWidth = 0.014 * R;
     const tw = 0.05 * Math.sin(ax * TAU * 6) * fade(ax); // реакция: усики шевелятся
-    for (const s of [-1, 1]) for (const k of [-1, 0, 1]) { ctx.beginPath(); ctx.moveTo(s * 0.08 * R, y + 0.015 * R); ctx.lineTo(s * 0.3 * R * (1 + 0.15 * hump(ax, 0.6)), y + k * 0.05 * R - 0.005 * R + tw * R * (k + 1.5)); ctx.stroke(); }
+    for (const s of [-1, 1]) for (const k of [-1, 0, 1]) { ctx.beginPath(); ctx.moveTo(s * 0.075 * R, y + 0.03 * R); ctx.lineTo(s * 0.2 * R * (1 + 0.15 * hump(ax, 0.6)), y + 0.03 * R + k * 0.035 * R + tw * R * (k + 1.5)); ctx.stroke(); }
     ctx.fillStyle = '#ff8fb5'; ctx.beginPath(); ctx.moveTo(-0.06 * R, y - 0.03 * R); ctx.lineTo(0.06 * R, y - 0.03 * R); ctx.lineTo(0, y + 0.04 * R); ctx.closePath();
     ctx.lineWidth = 0.03 * R; ctx.strokeStyle = '#ff8fb5'; ctx.stroke(); ctx.fill();
-    ctx.strokeStyle = '#c24d75'; ctx.lineWidth = 0.008 * R; ctx.stroke();
+    ctx.strokeStyle = '#c24d75'; ctx.lineWidth = 0.01 * R; ctx.stroke();
   } else if (kind === 'pig') { // пятачок
-    ctx.fillStyle = '#ffb3c8'; ell(0, y, 0.11 * R, 0.075 * R); ctx.strokeStyle = '#d9668a'; ctx.lineWidth = 0.016 * R; ctx.stroke();
+    ctx.beginPath(); ctx.ellipse(0, y, 0.11 * R, 0.075 * R, 0, 0, TAU); if (warm(color)) halo(0.045 * R);
+    ctx.fillStyle = '#ffb3c8'; ctx.fill(); ctx.strokeStyle = '#c24d75'; ctx.lineWidth = 0.016 * R; ctx.stroke();
     ctx.fillStyle = '#c24d75'; ell(-0.035 * R, y, 0.018 * R, 0.03 * R); ell(0.035 * R, y, 0.018 * R, 0.03 * R);
     ctx.fillStyle = 'rgba(255,255,255,0.75)'; ell(-0.05 * R, y - 0.045 * R, 0.025 * R, 0.01 * R, -0.3);
-  } else if (kind === 'strawberry') {
+  } else if (kind === 'strawberry') { // клубничка — крупнее, три семечка, светлая обводка на тёплом сердце
+    ctx.save(); ctx.translate(0, y); ctx.scale(1.3, 1.3); ctx.translate(0, -y);
     ctx.beginPath(); ctx.moveTo(0, y + 0.09 * R);
     ctx.bezierCurveTo(-0.1 * R, y + 0.04 * R, -0.1 * R, y - 0.06 * R, 0, y - 0.045 * R);
     ctx.bezierCurveTo(0.1 * R, y - 0.06 * R, 0.1 * R, y + 0.04 * R, 0, y + 0.09 * R); ctx.closePath();
+    if (warm(color)) halo(0.04 * R);
     ctx.fillStyle = '#ff3b5c'; ctx.fill(); ctx.strokeStyle = '#b3123a'; ctx.lineWidth = 0.012 * R; ctx.stroke();
-    ctx.fillStyle = '#ffe680'; for (const [dx, dy] of [[-0.04, -0.01], [0.035, -0.015], [0, 0.015], [-0.03, 0.035], [0.03, 0.035], [0, 0.06]]) ell(dx * R, y + dy * R, 0.007 * R, 0.011 * R);
-    ctx.fillStyle = '#4caf50'; for (const a of [-2.4, -1.57, -0.7]) ell(Math.cos(a) * 0.03 * R, y - 0.05 * R + Math.sin(a) * 0.012 * R, 0.035 * R, 0.014 * R, a);
-    ctx.fillStyle = 'rgba(255,255,255,0.7)'; ell(-0.045 * R, y + 0.0 * R, 0.01 * R, 0.022 * R, 0.3);
+    ctx.fillStyle = '#ffe680'; for (const [dx, dy] of [[-0.035, 0.0], [0.035, 0.0], [0, 0.04]]) ell(dx * R, y + dy * R, 0.01 * R, 0.015 * R);
+    ctx.fillStyle = '#4caf50'; for (const a of [-2.4, -1.57, -0.7]) ell(Math.cos(a) * 0.03 * R, y - 0.05 * R + Math.sin(a) * 0.012 * R, 0.035 * R, 0.016 * R, a);
+    ctx.fillStyle = 'rgba(255,255,255,0.7)'; ell(-0.05 * R, y + 0.0 * R, 0.012 * R, 0.024 * R, 0.3);
+    ctx.restore();
   } else if (kind === 'dog') { // блестящий собачий нос
     ctx.beginPath(); ctx.moveTo(0, y + 0.055 * R);
     ctx.bezierCurveTo(-0.07 * R, y + 0.045 * R, -0.11 * R, y - 0.01 * R, -0.08 * R, y - 0.04 * R);
@@ -462,7 +545,8 @@ function nose(kind: string, R: number, L: Live) {
 function cheekFx(kind: string, x: number, s: number): { sc: number; rot: number; sy: number } {
   const r = { sc: 1, rot: 0, sy: 1 };
   if (x < 0) return r;
-  if (kind === 'blush') r.sc = 1 + 0.35 * hump(x, 1.6);
+  if (kind === 'blush' || kind === 'shine') r.sc = 1 + 0.35 * hump(x, 1.6);
+  else if (kind === 'hearts') { const b = (y: number) => hump(y, 0.14) + 0.7 * hump(y - 0.22, 0.14); r.sc = 1 + 0.45 * (b(x) + b(x - 0.7)); } // сердечки бьются «тук-тук»
   else if (kind === 'doll') r.sc = 1 + 0.45 * hump(x, 0.5) + 0.12 * wob(x - 0.5, 3, 4);            // надула щёчки — «пуф!»
   else if (kind === 'swirl') r.rot = s * x * 9 * fade(x);                                       // завитки кружатся
   else if (kind === 'rainbow') r.sc = 1 + 0.3 * Math.abs(wob(x, 2, 2));
@@ -471,25 +555,40 @@ function cheekFx(kind: string, x: number, s: number): { sc: number; rot: number;
   return r;
 }
 
-function cheeks(kind: string, R: number, L: Live) {
+/** Масштаб наклеек-щёчек (румянец и сердечки — в своём размере) */
+const CHEEK_SC: Record<string, number> = { blush: 1, swirl: 1, shine: 1, hearts: 1, rainbow: 1.2 };
+
+function cheeks(kind: string, R: number, L: Live, color: string) {
   ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-  const ax = actT(L, 'cheeks', kind);
+  const ax = actT(L, 'cheeks', kind), bl = palOf(color).blush;
   for (const s of [-1, 1]) {
-    const x = s * 0.56 * R, y = 0.1 * R, fx = cheekFx(kind, ax, s);
+    const x = s * 0.56 * R, y = 0.1 * R, fx = cheekFx(kind, ax, s), sc = CHEEK_SC[kind] ?? 1.4;
     ctx.save();
-    ctx.translate(x, y); ctx.rotate(fx.rot); ctx.scale(fx.sc, fx.sc * fx.sy); ctx.translate(-x, -y);
-    if (kind !== 'blush' && kind !== 'swirl') { ctx.translate(x, y); ctx.scale(1.4, 1.4); ctx.translate(-x, -y); }
-    if (kind === 'blush') { ctx.fillStyle = `rgba(255,${90 - 40 * hump(ax, 1.6)},140,${0.5 + 0.4 * hump(ax, 1.6)})`; ell(x, y, 0.13 * R, 0.075 * R); } // реакция: краснеют сильнее
-    else if (kind === 'doll') { // круглые кукольные щёчки
-      ctx.fillStyle = '#ff6f9f'; circle(x, y, 0.075 * R); ctx.strokeStyle = '#d9406f'; ctx.lineWidth = 0.008 * R; ctx.stroke();
-      ctx.fillStyle = 'rgba(255,255,255,0.8)'; circle(x - 0.025 * R, y - 0.025 * R, 0.018 * R);
+    ctx.translate(x, y); ctx.rotate(fx.rot); ctx.scale(fx.sc * sc, fx.sc * fx.sy * sc); ctx.translate(-x, -y);
+    if (kind === 'blush' || kind === 'shine') { // румянец цвета из палитры; реакция: краснеют сильнее
+      ctx.fillStyle = rgba(bl); ell(x, y, 0.14 * R, 0.085 * R);
+      const k = hump(ax, 1.6); if (k > 0) { ctx.fillStyle = `rgba(255,60,120,${0.35 * k})`; ell(x, y, 0.14 * R, 0.085 * R); }
+      if (kind === 'shine') { // три белых штриха-блика; реакция: блики вспыхивают
+        const g = hump(ax - 0.1, 0.5) + hump(ax - 0.8, 0.5);
+        ctx.strokeStyle = `rgba(255,255,255,${0.8 + 0.2 * Math.min(1, g)})`; ctx.lineWidth = 0.018 * R * (1 + 0.5 * g);
+        for (const k of [-1, 0, 1]) { const xx = x + k * 0.045 * R, l = 1 + 0.4 * g; ctx.beginPath(); ctx.moveTo(xx + 0.015 * R * l, y - 0.03 * R * l); ctx.lineTo(xx - 0.015 * R * l, y + 0.03 * R * l); ctx.stroke(); }
+      }
+    } else if (kind === 'hearts') { // сердечки-румянец, чуть повёрнуты наружу
+      const col = color === 'red' || color === 'orange' ? '#ffc4d0' : color === 'pink' || color === 'dots' ? '#ff4f93' : '#ff8fb8';
+      ctx.save(); ctx.translate(x, y + 0.02 * R); ctx.rotate(s * 0.2); heartShape(0.085 * R); ctx.globalAlpha = 0.92; ctx.fillStyle = col; ctx.fill();
+      ctx.globalAlpha = 1; ctx.fillStyle = 'rgba(255,255,255,0.7)'; ell(-0.035 * R, -0.04 * R, 0.014 * R, 0.009 * R, -0.6); ctx.restore();
+    } else if (kind === 'doll') { // круглые кукольные щёчки: мягкое пятно без обводки
+      const g = ctx.createRadialGradient(x, y, 0.01 * R, x, y, 0.085 * R);
+      g.addColorStop(0, rgba(bl, Math.min(1, bl[3] + 0.3))); g.addColorStop(0.6, rgba(bl, Math.min(1, bl[3] + 0.15))); g.addColorStop(1, rgba(bl, 0));
+      ctx.fillStyle = g; circle(x, y, 0.085 * R);
+      ctx.fillStyle = 'rgba(255,255,255,0.8)'; circle(x - 0.025 * R, y - 0.025 * R, 0.016 * R);
     } else if (kind === 'freckles') { // реакция: веснушки пляшут по очереди
       ctx.fillStyle = 'rgba(140,70,40,0.65)';
       ([[-0.05, -0.02, 0.018], [0.04, -0.03, 0.018], [0, 0.03, 0.018], [0.07, 0.03, 0.015], [-0.07, 0.03, 0.014]] as const).forEach(([dx, dy, r], i) =>
         circle(x + dx * R, y + dy * R - 0.035 * R * Math.abs(Math.sin(ax * TAU * 2 + i * 1.3)) * fade(ax), r * R));
     }
     else if (kind === 'swirl') {
-      ctx.strokeStyle = 'rgba(255,70,140,0.75)'; ctx.lineWidth = 0.02 * R; ctx.beginPath();
+      ctx.strokeStyle = rgba(bl, Math.max(0.8, bl[3])); ctx.lineWidth = 0.03 * R; ctx.beginPath();
       for (let i = 0; i <= 30; i++) { const a = i * 0.42 * s, r = 0.008 * R + i * 0.0028 * R; ctx.lineTo(x + Math.cos(a) * r, y + Math.sin(a) * r * 0.8); }
       ctx.stroke();
     } else if (kind === 'rainbow') { // наклейка-радуга с облачками
@@ -520,11 +619,13 @@ function cheeks(kind: string, R: number, L: Live) {
 
 // ---------------- ПРИЧЁСКИ ----------------
 const HAIR: Record<string, [string, string]> = { long: ['#ffd36b', '#d99a2b'], pigtails: ['#a8653c', '#6e3d1f'], bun: ['#8a4b2a', '#5a2c14'], afro: ['#6b3a22', '#3e1f0f'] };
+/** Цвет волос: на жёлтом сердце блонд сливается — тогда каштановые */
+const hairCol = (kind: string, color: string): [string, string] => (kind === 'long' && (color === 'yellow' || color === 'orange') ? ['#c98a4b', '#8a5228'] : HAIR[kind]);
 
 function hairBack(kind: string, R: number, L: Live, color: string) {
   const ax = actT(L, 'hair', kind);
   if (kind === 'long') {
-    const [c, d] = HAIR.long;
+    const [c, d] = hairCol('long', color);
     for (const s of [-1, 1]) {
       ctx.save(); ctx.scale(s, 1);
       ctx.beginPath(); ctx.moveTo(0, -0.95 * R);
@@ -538,7 +639,7 @@ function hairBack(kind: string, R: number, L: Live, color: string) {
       ctx.restore();
     }
   } else if (kind === 'pigtails') {
-    const [c, d] = HAIR.pigtails;
+    const [c, d] = hairCol('pigtails', color);
     for (const s of [-1, 1]) {
       const spin = ax < 0 ? 0 : s * 0.75 * Math.sin(ax * TAU * 3.5) * fade(ax); // реакция: хвостики машут вверх-вниз, как пропеллер
       ctx.save(); ctx.translate(s * 0.86 * R, -0.72 * R); ctx.rotate(-s * 0.3 + spin + L.swing * 0.8 + (L.live ? Math.sin(t * 2.4 + s) * 0.06 : 0)); ctx.scale(s, 1);
@@ -551,11 +652,11 @@ function hairBack(kind: string, R: number, L: Live, color: string) {
       ctx.restore();
     }
   } else if (kind === 'bun') {
-    const [c, d] = HAIR.bun;
+    const [c, d] = hairCol('bun', color);
     ctx.fillStyle = c; circle(0, -0.84 * R, 0.3 * R); ctx.strokeStyle = d; ctx.lineWidth = 0.025 * R; ctx.stroke();
     ctx.beginPath(); ctx.arc(0, -0.84 * R, 0.18 * R, Math.PI * 1.1, Math.PI * 1.8); ctx.stroke();
   } else if (kind === 'afro') { // пышные кудряшки-облако
-    const [c, d] = HAIR.afro, P: [number, number, number][] = [];
+    const [c, d] = hairCol('afro', color), P: [number, number, number][] = [];
     for (let i = 0; i <= 14; i++) { const a = Math.PI * (0.9 + i * 1.2 / 14); P.push([Math.cos(a) * 1.1 * R, -0.42 * R + Math.sin(a) * 0.72 * R, (0.27 + (i % 2) * 0.04) * R]); }
     if (ax >= 0) P.forEach((q, i) => { q[1] -= 0.05 * R * Math.abs(Math.sin(ax * TAU * 2.2 + i * 0.7)) * fade(ax); }); // реакция: кудряшки пляшут волной
     ctx.fillStyle = d; for (const [x, y, r] of P) circle(x, y, r + 0.025 * R); ell(0, -0.45 * R, 1.1 * R, 0.6 * R);
@@ -591,9 +692,17 @@ function hairBack(kind: string, R: number, L: Live, color: string) {
 }
 
 /** Чёлка: волосы на макушке, обрезанные по контуру сердца, с фестонами внизу */
+/** Нижний край чёлки (без фестонов) */
+const bangY = (x: number, R: number) => -0.42 * R - 0.16 * R * Math.sin(Math.PI * Math.min(1, Math.abs(x) / R));
+/** Обрезка «всё, что ниже чёлки» — по середине фестонов */
+function bangsClip(R: number, curly: boolean) {
+  ctx.beginPath(); ctx.moveTo(-1.4 * R, 1.4 * R);
+  for (let i = 0; i <= 28; i++) { const x = -1.4 * R + i * 0.1 * R; ctx.lineTo(x, bangY(x, R) + (curly ? 0.07 : 0.055) * R); }
+  ctx.lineTo(1.4 * R, 1.4 * R); ctx.closePath(); ctx.clip();
+}
 function bangs(R: number, col: string, dk: string, curly = false) {
   ctx.save(); heartShape(R); ctx.clip();
-  const yb = (x: number) => -0.42 * R - 0.16 * R * Math.sin(Math.PI * Math.min(1, Math.abs(x) / R));
+  const yb = (x: number) => bangY(x, R);
   ctx.beginPath(); ctx.moveTo(-1.2 * R, -1.3 * R); ctx.lineTo(1.2 * R, -1.3 * R); ctx.lineTo(1.2 * R, yb(1.1 * R));
   const N = curly ? 12 : 9, w = 2.2 * R / N;
   for (let i = 0; i < N; i++) { const x0 = 1.1 * R - i * w, x1 = x0 - w, xm = (x0 + x1) / 2; ctx.quadraticCurveTo(xm, yb(xm) + (curly ? 0.13 : 0.1) * R, x1, yb(x1)); }
@@ -610,8 +719,8 @@ function bangs(R: number, col: string, dk: string, curly = false) {
   heartShape(R); ctx.strokeStyle = dk; ctx.lineWidth = 0.02 * R; ctx.stroke();
 }
 
-function hairBangs(kind: string, R: number) {
-  if (HAIR[kind]) bangs(R, HAIR[kind][0], HAIR[kind][1], kind === 'afro');
+function hairBangs(kind: string, R: number, color: string) {
+  if (HAIR[kind]) { const [c, d] = hairCol(kind, color); bangs(R, c, d, kind === 'afro'); }
 }
 
 export function bow(x: number, y: number, s: number, rot: number, col = '#ff4fa0', dk = '#c21f6e') {
@@ -626,12 +735,12 @@ export function bow(x: number, y: number, s: number, rot: number, col = '#ff4fa0
   ctx.restore();
 }
 
-function crown(R: number, ax = -1) {
+function crown(R: number, ax = -1, M: [string, string, string] = GOLD) {
   ctx.save(); ctx.translate(0, -0.56 * R); ctx.rotate(0.08);
   const w = 0.32 * R, h = 0.42 * R;
-  const g = ctx.createLinearGradient(0, -h, 0, 0); g.addColorStop(0, '#fff3a0'); g.addColorStop(1, '#f2b600');
+  const g = ctx.createLinearGradient(0, -h, 0, 0); g.addColorStop(0, M[0]); g.addColorStop(1, M[1]);
   ctx.beginPath(); ctx.moveTo(-w, 0); ctx.lineTo(-w * 1.1, -h * 0.85); ctx.lineTo(-w * 0.5, -h * 0.45); ctx.lineTo(0, -h); ctx.lineTo(w * 0.5, -h * 0.45); ctx.lineTo(w * 1.1, -h * 0.85); ctx.lineTo(w, 0); ctx.closePath();
-  ctx.fillStyle = g; ctx.fill(); ctx.strokeStyle = '#b07d00'; ctx.lineWidth = 0.02 * R; ctx.lineJoin = 'round'; ctx.stroke();
+  ctx.fillStyle = g; ctx.fill(); ctx.strokeStyle = M[2]; ctx.lineWidth = 0.028 * R; ctx.lineJoin = 'round'; ctx.stroke();
   ctx.fillStyle = '#ff3d7f'; circle(0, -0.18 * h, 0.06 * R); ctx.fillStyle = '#4da3ff'; circle(-w * 0.62, -0.15 * h, 0.04 * R); circle(w * 0.62, -0.15 * h, 0.04 * R);
   ctx.fillStyle = '#fff'; for (const [x, y] of [[-w * 1.1, -h * 0.85], [0, -h], [w * 1.1, -h * 0.85]]) circle(x, y, 0.035 * R);
   ctx.save(); ctx.translate(w * 0.75, -h * 0.6); ctx.rotate(t * 2); starPath(4, 0.06 * R * (0.7 + 0.3 * Math.sin(t * 5)), 0.015 * R); ctx.fill(); ctx.restore();
@@ -642,6 +751,33 @@ function crown(R: number, ax = -1) {
   ctx.restore();
 }
 
+/** Ободок по верхнему контуру сердца (цвет акцента) с бантиком сбоку; реакция: по ободку бежит блеск, бантик хлопает */
+function headband(R: number, ax: number, P: Pal) {
+  const pts: [number, number][] = [];
+  for (let i = 0; i <= 12; i++) { const [x, y] = topPoint(0.98 - i * 0.98 / 12, R); pts.push([x + 0.03 * R, y + 0.06 * R]); }
+  for (let i = 12; i >= 0; i--) { const [x, y] = pts[i]; pts.push([-x, y]); }
+  const path = () => { ctx.beginPath(); pts.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y))); };
+  ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  path(); ctx.strokeStyle = P.acc[1]; ctx.lineWidth = 0.085 * R; ctx.stroke();
+  path(); ctx.strokeStyle = P.acc[0]; ctx.lineWidth = 0.058 * R; ctx.stroke();
+  ctx.save(); path(); ctx.strokeStyle = 'rgba(255,255,255,0.6)'; ctx.lineWidth = 0.016 * R; ctx.translate(0, -0.012 * R); ctx.stroke(); ctx.restore();
+  if (ax >= 0) { const p = clamp01(ax / 1.2), i = Math.min(pts.length - 1, Math.floor(p * pts.length)), [x, y] = pts[i], k = hump(ax, 1.2);
+    ctx.save(); ctx.translate(x, y); ctx.rotate(ax * 5); ctx.fillStyle = '#fff'; starPath(4, 0.09 * R * k, 0.02 * R); ctx.fill(); ctx.restore(); }
+  const [bx, by] = topPoint(0.55, R);
+  bow(bx + 0.03 * R, by + 0.06 * R, 0.15 * R * (1 + 0.3 * Math.abs(wob(ax, 3, 2.5))), -0.45, P.acc[0] === '#ffffff' ? '#ff9ccf' : P.acc[0], P.acc[1]);
+}
+/** Заколки: звёздочка (металл) и сердечко (камень) на макушке слева; реакция: звёздочка крутится и сверкает */
+function hairClip(R: number, ax: number, P: Pal) {
+  const [x1, y1] = topPoint(0.4, R), [x2, y2] = topPoint(0.72, R), M = P.metal;
+  gemHeart(x2 + 0.07 * R, y2 + 0.1 * R, 0.1 * R * (1 + 0.25 * hump(ax - 0.5, 0.5)), P.gem[0], P.gem[1], R, -0.5);
+  const sp = ax < 0 ? 0 : TAU * ease.inOut(clamp01(ax / 0.9)), k = 1 + 0.3 * hump(ax, 0.9);
+  ctx.save(); ctx.translate(x1 + 0.02 * R, y1 + 0.08 * R); ctx.rotate(-0.3 + sp); ctx.scale(k, k);
+  starPath(5, 0.13 * R, 0.06 * R); ctx.fillStyle = M[1]; ctx.fill(); ctx.strokeStyle = M[2]; ctx.lineWidth = 0.02 * R; ctx.lineJoin = 'round'; ctx.stroke();
+  ctx.fillStyle = 'rgba(255,255,255,0.8)'; circle(-0.03 * R, -0.03 * R, 0.022 * R);
+  ctx.restore();
+  if (ax >= 0) { const g = hump(ax - 0.6, 0.6); if (g > 0) { ctx.save(); ctx.translate(x1 - 0.1 * R, y1 - 0.05 * R); ctx.fillStyle = '#fff'; starPath(4, 0.08 * R * g, 0.018 * R); ctx.fill(); ctx.restore(); } }
+}
+
 /** Точка на верхнем контуре сердца (левая половина, s от 0 у ложбинки до 1 у бока) */
 function topPoint(s: number, R: number): [number, number] {
   const u = 1 - s, p0 = [0, -0.5], c1 = [-0.15, -0.95], c2 = [-0.95, -1.05], p3 = [-1.0, -0.4];
@@ -649,18 +785,20 @@ function topPoint(s: number, R: number): [number, number] {
   return [b(0) * R, b(1) * R];
 }
 
-function hairFront(kind: string, R: number, L: Live) {
-  const ax = actT(L, 'hair', kind);
-  if (kind === 'bow') bow(-0.52 * R, -0.9 * R, 0.32 * R, -0.35 + L.swing * 0.3);
-  else if (kind === 'pigtails') { for (const s of [-1, 1]) { ctx.fillStyle = '#ff4fa0'; circle(s * 0.86 * R, -0.72 * R, 0.085 * R); ctx.fillStyle = 'rgba(255,255,255,0.7)'; circle(s * 0.86 * R - 0.03 * R, -0.75 * R, 0.025 * R); } }
-  else if (kind === 'bun') bow(0.2 * R, -1.02 * R, 0.16 * R, 0.4, '#ffd23f', '#d39a00');
+function hairFront(kind: string, R: number, L: Live, color: string) {
+  const ax = actT(L, 'hair', kind), P = palOf(color), [ac, ad] = P.acc;
+  if (kind === 'bow') bow(-0.52 * R, -0.9 * R, 0.32 * R, -0.35 + L.swing * 0.3, ac, ad);
+  else if (kind === 'pigtails') { for (const s of [-1, 1]) { ctx.fillStyle = ac; circle(s * 0.86 * R, -0.72 * R, 0.085 * R); ctx.strokeStyle = ad; ctx.lineWidth = 0.016 * R; ctx.stroke(); ctx.fillStyle = 'rgba(255,255,255,0.7)'; circle(s * 0.86 * R - 0.03 * R, -0.75 * R, 0.025 * R); } }
+  else if (kind === 'bun') bow(0.2 * R, -1.02 * R, 0.16 * R, 0.4, ac, ad);
   else if (kind === 'long') { // заколка
     ctx.save(); ctx.translate(0.58 * R, -0.8 * R); ctx.rotate(0.45);
-    ctx.fillStyle = '#7fd1ff'; ell(0, 0, 0.13 * R, 0.045 * R); ctx.strokeStyle = '#3388cc'; ctx.lineWidth = 0.014 * R; ctx.stroke();
+    ctx.fillStyle = ac; ell(0, 0, 0.13 * R, 0.045 * R); ctx.strokeStyle = ad; ctx.lineWidth = 0.014 * R; ctx.stroke();
     ctx.fillStyle = '#fff'; for (const d of [-1, 0, 1]) circle(d * 0.07 * R, 0, 0.018 * R);
     ctx.restore();
-  } else if (kind === 'afro') flower(0.55 * R, -0.88 * R, 0.11 * R, '#ff7aa8', 0.3);
-  else if (kind === 'crown') crown(R, ax);
+  } else if (kind === 'afro') flower(0.55 * R, -0.88 * R, 0.11 * R, ac === '#ffffff' ? '#ff9ccf' : ac, 0.3);
+  else if (kind === 'crown') crown(R, ax, P.metal);
+  else if (kind === 'headband') headband(R, ax, P);
+  else if (kind === 'clip') hairClip(R, ax, P);
   else if (kind === 'flowers') {
     const cols = ['#ff7aa8', '#ffd23f', '#c9a7ff', '#ffffff', '#7fd1ff'];
     const pts: [number, number][] = [];
@@ -686,20 +824,39 @@ function hairFront(kind: string, R: number, L: Live) {
     flower(-0.2 * R, -0.58 * R, 0.08 * R, '#ff9ccf', 0.3); flower(0.2 * R, -0.58 * R, 0.08 * R, '#b9a2ff', 1);
   } else if (kind === 'bunny') { // ободок с бантиком
     const [x1, y1] = topPoint(0.55, R);
-    bow(x1 + 0.05 * R, y1 + 0.02 * R, 0.13 * R, -0.4, '#ff8fc8', '#d94f97');
+    bow(x1 + 0.05 * R, y1 + 0.02 * R, 0.13 * R, -0.4, ac === '#ffffff' ? '#ff8fc8' : ac, ad);
   }
 }
 
 // ---------------- СЕРЁЖКИ ----------------
-function earrings(kind: string, R: number, L: Live) {
-  const ax = actT(L, 'earrings', kind), fd = fade(ax);
+/** Гвоздики сидят прямо на мочке, без крючка */
+const STUDS: Record<string, boolean> = { studheart: true, studgem: true, bow: true };
+function earrings(kind: string, R: number, L: Live, color: string) {
+  const ax = actT(L, 'earrings', kind), fd = fade(ax), P = palOf(color), M = P.metal, [gc, gk] = P.gem;
   for (const s of [-1, 1]) {
     ctx.save(); ctx.translate(s * 0.9 * R, 0.04 * R); // мочка — на уровне между глазами и ртом
+    if (STUDS[kind]) { // гвоздики не качаются
+      ctx.scale(1.3, 1.3); ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+      if (kind === 'studheart') { // реакция: сердечки бьются
+        const b = (y: number) => hump(y, 0.14) + 0.7 * hump(y - 0.22, 0.14), k = 1 + 0.45 * (b(ax) + b(ax - 0.7));
+        gemHeart(0, 0.03 * R, 0.085 * R * k, gc, gk, R, s * 0.15);
+      } else if (kind === 'studgem') { // камушек в металлической оправе; реакция: вспыхивает звёздочка
+        ctx.fillStyle = M[1]; circle(0, 0.03 * R, 0.08 * R); ctx.strokeStyle = M[2]; ctx.lineWidth = 0.012 * R; ctx.stroke();
+        bead(0, 0.03 * R, 0.056 * R, gc, gk, R);
+        const k = hump(ax - (s > 0 ? 0.25 : 0), 0.6);
+        if (k > 0) { ctx.save(); ctx.translate(0.03 * R, 0); ctx.rotate(ax * 4); ctx.fillStyle = '#fff'; starPath(4, 0.1 * R * k, 0.02 * R); ctx.fill(); ctx.restore(); }
+      } else { // бантики цвета акцента; реакция: хлопают крылышками
+        const k = 1 + 0.4 * Math.abs(wob(ax - (s > 0 ? 0.15 : 0), 3, 2));
+        ctx.save(); ctx.translate(0, 0.02 * R); ctx.scale(k, 1); bow(0, 0, 0.15 * R, s * 0.2, P.acc[0] === '#ffffff' ? '#ff9ccf' : P.acc[0], P.acc[1]); ctx.restore();
+      }
+      ctx.restore(); continue;
+    }
     ctx.rotate(s * 0.08 + L.swing + (L.live ? Math.sin(t * 2.3 + s) * 0.08 : 0));
     ctx.scale(1.3, 1.3);
-    ctx.strokeStyle = '#d9a400'; ctx.lineWidth = 0.02 * R; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-    ctx.fillStyle = '#ffd23f'; circle(0, 0, 0.03 * R);
-    ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(0, 0.09 * R); ctx.stroke();
+    ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    // крючок металлом из палитры (на жёлтом — серебро), с тёмной окантовкой — виден на любом сердце
+    ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(0, 0.09 * R); ctx.strokeStyle = M[2]; ctx.lineWidth = 0.03 * R; ctx.stroke(); ctx.strokeStyle = M[1]; ctx.lineWidth = 0.016 * R; ctx.stroke();
+    ctx.fillStyle = M[1]; circle(0, 0, 0.03 * R); ctx.strokeStyle = M[2]; ctx.lineWidth = 0.01 * R; ctx.stroke();
     ctx.translate(0, 0.09 * R);
     if (ax >= 0) { // реакция: у каждой серёжки своё движение подвески
       if (kind === 'hoop') ctx.scale(Math.max(0.08, Math.abs(Math.cos(ax * TAU * 1.6 * fd))) * (Math.cos(ax * TAU * 1.6 * fd) < 0 ? -1 : 1), 1); // крутится как обруч
@@ -713,20 +870,24 @@ function earrings(kind: string, R: number, L: Live) {
     }
     if (kind === 'pearl') {
       const g = ctx.createRadialGradient(-0.025 * R, 0.05 * R, 0.005 * R, 0, 0.075 * R, 0.08 * R); g.addColorStop(0, '#fff'); g.addColorStop(1, '#e3d6ea');
-      ctx.fillStyle = g; circle(0, 0.075 * R, 0.075 * R); ctx.strokeStyle = '#c7b3cf'; ctx.lineWidth = 0.01 * R; ctx.stroke();
-    } else if (kind === 'star') { ctx.translate(0, 0.1 * R); starPath(5, 0.1 * R, 0.045 * R); ctx.fillStyle = '#ffd23f'; ctx.fill(); ctx.strokeStyle = '#d98a00'; ctx.lineWidth = 0.012 * R; ctx.stroke(); }
-    else if (kind === 'hoop') { ctx.strokeStyle = '#f2b600'; ctx.lineWidth = 0.035 * R; ctx.beginPath(); ctx.arc(0, 0.11 * R, 0.11 * R, 0, TAU); ctx.stroke(); ctx.strokeStyle = 'rgba(255,255,255,0.7)'; ctx.lineWidth = 0.012 * R; ctx.beginPath(); ctx.arc(0, 0.11 * R, 0.11 * R, Math.PI * 1.1, Math.PI * 1.5); ctx.stroke(); }
+      ctx.fillStyle = g; circle(0, 0.075 * R, 0.075 * R); ctx.strokeStyle = '#b9a0c4'; ctx.lineWidth = 0.012 * R; ctx.stroke();
+    } else if (kind === 'star') { ctx.translate(0, 0.1 * R); starPath(5, 0.1 * R, 0.045 * R); ctx.fillStyle = M[1]; ctx.fill(); ctx.strokeStyle = M[2]; ctx.lineWidth = 0.014 * R; ctx.stroke(); }
+    else if (kind === 'hoop') {
+      ctx.beginPath(); ctx.arc(0, 0.11 * R, 0.11 * R, 0, TAU); ctx.strokeStyle = M[2]; ctx.lineWidth = 0.05 * R; ctx.stroke(); ctx.strokeStyle = M[1]; ctx.lineWidth = 0.032 * R; ctx.stroke();
+      ctx.strokeStyle = 'rgba(255,255,255,0.75)'; ctx.lineWidth = 0.012 * R; ctx.beginPath(); ctx.arc(0, 0.11 * R, 0.11 * R, Math.PI * 1.1, Math.PI * 1.5); ctx.stroke();
+    }
     else if (kind === 'cherry') {
       ctx.strokeStyle = '#4c8a2a'; ctx.lineWidth = 0.015 * R;
       ctx.beginPath(); ctx.moveTo(0, 0); ctx.quadraticCurveTo(-0.06 * R, 0.05 * R, -0.06 * R, 0.13 * R); ctx.moveTo(0, 0); ctx.quadraticCurveTo(0.05 * R, 0.05 * R, 0.06 * R, 0.11 * R); ctx.stroke();
       ctx.fillStyle = '#5cc160'; ell(0.04 * R, -0.01 * R, 0.04 * R, 0.017 * R, -0.4);
       const j1 = 0.05 * R * hump(ax, 0.2), j2 = 0.05 * R * hump(ax - 0.25, 0.2); // реакция: вишенки по очереди подпрыгивают
+      if (warm(color)) { ctx.fillStyle = 'rgba(255,255,255,0.9)'; circle(-0.06 * R, 0.16 * R - j1, 0.072 * R); circle(0.06 * R, 0.14 * R - j2, 0.072 * R); } // на красном — светлая подложка
       ctx.fillStyle = '#e8173c'; circle(-0.06 * R, 0.16 * R - j1, 0.055 * R); circle(0.06 * R, 0.14 * R - j2, 0.055 * R);
       ctx.fillStyle = 'rgba(255,255,255,0.75)'; circle(-0.075 * R, 0.14 * R - j1, 0.014 * R); circle(0.045 * R, 0.12 * R - j2, 0.014 * R);
-    } else if (kind === 'drop') {
-      const g = ctx.createLinearGradient(-0.06 * R, 0, 0.06 * R, 0.2 * R); g.addColorStop(0, '#d8f4ff'); g.addColorStop(1, '#3fa0ff');
+    } else if (kind === 'drop') { // капелька цвета «камня»
+      const g = ctx.createLinearGradient(-0.06 * R, 0, 0.06 * R, 0.2 * R); g.addColorStop(0, '#ffffff'); g.addColorStop(1, gc === '#ffffff' ? '#ffd6e4' : gc);
       ctx.beginPath(); ctx.moveTo(0, 0); ctx.bezierCurveTo(0.09 * R, 0.08 * R, 0.08 * R, 0.19 * R, 0, 0.19 * R); ctx.bezierCurveTo(-0.08 * R, 0.19 * R, -0.09 * R, 0.08 * R, 0, 0); ctx.closePath();
-      ctx.fillStyle = g; ctx.fill(); ctx.strokeStyle = '#2a7ed1'; ctx.lineWidth = 0.01 * R; ctx.stroke();
+      ctx.fillStyle = g; ctx.fill(); ctx.strokeStyle = gk; ctx.lineWidth = 0.014 * R; ctx.stroke();
       ctx.fillStyle = 'rgba(255,255,255,0.85)'; ell(-0.02 * R, 0.1 * R, 0.014 * R, 0.035 * R, 0.3);
     } else if (kind === 'icecream') { // мороженое в рожке
       ctx.beginPath(); ctx.moveTo(-0.058 * R, 0.075 * R); ctx.lineTo(0.058 * R, 0.075 * R); ctx.lineTo(0, 0.25 * R); ctx.closePath();
@@ -740,17 +901,17 @@ function earrings(kind: string, R: number, L: Live) {
       [[-0.03, 0.02, 0.5], [0.02, 0.0, -0.6], [0.035, 0.05, 1.2]].forEach(([x, y, a], i) => { ctx.save(); ctx.translate(x * R, y * R); ctx.rotate(a); ctx.fillStyle = sp[i]; ell(0, 0, 0.014 * R, 0.006 * R); ctx.restore(); });
       ctx.fillStyle = 'rgba(255,255,255,0.7)'; circle(-0.025 * R, 0.02 * R, 0.012 * R);
     } else if (kind === 'butterfly') {
-      butterfly(0, 0.1 * R, 0.1 * R, L.live ? t * (ax >= 0 ? 16 : 5) + s : 0.4, '#b98cff', 0);
+      butterfly(0, 0.1 * R, 0.1 * R, L.live ? t * (ax >= 0 ? 16 : 5) + s : 0.4, P.acc[0] === '#ffffff' ? '#b98cff' : P.acc[0], 0);
     } else if (kind === 'bell') { // колокольчик с язычком
-      const g = ctx.createLinearGradient(-0.08 * R, 0, 0.08 * R, 0.2 * R); g.addColorStop(0, '#fff3a0'); g.addColorStop(1, '#e8a800');
-      ctx.fillStyle = '#d9a400'; circle(0, 0.015 * R, 0.018 * R);
+      const g = ctx.createLinearGradient(-0.08 * R, 0, 0.08 * R, 0.2 * R); g.addColorStop(0, M[0]); g.addColorStop(1, M[1]);
+      ctx.fillStyle = M[2]; circle(0, 0.015 * R, 0.018 * R);
       const cl = (L.live ? Math.sin(t * 6 + s) * 0.02 : 0) * R - L.swing * 0.08 * R + 0.045 * R * Math.sin(ax * TAU * 4) * fd; // реакция: язычок звенит
-      ctx.fillStyle = '#b07d00'; circle(cl, 0.2 * R, 0.025 * R);
+      ctx.fillStyle = M[2]; circle(cl, 0.2 * R, 0.025 * R);
       ctx.beginPath(); ctx.moveTo(-0.075 * R, 0.18 * R); ctx.quadraticCurveTo(-0.075 * R, 0.025 * R, 0, 0.025 * R); ctx.quadraticCurveTo(0.075 * R, 0.025 * R, 0.075 * R, 0.18 * R); ctx.lineTo(0.095 * R, 0.2 * R); ctx.lineTo(-0.095 * R, 0.2 * R); ctx.closePath();
-      ctx.fillStyle = g; ctx.fill(); ctx.strokeStyle = '#a87300'; ctx.lineWidth = 0.01 * R; ctx.stroke();
+      ctx.fillStyle = g; ctx.fill(); ctx.strokeStyle = M[2]; ctx.lineWidth = 0.014 * R; ctx.stroke();
       ctx.fillStyle = 'rgba(255,255,255,0.75)'; ell(-0.035 * R, 0.09 * R, 0.012 * R, 0.04 * R, 0.15);
-    } else if (kind === 'feather') { // пёрышко
-      ctx.rotate(0.12);
+    } else if (kind === 'feather') { // пёрышко (укорочено: было самым длинным в разделе)
+      ctx.rotate(0.12); ctx.scale(1, 0.75);
       const g = ctx.createLinearGradient(0, 0, 0, 0.32 * R); g.addColorStop(0, '#7fe0d0'); g.addColorStop(0.5, '#6fb4ff'); g.addColorStop(1, '#c38cff');
       ctx.beginPath(); ctx.moveTo(0, 0.01 * R); ctx.bezierCurveTo(0.1 * R, 0.07 * R, 0.09 * R, 0.22 * R, 0.01 * R, 0.32 * R); ctx.bezierCurveTo(-0.08 * R, 0.22 * R, -0.08 * R, 0.07 * R, 0, 0.01 * R); ctx.closePath();
       ctx.fillStyle = g; ctx.fill(); ctx.strokeStyle = '#4a7fc0'; ctx.lineWidth = 0.009 * R; ctx.stroke();
@@ -769,79 +930,107 @@ function nq(s: number, R: number): [number, number] {
 }
 const nAng = (s: number, R: number) => { const [x1, y1] = nq(Math.max(0, s - 0.01), R), [x2, y2] = nq(Math.min(1, s + 0.01), R); return Math.atan2(y2 - y1, x2 - x1); };
 
-function necklace(kind: string, R: number, L: Live) {
-  const ax = actT(L, 'necklace', kind), fd = fade(ax);
+function necklace(kind: string, R: number, L: Live, color: string) {
+  const ax = actT(L, 'necklace', kind), fd = fade(ax), P = palOf(color), M = P.metal, [ac, ad] = P.acc, [gc, gk] = P.gem;
   const chainPath = () => { ctx.beginPath(); for (let i = 0; i <= 24; i++) { const [x, y] = nq(i / 24, R); ctx.lineTo(x, y); } };
   const chain = (col: string, w: number) => { ctx.strokeStyle = col; ctx.lineWidth = w * R; chainPath(); ctx.stroke(); };
+  /** цепочка металлом: двойной штрих, чтобы читалась и на превью, и на сердце любого цвета */
+  const metalChain = () => { chain(M[2], 0.026); chain(M[1], 0.015); };
   ctx.lineCap = 'round'; ctx.lineJoin = 'round';
   if (kind === 'pearls') {
     chain('rgba(200,180,200,0.8)', 0.01);
-    for (let i = 0; i < 13; i++) {
-      const [x, y] = nq(0.04 + i * 0.92 / 12, R), g = ax < 0 ? 0 : Math.max(0, 1 - Math.abs(ax * 10 - i - 1) / 1.5) * fd; // реакция: блеск бежит по жемчужинам
-      if (g > 0) { ctx.fillStyle = `rgba(255,255,255,${0.75 * g})`; circle(x, y, 0.09 * R * g); }
-      const r = 0.045 * R * (1 + 0.25 * g);
-      ctx.fillStyle = '#fbf6ff'; circle(x, y, r); ctx.strokeStyle = '#c9b4d4'; ctx.lineWidth = 0.008 * R; ctx.stroke(); ctx.fillStyle = '#fff'; circle(x - 0.015 * R, y - 0.015 * R, 0.012 * R * (1 + 1.5 * g));
+    for (let i = 0; i < 11; i++) {
+      const [x, y] = nq(0.04 + i * 0.92 / 10, R), g = ax < 0 ? 0 : Math.max(0, 1 - Math.abs(ax * 8 - i - 1) / 1.5) * fd; // реакция: блеск бежит по жемчужинам
+      if (g > 0) { ctx.fillStyle = `rgba(255,255,255,${0.75 * g})`; circle(x, y, 0.1 * R * g); }
+      const r = (i === 5 ? 0.075 : 0.055) * R * (1 + 0.25 * g);
+      ctx.fillStyle = '#fbf6ff'; circle(x, y, r); ctx.strokeStyle = '#b9a0c4'; ctx.lineWidth = 0.012 * R; ctx.stroke(); ctx.fillStyle = '#fff'; circle(x - r * 0.3, y - r * 0.3, r * 0.3 * (1 + 1.5 * g));
     }
+  } else if (kind === 'tone') { // бусы в тон: один цвет акцента, к центру крупнее; реакция: бусины по очереди раздуваются
+    chain(ad, 0.01);
+    for (let i = 0; i < 9; i++) { const s = 0.05 + i * 0.9 / 8, [x, y] = nq(s, R), j = hump(ax - i * 0.08, 0.3); bead(x, y - 0.03 * R * j, (0.045 + 0.03 * Math.sin(Math.PI * s)) * R * (1 + 0.3 * j), ac, ad, R); }
+  } else if (kind === 'heartchain' || kind === 'gem') { // цепочка с кулоном: сердечко или капелька цвета «камня»
+    metalChain();
+    const [x, y] = nq(0.5, R);
+    mv(L, 'necklace', kind, R, x, y, () => {
+      ctx.fillStyle = M[1]; circle(x, y + 0.005 * R, 0.022 * R); ctx.strokeStyle = M[2]; ctx.lineWidth = 0.01 * R; ctx.stroke();
+      if (kind === 'heartchain') gemHeart(x, y + 0.1 * R, 0.11 * R, gc, gk, R);
+      else {
+        const cy = y + 0.015 * R;
+        ctx.beginPath(); ctx.moveTo(x, cy); ctx.bezierCurveTo(x + 0.11 * R, cy + 0.1 * R, x + 0.09 * R, cy + 0.2 * R, x, cy + 0.2 * R); ctx.bezierCurveTo(x - 0.09 * R, cy + 0.2 * R, x - 0.11 * R, cy + 0.1 * R, x, cy); ctx.closePath();
+        const g = ctx.createLinearGradient(x - 0.08 * R, cy, x + 0.08 * R, cy + 0.2 * R); g.addColorStop(0, '#ffffff'); g.addColorStop(1, gc === '#ffffff' ? '#ffd6e4' : gc);
+        ctx.fillStyle = g; ctx.fill(); ctx.strokeStyle = gk; ctx.lineWidth = 0.014 * R; ctx.stroke();
+        ctx.fillStyle = 'rgba(255,255,255,0.85)'; ell(x - 0.03 * R, cy + 0.11 * R, 0.014 * R, 0.035 * R, 0.3);
+      }
+      if (ax >= 0) { const k = hump(ax - 0.2, 1); if (k > 0) { ctx.save(); ctx.translate(x + 0.05 * R, y + 0.08 * R); ctx.rotate(ax * 4); ctx.fillStyle = '#fff'; starPath(4, 0.1 * R * k, 0.02 * R); ctx.fill(); ctx.restore(); } } // реакция: кулон сверкает
+    });
+  } else if (kind === 'ribbon') { // ленточка-чокер цвета акцента с бантиком; концы обрезаны по контуру сердца
+    ctx.save(); heartShape(R); ctx.clip(); ctx.lineCap = 'butt';
+    chain(ad, 0.085); chain(ac, 0.062);
+    ctx.save(); ctx.setLineDash([0.02 * R, 0.03 * R]); chain('rgba(255,255,255,0.7)', 0.012); ctx.restore();
+    ctx.restore();
+    const [x, y] = nq(0.5, R), k = Math.abs(wob(ax, 3, 2)); // реакция: бантик хлопает крылышками
+    ctx.save(); ctx.translate(x, y); ctx.scale(1 + 0.35 * k, 1 - 0.1 * k); bow(0, 0, 0.2 * R, 0, ac === '#ffffff' ? '#ff9ccf' : ac, ad); ctx.restore();
   } else if (kind === 'flowers') {
     const cols = ['#ff7aa8', '#ffd23f', '#c9a7ff', '#7fd1ff', '#ff9636'];
-    ctx.fillStyle = '#5cc160';
+    ctx.fillStyle = color === 'green' ? '#2f8f3a' : '#5cc160'; // на зелёном сердце листья темнее, иначе пропадают
     for (let i = 0; i < 8; i++) { const s = 0.1 + i * 0.8 / 7, [x, y] = nq(s, R); ell(x, y + 0.02 * R, 0.07 * R, 0.03 * R, nAng(s, R) + 0.5); }
     for (let i = 0; i < 9; i++) { const [x, y] = nq(0.05 + i * 0.9 / 8, R); flower(x, y - 0.03 * R * hump(ax - i * 0.06, 0.4), 0.065 * R * (1 + 0.4 * hump(ax - i * 0.06, 0.4)), cols[i % cols.length], i + (ax < 0 ? 0 : ax * 5 * fd)); } // реакция: цветочки кружатся волной
   } else if (kind === 'beads') {
-    chain('rgba(120,80,110,0.6)', 0.01);
-    for (let i = 0; i < 13; i++) { // реакция: бусины подпрыгивают каскадом — в такт звону (шаг 0.07 с)
-      const [x, y0] = nq(0.04 + i * 0.92 / 12, R), j = hump(ax - i * 0.07, 0.25), y = y0 - 0.08 * R * j;
-      ctx.fillStyle = RAINBOW[i % RAINBOW.length]; circle(x, y, 0.042 * R * (1 + 0.3 * j)); ctx.fillStyle = 'rgba(255,255,255,0.6)'; circle(x - 0.013 * R, y - 0.013 * R, 0.012 * R);
+    chain('rgba(120,80,110,0.6)', 0.012);
+    for (let i = 0; i < 9; i++) { // реакция: бусины подпрыгивают каскадом — в такт звону
+      const [x, y0] = nq(0.05 + i * 0.9 / 8, R), j = hump(ax - i * 0.09, 0.25), y = y0 - 0.08 * R * j;
+      bead(x, y, 0.055 * R * (1 + 0.3 * j), RAINBOW[i % RAINBOW.length], 'rgba(80,30,60,0.45)', R);
     }
-  } else if (kind === 'locket' || kind === 'star') { // круглый медальон с камушком
-    chain('#e6b000', 0.016);
-    const [x, y] = nq(0.5, R), cy = y + 0.12 * R;
+  } else if (kind === 'locket' || kind === 'star') { // круглый медальон с камушком (поднят, чтобы не ложился на кончик)
+    metalChain();
+    const [x, y] = nq(0.5, R), cy = y + 0.08 * R;
     mv(L, 'necklace', kind, R, x, y, () => {
-    ctx.save(); ctx.translate(x, y); ctx.scale(1.4, 1.4); ctx.translate(-x, -y);
-    ctx.strokeStyle = '#e6b000'; ctx.lineWidth = 0.014 * R; ctx.beginPath(); ctx.arc(x, y + 0.01 * R, 0.022 * R, 0, TAU); ctx.stroke();
-    const g = ctx.createRadialGradient(x - 0.04 * R, cy - 0.04 * R, 0.01 * R, x, cy, 0.11 * R); g.addColorStop(0, '#fff6b8'); g.addColorStop(1, '#e0a400');
-    ctx.fillStyle = g; circle(x, cy, 0.095 * R); ctx.strokeStyle = '#b07d00'; ctx.lineWidth = 0.012 * R; ctx.stroke();
-    ctx.lineWidth = 0.007 * R; ctx.beginPath(); ctx.arc(x, cy, 0.072 * R, 0, TAU); ctx.stroke();
-    const gg = ctx.createRadialGradient(x - 0.012 * R, cy - 0.012 * R, 0.003 * R, x, cy, 0.04 * R); gg.addColorStop(0, '#ffc2e0'); gg.addColorStop(1, '#e0207a');
-    ctx.fillStyle = gg; circle(x, cy, 0.038 * R); ctx.fillStyle = '#fff'; circle(x - 0.013 * R, cy - 0.013 * R, 0.01 * R);
-    if (ax >= 0) { const k = hump(ax, 1.4); ctx.fillStyle = `rgba(255,250,200,${0.6 * k})`; circle(x, cy, 0.14 * R * k); smallHeart(x, cy, 0.05 * R * (1 + k), '#ff3d7f'); } // реакция: медальон светится, в нём сердечко
+    ctx.save(); ctx.translate(x, y); ctx.scale(1.25, 1.25); ctx.translate(-x, -y);
+    ctx.strokeStyle = M[2]; ctx.lineWidth = 0.014 * R; ctx.beginPath(); ctx.arc(x, y + 0.005 * R, 0.02 * R, 0, TAU); ctx.stroke();
+    const g = ctx.createRadialGradient(x - 0.04 * R, cy - 0.04 * R, 0.01 * R, x, cy, 0.11 * R); g.addColorStop(0, M[0]); g.addColorStop(1, M[1]);
+    ctx.fillStyle = g; circle(x, cy, 0.075 * R); ctx.strokeStyle = M[2]; ctx.lineWidth = 0.014 * R; ctx.stroke();
+    ctx.lineWidth = 0.007 * R; ctx.beginPath(); ctx.arc(x, cy, 0.056 * R, 0, TAU); ctx.stroke();
+    bead(x, cy, 0.032 * R, gc === '#ffffff' ? '#ff6fa8' : gc, gk, R);
+    if (ax >= 0) { const k = hump(ax, 1.4); ctx.fillStyle = `rgba(255,250,200,${0.6 * k})`; circle(x, cy, 0.12 * R * k); smallHeart(x, cy, 0.045 * R * (1 + k), '#ff3d7f'); } // реакция: медальон светится, в нём сердечко
     ctx.restore();
     });
-  } else if (kind === 'bowtie') { // галстук-бабочка в горошек
+  } else if (kind === 'bowtie') { // галстук-бабочка в горошек, цвет акцента
     const spin = ax < 0 ? 0 : TAU * 2 * ease.inOut(clamp01(ax / 0.9)); // реакция: бабочка крутится пропеллером
     ctx.save(); ctx.translate(0, 0.47 * R); ctx.rotate(Math.sin(t * 2) * 0.05 + spin);
     const wing = (sd: number) => { ctx.beginPath(); ctx.moveTo(0, 0); ctx.quadraticCurveTo(sd * 0.08 * R, -0.11 * R, sd * 0.21 * R, -0.1 * R); ctx.quadraticCurveTo(sd * 0.25 * R, 0, sd * 0.21 * R, 0.1 * R); ctx.quadraticCurveTo(sd * 0.08 * R, 0.11 * R, 0, 0); ctx.closePath(); };
+    const wc = ac === '#ffffff' ? '#ff6f9f' : ad, dc = ac === '#ffffff' ? '#fff' : ac;
     for (const sd of [-1, 1]) {
-      wing(sd); ctx.fillStyle = '#ff4f7a'; ctx.fill();
-      ctx.save(); wing(sd); ctx.clip(); ctx.fillStyle = '#fff';
-      for (const [dx, dy] of [[0.08, -0.04], [0.15, 0.03], [0.19, -0.06], [0.11, 0.07]]) circle(sd * dx * R, dy * R, 0.017 * R);
+      wing(sd); ctx.fillStyle = wc; ctx.fill();
+      ctx.save(); wing(sd); ctx.clip(); ctx.fillStyle = dc;
+      for (const [dx, dy] of [[0.08, -0.04], [0.15, 0.03], [0.19, -0.06], [0.11, 0.07]]) circle(sd * dx * R, dy * R, 0.019 * R);
       ctx.restore();
-      wing(sd); ctx.strokeStyle = '#b3123a'; ctx.lineWidth = 0.014 * R; ctx.stroke();
+      wing(sd); ctx.strokeStyle = 'rgba(70,20,50,0.7)'; ctx.lineWidth = 0.014 * R; ctx.stroke();
     }
-    ctx.fillStyle = '#e8305e'; ell(0, 0, 0.05 * R, 0.062 * R); ctx.stroke();
+    ctx.fillStyle = wc; ell(0, 0, 0.05 * R, 0.062 * R); ctx.stroke();
     ctx.restore();
-  } else if (kind === 'scarf') { // вязаный шарфик в полоску
-    ctx.lineCap = 'butt';
-    chain('#c93d63', 0.14); chain('#ff6f91', 0.12);
-    ctx.setLineDash([0.05 * R, 0.07 * R]); chain('#fff3b0', 0.12); ctx.setLineDash([]);
-    const [tx, ty] = nq(0.3, R);
+  } else if (kind === 'scarf') { // вязаный шарфик в полоску: акцент + белый, по контуру сердца
+    ctx.save(); heartShape(R); ctx.clip(); ctx.lineCap = 'butt';
+    chain(ad, 0.14); chain(ac, 0.12);
+    ctx.setLineDash([0.05 * R, 0.07 * R]); chain('#ffffff', 0.12); ctx.setLineDash([]);
+    ctx.restore();
+    const [tx, ty] = nq(0.36, R);
     // реакция: хвост шарфа развевается на ветру — отлетает вбок и идёт волной
     const wk = ax < 0 ? 0 : fd * clamp01(ax / 0.25), wind = wk * (0.9 + 0.25 * Math.sin(ax * TAU * 2.5));
-    ctx.save(); ctx.translate(tx, ty); ctx.rotate(0.12 + Math.sin(t * 1.8) * 0.04 + wind);
-    const wv = (yy: number) => wk * Math.sin(ax * TAU * 3 - yy / R * 9) * 0.04 * R * (yy / (0.3 * R)); // волна вдоль хвоста
+    ctx.save(); ctx.translate(tx, ty); ctx.rotate(0.05 + Math.sin(t * 1.8) * 0.04 + wind);
+    const TL = 0.22 * R, wv = (yy: number) => wk * Math.sin(ax * TAU * 3 - yy / R * 9) * 0.04 * R * (yy / TL); // волна вдоль хвоста
     const strip = (y0: number, h: number) => { const n = 6; ctx.beginPath(); for (let i = 0; i <= n; i++) { const yy = y0 + h * i / n; ctx.lineTo(-0.06 * R + wv(yy), yy); } for (let i = n; i >= 0; i--) { const yy = y0 + h * i / n; ctx.lineTo(0.06 * R + wv(yy), yy); } ctx.closePath(); };
-    strip(0, 0.3 * R); ctx.fillStyle = '#ff6f91'; ctx.fill();
-    ctx.fillStyle = '#fff3b0'; for (let i = 0; i < 3; i++) { strip((0.05 + i * 0.09) * R, 0.035 * R); ctx.fill(); }
-    strip(0, 0.3 * R); ctx.strokeStyle = '#c93d63'; ctx.lineWidth = 0.012 * R; ctx.stroke();
-    ctx.lineCap = 'round'; ctx.strokeStyle = '#ff6f91'; ctx.lineWidth = 0.018 * R;
-    for (let i = 0; i < 4; i++) { const x = (-0.045 + i * 0.03) * R + wv(0.3 * R); ctx.beginPath(); ctx.moveTo(x, 0.3 * R); ctx.lineTo(x + wv(0.36 * R) - wv(0.3 * R), 0.36 * R); ctx.stroke(); }
+    strip(0, TL); ctx.fillStyle = ac; ctx.fill();
+    ctx.fillStyle = '#ffffff'; for (let i = 0; i < 2; i++) { strip((0.05 + i * 0.09) * R, 0.035 * R); ctx.fill(); }
+    strip(0, TL); ctx.strokeStyle = ad; ctx.lineWidth = 0.014 * R; ctx.stroke();
+    ctx.lineCap = 'round'; ctx.strokeStyle = ad; ctx.lineWidth = 0.018 * R;
+    for (let i = 0; i < 4; i++) { const x = (-0.045 + i * 0.03) * R + wv(TL); ctx.beginPath(); ctx.moveTo(x, TL); ctx.lineTo(x + wv(TL + 0.05 * R) - wv(TL), TL + 0.05 * R); ctx.stroke(); }
     ctx.restore();
-  } else if (kind === 'key') { // цепочка с ключиком
-    chain('#e6b000', 0.012);
+  } else if (kind === 'key') { // цепочка с ключиком (короче — не свисает ниже кончика)
+    metalChain();
     const [x, y] = nq(0.5, R);
     const turn = ax < 0 ? 0 : 1.1 * hump(ax, 1.0) + 0.15 * wob(ax - 1.0, 3); // реакция: ключик поворачивается
-    ctx.save(); ctx.translate(x, y); ctx.rotate(Math.sin(t * 1.7) * 0.12 + turn); ctx.scale(1.6, 1.6);
-    ctx.fillStyle = '#ffd23f'; ctx.strokeStyle = '#b07d00'; ctx.lineWidth = 0.012 * R;
+    ctx.save(); ctx.translate(x, y); ctx.rotate(Math.sin(t * 1.7) * 0.12 + turn); ctx.scale(1.1, 1.1);
+    ctx.fillStyle = M[1]; ctx.strokeStyle = M[2]; ctx.lineWidth = 0.014 * R;
     ctx.beginPath(); ctx.arc(0, 0.075 * R, 0.055 * R, 0, TAU); ctx.arc(0, 0.075 * R, 0.025 * R, 0, TAU, true); ctx.fill('evenodd'); ctx.stroke();
     ctx.beginPath(); ctx.rect(-0.015 * R, 0.125 * R, 0.03 * R, 0.17 * R); ctx.rect(0.012 * R, 0.24 * R, 0.045 * R, 0.022 * R); ctx.rect(0.012 * R, 0.275 * R, 0.035 * R, 0.02 * R);
     ctx.fill(); ctx.stroke();

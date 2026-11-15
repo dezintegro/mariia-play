@@ -179,12 +179,13 @@ test('волшебная палочка, фото-альбом и безопас
     A.tapAt(U.items[0].x, U.items[0].y); out.flash = G.flash > 0; out.albumN = G.album.length;
     g.step(1); const snap = JSON.stringify(G.cfg);
     out.photos = U.items.filter((i: any) => i.kind === 'photo').length;
-    A.goStage(5); A.choose({ kind: 'single', k: 'bunny' }); A.goStage(ALB); g.step(0.5);
+    // палочка могла уже надеть ушки (набор «зайка») — тогда другая причёска
+    A.goStage(5); A.choose({ kind: 'single', k: G.cfg.hair === 'bunny' ? 'crown' : 'bunny' }); A.goStage(ALB); g.step(0.5);
     const ph = U.items[1]; A.tapAt(ph.x, ph.y); g.step(0.3);
     out.restored = JSON.stringify(G.cfg) === snap;
     out.sel = U.items.filter((i: any) => i.kind === 'photo').length;
     // «заново» в празднике: сначала фото в альбом
-    A.goStage(1); g.step(0.3); A.choose({ kind: 'single', k: 'cat' }); const before = G.album.length;
+    A.goStage(1); g.step(0.3); A.choose({ kind: 'single', k: G.cfg.eyes === 'cat' ? 'glasses' : 'cat' }); const before = G.album.length;
     A.party(); g.step(2); out.hitCamera = A.hitAt(U.camera.x, U.camera.y)?.k;
     A.tapAt(U.again.x, U.again.y); out.albumAfterAgain = G.album.length - before; out.reset = G.cfg.eyes === 'round';
     g.step(1);
@@ -238,6 +239,7 @@ test('свои реакции: у каждой детали — свой зву�
         A.choose(it);
         const a = hs.act;
         if (!a || a.id !== id || a.k !== it.k) bad.push(`нет реакции ${id}:${it.k}`);
+        if (!g.hasReaction(id, it.k)) bad.push(`нет своей реакции (звук+анимация) ${id}:${it.k}`);
         g.step(0.9); // середина реакции — всё рисуется без ошибок
         g.step(1.6);
         if (hs.act) bad.push(`не закончилась ${id}:${it.k}`);
@@ -247,7 +249,7 @@ test('свои реакции: у каждой детали — свой зву�
     return { n, bad };
   }, IDS);
   expect(r.bad).toEqual([]);
-  expect(r.n).toBe(73);
+  expect(r.n).toBe(87);
   noErrors(errors);
 
   // 2. тап по надетой детали — реакция именно этой детали; тап по телу — старые 3 реакции
@@ -283,6 +285,63 @@ test('свои реакции: у каждой детали — свой зву�
     await shot(page, `heart-react-${id}-${k}`);
     await page.evaluate(() => { const g = window.__game; g.step(2.5); g.pause(false); });
   }
+  noErrors(errors);
+});
+
+test('палитра в тон: на каждом цвете сердца все детали и их реакции рисуются без ошибок', async ({ page }) => {
+  const errors = await openScene(page, PAGE);
+  const r = await page.evaluate(() => {
+    const g = window.__game, G = g.G, IDS = ['eyes', 'lashes', 'nose', 'cheeks', 'hair', 'earrings', 'necklace'];
+    let n = 0;
+    // варианты берём из панели каждого этапа
+    const all: [string, string][] = [];
+    IDS.forEach((id: string) => { g.api.goStage(['color', ...IDS].indexOf(id)); g.step(0.05); for (const it of g.UI.items) if (it.kind === 'single') all.push([id, it.k]); });
+    g.api.goStage(0); g.step(0.05);
+    for (const color of g.colors) {
+      Object.assign(G.cfg, { color, eyes: 'round', lashes: 'long', nose: 'dot', cheeks: 'blush', hair: 'bow', earrings: 'pearl', necklace: 'pearls' });
+      for (const [id, k] of all) {
+        G.cfg[id] = k; G.hs.act = { id, k, t: 0.6 }; g.step(1 / 60); n++; // кадр в середине реакции
+      }
+      G.hs.act = null; G.hs.blink = 0.5; G.hs.love = 1; g.step(1 / 60); G.hs.love = 0; // моргание и «влюблённость» на последнем наряде
+    }
+    return { n, colors: g.colors.length, variants: all.length };
+  });
+  expect(r.colors).toBeGreaterThanOrEqual(12);
+  expect(r.variants).toBe(77);
+  expect(r.n).toBe(r.colors * r.variants);
+  noErrors(errors);
+});
+
+test('палочка собирает образы из наборов: много раз подряд без ошибок, детали — из панели', async ({ page }) => {
+  const errors = await openScene(page, PAGE);
+  const r = await page.evaluate(() => {
+    const g = window.__game, G = g.G, A = g.api, bad: string[] = [];
+    const STG = ['color', 'eyes', 'lashes', 'nose', 'cheeks', 'hair', 'earrings', 'necklace'];
+    const opts: Record<string, string[]> = {};
+    STG.forEach((id, s) => { A.goStage(s); g.step(0.05); opts[id] = g.UI.items.filter((i: any) => i.kind === 'single').map((i: any) => i.k); });
+    // наборы — только из существующих вариантов
+    for (const set of g.SETS) for (const id of STG) if (!opts[id].includes(set[id])) bad.push(`набор ${set.name}: ${id}=${set[id]}`);
+    // wandCfg: 400 раз; больше половины — узнаваемый набор (совпадает с набором минимум в 5 деталях)
+    let fromSet = 0;
+    for (let i = 0; i < 400; i++) {
+      const c = A.wandCfg();
+      for (const id of STG) if (c[id] != null && !opts[id].includes(c[id])) bad.push(`wandCfg ${id}=${c[id]}`);
+      if (g.SETS.some((s: any) => STG.filter(id => s[id] === c[id]).length >= 5)) fromSet++;
+    }
+    // настоящая палочка 40 раз подряд
+    const seen = new Set<string>();
+    for (let i = 0; i < 40; i++) {
+      A.wand(); g.step(3);
+      if (G.wand) bad.push('палочка не закончила');
+      seen.add(STG.map(id => G.cfg[id]).join('|'));
+    }
+    return { bad, fromSet, distinct: seen.size };
+  });
+  expect(r.bad).toEqual([]);
+  expect(r.fromSet).toBeGreaterThan(200);
+  expect(r.fromSet).toBeLessThan(370);
+  expect(r.distinct).toBeGreaterThan(20);
+  await shot(page, 'heart-wand-set');
   noErrors(errors);
 });
 

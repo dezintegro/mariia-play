@@ -186,6 +186,12 @@ const RX: Record<string, Spec> = {
     blink: tm => blinks(tm, [0.15, 0.7], 0.35),
     xf: tm => ({ rot: 0.1 * hump(tm, 1.4), sx: 1 - 0.03 * hump(tm, 1.4) }),
   },
+  'lashes:one': { // одна ресничка: медленно и кокетливо хлопает, «дзынь»
+    snd: () => { tone(900, 0.3, { type: 'triangle', slide: 1500, vol: 0.09 }); tone(2093, 0.5, { vol: 0.05, delay: 0.45 }); },
+    tick: (tm, pr) => { if (at(tm, pr, 0.5)) both(s => sparks(s * 0.5, -0.3, 3, '#ffffff', 90)); },
+    blink: tm => blinks(tm, [0.2], 0.4),
+    xf: tm => ({ rot: -0.08 * hump(tm, 1.2) }),
+  },
   'lashes:flutter': { // хлопает часто-часто, как крылышками, и чуть взлетает
     snd: () => { for (let i = 0; i < 12; i++) tone(rand(1600, 2400), 0.04, { vol: 0.04, delay: i * 0.06 }); tone(500, 0.8, { type: 'triangle', slide: 900, vol: 0.05 }); },
     blink: tm => (tm < 1.0 ? Math.abs(Math.sin(tm * TAU * 4)) : 0),
@@ -222,6 +228,25 @@ const RX: Record<string, Spec> = {
   'nose:dot': { // «буп» и шмыг-шмыг
     snd: () => { tone(600, 0.1, { slide: 400, vol: 0.14 }); sniff(0.3); sniff(0.48); },
     xf: tm => ({ dy: -0.02 * hump(tm - 0.3, 0.35) }),
+  },
+  'nose:tone': { // «буп» — и блик на носике вспыхивает
+    snd: () => { tone(700, 0.1, { slide: 1000, vol: 0.13 }); tone(1800, 0.35, { vol: 0.05, delay: 0.3 }); tone(2400, 0.3, { vol: 0.03, delay: 0.36 }); },
+    tick: (tm, pr) => { if (at(tm, pr, 0.3)) sparks(-0.02, 0.03, 5, '#ffffff', 90); },
+    xf: tm => ({ dy: -0.03 * hump(tm, 0.4) }),
+  },
+  'nose:soft': { // носик-кнопочка: «пи-пи-пи», как резиновая игрушка
+    snd: () => { [0, 0.3, 0.6].forEach((d, i) => tone(850 + i * 120, 0.12, { type: 'triangle', slide: 1300 + i * 150, vol: 0.11, delay: d })); },
+    xf: tm => ({ sy: 1 - 0.03 * (hump(tm, 0.2) + hump(tm - 0.3, 0.2) + hump(tm - 0.6, 0.2)) }),
+    mouth: tm => laugh(tm, 0.8, 1.5, 4) * 0.7,
+  },
+  'nose:tri': { // носик зверька: шмыг-шмыг-шмыг, как у зайчика
+    snd: () => { [0, 0.16, 0.32, 0.48].forEach(d => sniff(d, 0.07)); tone(1500, 0.08, { type: 'triangle', slide: 1900, vol: 0.06, delay: 0.75 }); },
+    xf: tm => ({ dy: -0.012 * Math.abs(Math.sin(tm * TAU * 6)) * hump(tm, 0.9) }),
+  },
+  'nose:line': { // носик-дужка: улыбается шире и хихикает
+    snd: () => { tone(500, 0.3, { type: 'triangle', slide: 900, vol: 0.08 }); later(0.3, () => sfx.giggle(1.25)); },
+    xf: tm => ({ sx: 1 + 0.04 * hump(tm, 0.9) }),
+    mouth: tm => laugh(tm, 0.3, 1.2, 4),
   },
   'nose:heart': { // носик-сердечко бьётся
     snd: () => { for (const d of [0, 0.6]) { tone(300, 0.08, { vol: 0.2, delay: d }); tone(280, 0.1, { vol: 0.16, delay: d + 0.13 }); } tone(1568, 0.4, { vol: 0.05, delay: 0.3 }); },
@@ -272,6 +297,17 @@ const RX: Record<string, Spec> = {
     xf: tm => ({ rot: -0.1 * hump(tm, 1.5), sx: 1 - 0.05 * hump(tm, 1.5) }),
     mouth: tm => laugh(tm, 0.35, 1.0, 5) * 0.6,
   },
+  'cheeks:shine': { // щёчки-блёстки: краснеет, блики вспыхивают, хрустальный звон
+    snd: () => { for (let i = 0; i < 7; i++) tone(rand(2200, 3400), 0.15, { vol: 0.04, delay: i * 0.07 }); later(0.6, () => sfx.giggle(1.4)); },
+    go: () => { hs().love = Math.max(hs().love, 0.4); },
+    tick: (tm, pr) => { if (at(tm, pr, 0.15) || at(tm, pr, 0.85)) both(s => sparks(s * 0.56, 0.08, 4, '#ffffff', 110)); },
+    xf: tm => ({ rot: 0.08 * hump(tm, 1.4) }),
+  },
+  'cheeks:hearts': { // сердечки на щёчках бьются «тук-тук», из них вылетают сердечки
+    snd: () => { for (const d of [0, 0.7]) { tone(300, 0.08, { vol: 0.2, delay: d }); tone(280, 0.1, { vol: 0.16, delay: d + 0.22 }); } tone(1319, 0.5, { type: 'triangle', vol: 0.05, delay: 0.4 }); },
+    tick: (tm, pr) => { if (at(tm, pr, 0.05) || at(tm, pr, 0.75)) both(s => hearts(s * 0.56, 0.05, 2, '#ff6fa8')); },
+    xf: tm => { const s = 1 + 0.03 * (beat(tm) + beat(tm - 0.7)); return { sx: s, sy: s }; },
+  },
   'cheeks:doll': { // надувает щёчки — «пуф!»
     snd: () => { tone(150, 0.4, { slide: 300, vol: 0.1, attack: 0.1 }); tone(800, 0.08, { slide: 200, vol: 0.14, delay: 0.5 }); later(0.5, () => whoosh(0.18, 0.08)); },
     tick: (tm, pr) => { if (at(tm, pr, 0.5)) puff(0, 0.25, 5, '#ffffff', 12); },
@@ -311,6 +347,16 @@ const RX: Record<string, Spec> = {
   'hair:bow': { // бантик хлопает «крылышками»
     snd: () => { sfx.rustle(); tone(1319, 0.3, { type: 'triangle', vol: 0.08, delay: 0.25 }); },
     xf: tm => ({ rot: 0.06 * wob(tm, 2, 2) }),
+  },
+  'hair:headband': { // по ободку бежит блеск, бантик хлопает — «глиссандо»
+    snd: () => { seq([1047, 1175, 1319, 1568, 1760, 2093], 0.09, { vol: 0.05, type: 'sine', dur: 0.3 }); later(0.1, sfx.rustle); },
+    tick: (tm, pr) => { if (at(tm, pr, 0.6)) sparks(0, -0.75, 6, '#ffffff', 140); },
+    xf: tm => ({ dy: -0.05 * hump(tm, 0.8) }),
+  },
+  'hair:clip': { // заколка-звёздочка крутится и сверкает, «дзинь-дзинь»
+    snd: () => { whoosh(0.5, 0.06); bell(1760, 0.5, 0.07); bell(2349, 0.7, 0.05); },
+    tick: (tm, pr) => { if (at(tm, pr, 0.6)) sparks(-0.55, -0.85, 8, '#fff6a8', 150); },
+    xf: tm => ({ rot: -0.08 * hump(tm, 1.2) }),
   },
   'hair:long': { // взмах длинными волосами, «шшш-ах»
     snd: () => { whoosh(0.7, 0.12); [1047, 1319, 1568].forEach((f, i) => tone(f, 0.7, { vol: 0.05, delay: 0.3 + i * 0.05 })); },
@@ -365,6 +411,20 @@ const RX: Record<string, Spec> = {
     tick: (tm, pr) => { if (at(tm, pr, 0.2)) both(s => sparks(s * 0.9, 0.35, 4, '#ffffff', 90)); },
     xf: tm => { const s = 1 + 0.03 * hump(tm, 1); return { sx: s, sy: s }; },
   },
+  'earrings:studheart': { // гвоздики-сердечки бьются, из ушек вылетают сердечки
+    snd: () => { for (const d of [0, 0.7]) { tone(330, 0.08, { vol: 0.18, delay: d }); tone(300, 0.1, { vol: 0.14, delay: d + 0.22 }); } tone(1568, 0.4, { vol: 0.04, delay: 0.35 }); },
+    tick: (tm, pr) => { if (at(tm, pr, 0.05) || at(tm, pr, 0.75)) both(s => hearts(s * 0.9, 0.05, 2)); },
+    xf: tm => { const s = 1 + 0.025 * (beat(tm) + beat(tm - 0.7)); return { sx: s, sy: s }; },
+  },
+  'earrings:studgem': { // камушки по очереди вспыхивают звёздочкой: «дзинь — дзинь»
+    snd: () => { bell(2637, 0, 0.06); bell(3136, 0.25, 0.06); },
+    tick: (tm, pr) => { if (at(tm, pr, 0.05)) sparks(-0.9, 0.05, 5, '#ffffff', 100); if (at(tm, pr, 0.3)) sparks(0.9, 0.05, 5, '#ffffff', 100); },
+    xf: tm => ({ dy: -0.04 * hump(tm, 0.8) }),
+  },
+  'earrings:bow': { // бантики хлопают крылышками — шуршат
+    snd: () => { sfx.rustle(); later(0.35, sfx.rustle); tone(1175, 0.3, { type: 'triangle', vol: 0.06, delay: 0.6 }); },
+    xf: tm => ({ sx: 1 + 0.04 * wob(tm, 3, 2) }),
+  },
   'earrings:hoop': { // колечки крутятся как обруч
     snd: () => { tone(300, 0.4, { type: 'triangle', slide: 600, vol: 0.07 }); tone(600, 0.4, { type: 'triangle', slide: 300, vol: 0.07, delay: 0.4 }); whoosh(0.8, 0.05); },
     xf: tm => ({ rot: 0.1 * Math.sin(tm * TAU * 2) * hump(tm, 1.5) }),
@@ -408,6 +468,24 @@ const RX: Record<string, Spec> = {
   'necklace:pearls': { // по жемчужинам бежит блеск
     snd: () => seq([1319, 1568, 1760, 2093, 2349, 2637], 0.08, { vol: 0.05, type: 'sine', dur: 0.4 }),
     xf: tm => ({ sy: 1 + 0.04 * hump(tm, 1.2) }),
+  },
+  'necklace:tone': { // бусины по очереди раздуваются — «пуп-пуп-пуп» вверх по гамме
+    snd: () => { [523, 587, 659, 698, 784, 880, 988, 1047, 1175].forEach((f, i) => tone(f, 0.08, { slide: f * 1.5, vol: 0.09, delay: i * 0.08 })); },
+    xf: tm => ({ sy: 1 + 0.03 * hump(tm, 1) }),
+  },
+  'necklace:heartchain': { // кулон-сердечко качается и сверкает, шкатулка играет, вылетает сердечко
+    snd: () => seq([1319, 1568, 2093, 1568, 1319, 1047], 0.14, { vol: 0.05, type: 'sine', dur: 0.3 }),
+    tick: (tm, pr) => { if (at(tm, pr, 0.4)) hearts(0, 0.68, 4); },
+    xf: tm => ({ rot: 0.05 * Math.sin(tm * TAU * 1.5) * hump(tm, 1.4) }),
+  },
+  'necklace:gem': { // капелька дрожит и сверкает, «кап-дзинь»
+    snd: () => { tone(900, 0.1, { slide: 1800, vol: 0.12 }); bell(2349, 0.3, 0.06); },
+    tick: (tm, pr) => { if (at(tm, pr, 0.3)) sparks(0.05, 0.7, 6, '#ffffff', 120); },
+    xf: tm => ({ dy: -0.03 * hump(tm, 0.6) }),
+  },
+  'necklace:ribbon': { // ленточка: бантик хлопает, сердце кокетливо поворачивается
+    snd: () => { sfx.rustle(); tone(784, 0.25, { type: 'triangle', slide: 1047, vol: 0.07, delay: 0.3 }); tone(1047, 0.35, { type: 'triangle', vol: 0.06, delay: 0.55 }); },
+    xf: tm => ({ rot: 0.1 * hump(tm, 1.2) }),
   },
   'necklace:beads': { // бусины подпрыгивают и звенят каскадом
     snd: () => { const f = [523, 587, 659, 784, 880, 1047, 1175, 1319, 1568, 1760, 2093, 2349, 2637]; f.forEach((x, i) => tone(x, 0.25, { type: 'triangle', vol: 0.07, delay: i * 0.07 })); },

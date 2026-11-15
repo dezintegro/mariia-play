@@ -3,12 +3,12 @@ import { AC, initAudio, soundOn, toggleSound } from '../../core/audio';
 import { H, S, TAU, W, advance, clamp, ctx, cv, pick, pointer, rand, resizeCanvas, t } from '../../core/canvas';
 import { drawButton } from '../../core/draw';
 import { addP, burst, drawParticles, updateParticles } from '../../core/particles';
-import { Live, drawHeart } from './heart';
+import { COLORS, Live, drawHeart } from './heart';
 import { photoFrame } from './icons';
 import { PENTA, musicBeat, sfx, updMusic } from './sounds';
-import { ALBUM_MAX, DRESS_N, G, Item, STAGES, defaultCfg, load, sameCfg, save, stageItems } from './state';
+import { ALBUM_MAX, DRESS_N, G, Item, SETS, STAGES, defaultCfg, load, sameCfg, save, setCfg, stageItems } from './state';
 import { careAct, careHeartTap, careLive, careStageChange, careXform, drawCareBack, drawCareFront, drawCareOverlay, hitCare, tapCare, updateCare } from './care';
-import { partAt, react, reactXform, updateReact } from './reactions';
+import { hasReaction, partAt, react, reactXform, updateReact } from './reactions';
 import { MINI_COLORS, miniHeart } from './things';
 import { UI, drawUI, hitUI, iconAgain, iconBrush, iconCamera, iconSound, isSel, layout, maxOff, revealItem, revealStage, updateScroll } from './ui';
 import { babyPos, drawBg, groundY, drawEnvBack, drawEnvFront, env, hitWorld, tapWorld, updateWorld } from './world';
@@ -196,20 +196,42 @@ function drawPhotoFly() {
 
 // ---------------- ВОЛШЕБНАЯ ПАЛОЧКА ----------------
 const WAND_P: Record<string, number> = { lashes: 0.7, nose: 0.7, cheeks: 0.7, hair: 0.85, earrings: 0.65, necklace: 0.65 };
-/** Случайный наряд: детали «прощёлкиваются» по очереди, сердце крутится */
+/** Разделы, где палочка может заменить деталь набора на «базовую» (первые варианты раздела) */
+const SWAP_IDS = ['eyes', 'lashes', 'nose', 'cheeks', 'hair', 'earrings', 'necklace'];
+/** Наряд для палочки: ~70% — готовый образ из SETS с 1–2 заменами на базовые варианты, ~30% — полный случай */
+export function wandCfg(rnd = Math.random): Record<string, any> {
+  const pk = <T,>(a: T[]) => a[Math.floor(rnd() * a.length)];
+  if (rnd() < 0.7) {
+    const c = setCfg(pk(SETS));
+    const n = 1 + (rnd() < 0.5 ? 1 : 0), ids = SWAP_IDS.slice();
+    for (let j = 0; j < n; j++) {
+      const id = ids.splice(Math.floor(rnd() * ids.length), 1)[0], st = STAGES.find(q => q.id === id);
+      const basic = st.opts.slice(0, id === 'eyes' ? 3 : 4).filter(o => o !== c[id]);
+      c[id] = pk(basic);
+    }
+    return c;
+  }
+  const c: Record<string, any> = {};
+  for (let i = 0; i < DRESS_N; i++) {
+    const st = STAGES[i];
+    if (st.id === 'env') { const on: Record<string, boolean> = {}; for (const k of st.opts) if (rnd() < 0.25) on[k] = true; if (!Object.keys(on).length) on[pk(st.opts)] = true; c.env = on; continue; }
+    if (st.id === 'bg') { c.bg = pk(stageItems(i).filter(q => q.kind === 'bgcolor')).k; const d: Record<string, boolean> = {}; for (let j = 0; j < 2; j++) if (rnd() < 0.6) d[pk(stageItems(i).filter(q => q.kind === 'bgd')).k as string] = true; c.bgd = d; continue; }
+    c[st.id] = rnd() < (WAND_P[st.id] ?? 1) ? pk(st.opts) : null;
+  }
+  return c;
+}
+/** Наряд палочкой: детали «прощёлкиваются» по очереди, сердце крутится */
 export function wand() {
   if (G.wand || G.finale) return;
   keepInAlbum();
   UI.wand.press = 1;
+  let c = wandCfg();
+  for (let k = 0; k < 5 && sameCfg({ ...defaultCfg(), ...c }, G.cfg); k++) c = wandCfg(); // не повторять текущий наряд
   const seq: [string, any][] = [];
   for (let i = 0; i < DRESS_N; i++) {
-    const st = STAGES[i];
-    if (st.id === 'env') { const on: Record<string, boolean> = {}; for (const k of st.opts) if (Math.random() < 0.25) on[k] = true; if (!Object.keys(on).length) on[pick(st.opts)] = true; seq.push(['env', on]); continue; }
-    if (st.id === 'bg') { seq.push(['bg', pick(stageItems(i).filter(q => q.kind === 'bgcolor')).k]); const d: Record<string, boolean> = {}; for (let j = 0; j < 2; j++) if (Math.random() < 0.6) d[pick(stageItems(i).filter(q => q.kind === 'bgd')).k as string] = true; seq.push(['bgd', d]); continue; }
-    const p = WAND_P[st.id] ?? 1, cur = G.cfg[st.id];
-    let v = Math.random() < p ? pick(st.opts) : null;
-    if (v === cur && v != null) v = pick(st.opts.filter(o => o !== cur));
-    seq.push([st.id, v]);
+    const id = STAGES[i].id;
+    if (id === 'bg') { seq.push(['bg', c.bg]); seq.push(['bgd', c.bgd]); }
+    else seq.push([id, c[id] ?? null]);
   }
   G.wand = { t: 0, seq, i: 0 };
   hs.spinT = 0; sfx.wand(); hs.mouth = 1;
@@ -452,5 +474,6 @@ requestAnimationFrame(frame);
   pause(on = true) { paused = on; },
   audio() { return AC ? AC.state : 'none'; },
   start() { G.started = true; document.getElementById('start')!.classList.add('hide'); },
-  api: { tapAt, swipe, hitAt, choose, party, goStage, revealItem, startFinale, restart, cont, tapHeart, layout, wand, takePhoto, loadPhoto },
+  api: { tapAt, swipe, hitAt, choose, party, goStage, revealItem, startFinale, restart, cont, tapHeart, layout, wand, wandCfg, takePhoto, loadPhoto },
+  SETS, hasReaction, colors: Object.keys(COLORS),
 };

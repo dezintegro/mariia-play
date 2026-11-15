@@ -2,16 +2,18 @@
 
 import { CARE_OPTS } from './careopts';
 
+// Порядок вариантов: сначала простые «базовые» (подходят почти ко всему), дальше характерные и шуточные.
+// Старые варианты, убранные из панели (нос button, ожерелье key/hearts), по-прежнему рисуются — сохранённые наряды не ломаются.
 /** Этапы по порядку. optional — можно «без этого»; multi — можно выбрать несколько сразу; care — уход (еда, ванна, сон). */
 export const STAGES = [
   { id: 'color', opts: ['red', 'pink', 'purple', 'blue', 'green', 'yellow', 'rainbow', 'dots', 'stripes', 'sunset'] },
   { id: 'eyes', opts: ['round', 'sparkle', 'happy', 'sleepy', 'cat', 'rainbow', 'glasses', 'sunglasses', 'wink', 'button'] },
-  { id: 'lashes', optional: true, opts: ['short', 'long', 'flutter', 'color', 'lower', 'wing', 'glitter', 'brows'] },
-  { id: 'nose', optional: true, opts: ['dot', 'heart', 'button', 'clown', 'cat', 'pig', 'strawberry', 'dog', 'mustache'] },
-  { id: 'cheeks', optional: true, opts: ['blush', 'doll', 'freckles', 'swirl', 'rainbow', 'daisy', 'candy', 'paw'] },
-  { id: 'hair', optional: true, opts: ['bow', 'long', 'pigtails', 'crown', 'flowers', 'unicorn', 'bun', 'cat', 'bunny', 'afro'] },
-  { id: 'earrings', optional: true, opts: ['pearl', 'hoop', 'cherry', 'drop', 'icecream', 'butterfly', 'bell', 'feather', 'star'] },
-  { id: 'necklace', optional: true, opts: ['pearls', 'beads', 'flowers', 'locket', 'bowtie', 'scarf', 'key', 'shells', 'candy'] },
+  { id: 'lashes', optional: true, opts: ['short', 'long', 'one', 'flutter', 'wing', 'lower', 'brows', 'glitter', 'color'] },
+  { id: 'nose', optional: true, opts: ['dot', 'tone', 'soft', 'tri', 'line', 'heart', 'cat', 'dog', 'pig', 'clown', 'strawberry', 'mustache'] },
+  { id: 'cheeks', optional: true, opts: ['blush', 'shine', 'hearts', 'doll', 'freckles', 'swirl', 'daisy', 'paw', 'rainbow', 'candy'] },
+  { id: 'hair', optional: true, opts: ['bow', 'headband', 'clip', 'flowers', 'crown', 'long', 'pigtails', 'bun', 'cat', 'bunny', 'unicorn', 'afro'] },
+  { id: 'earrings', optional: true, opts: ['pearl', 'studheart', 'studgem', 'hoop', 'drop', 'bow', 'star', 'butterfly', 'cherry', 'bell', 'feather', 'icecream'] },
+  { id: 'necklace', optional: true, opts: ['pearls', 'tone', 'heartchain', 'gem', 'ribbon', 'locket', 'beads', 'flowers', 'shells', 'bowtie', 'scarf', 'candy'] },
   { id: 'env', optional: true, multi: true, opts: ['babies', 'bubbles', 'butterflies', 'balloons', 'sparkles', 'flowers', 'kitten', 'fish', 'duck'] },
   { id: 'bg', opts: [] as string[] },
   { id: 'food', care: true, opts: CARE_OPTS.food },
@@ -34,6 +36,24 @@ export const BG_COLORS: Record<string, [string, string]> = {
   lemon: ['#fffbd8', '#ffe27a'],
 };
 export const BG_DETAILS = ['clouds', 'rainbow', 'sun', 'hills', 'moon', 'garland', 'tree', 'castle', 'sea'];
+
+/** Готовые образы для волшебной палочки: все детали наряда + окружение + фон подобраны друг к другу */
+export const SETS: Record<string, any>[] = [
+  { name: 'princess', color: 'pink', eyes: 'sparkle', lashes: 'long', nose: 'dot', cheeks: 'blush', hair: 'crown', earrings: 'pearl', necklace: 'pearls', env: ['sparkles'], bg: 'lilac', bgd: ['castle'] },
+  { name: 'kitty', color: 'purple', eyes: 'cat', lashes: 'short', nose: 'cat', cheeks: 'paw', hair: 'cat', earrings: 'bell', necklace: 'ribbon', env: ['kitten'], bg: 'mint', bgd: ['hills'] },
+  { name: 'sea', color: 'blue', eyes: 'round', lashes: 'lower', nose: 'dot', cheeks: 'blush', hair: 'long', earrings: 'drop', necklace: 'shells', env: ['fish', 'bubbles'], bg: 'sky', bgd: ['sea'] },
+  { name: 'sweets', color: 'dots', eyes: 'happy', lashes: 'color', nose: 'strawberry', cheeks: 'candy', hair: 'bun', earrings: 'icecream', necklace: 'candy', env: ['balloons'], bg: 'peach', bgd: ['garland'] },
+  { name: 'fairy', color: 'green', eyes: 'round', lashes: 'flutter', nose: 'heart', cheeks: 'daisy', hair: 'flowers', earrings: 'butterfly', necklace: 'flowers', env: ['butterflies', 'flowers'], bg: 'lemon', bgd: ['sun', 'tree'] },
+  { name: 'unicorn', color: 'sunset', eyes: 'rainbow', lashes: 'glitter', nose: 'heart', cheeks: 'rainbow', hair: 'unicorn', earrings: 'star', necklace: 'locket', env: ['sparkles'], bg: 'night', bgd: ['moon', 'rainbow'] },
+  { name: 'bunny', color: 'yellow', eyes: 'button', lashes: 'short', nose: 'tri', cheeks: 'doll', hair: 'bunny', earrings: 'pearl', necklace: 'ribbon', env: ['flowers', 'duck'], bg: 'mint', bgd: ['hills'] },
+  { name: 'classic', color: 'red', eyes: 'round', lashes: 'long', nose: 'dot', cheeks: 'blush', hair: 'bow', earrings: 'studheart', necklace: 'pearls', env: ['babies'], bg: 'pink', bgd: ['clouds'] },
+];
+/** Наряд из набора: env/bgd — в виде { ключ: true } */
+export function setCfg(set: Record<string, any>): Record<string, any> {
+  const on = (a: string[]) => Object.fromEntries(a.map(k => [k, true]));
+  const c: Record<string, any> = { ...set, env: on(set.env), bgd: on(set.bgd) };
+  delete c.name; return c;
+}
 
 export type Item = { kind: 'single' | 'none' | 'toggle' | 'bgcolor' | 'bgd' | 'care' | 'camera' | 'photo'; k: string | null };
 
