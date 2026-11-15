@@ -36,7 +36,8 @@ export const env = {
 
 const on = (k: string) => !!G.cfg.env[k];
 const bgOn = (k: string) => !!G.cfg.bgd[k];
-export const groundY = () => G.HR.y + G.HR.h * 0.95;
+/** Земля: в празднике — над рядом кнопок «заново / фото / украшать дальше», чтобы котёнок и цветы не прятались под ними */
+export const groundY = () => { const g = G.HR.y + G.HR.h * 0.95, a = G.zones.again; return G.finale && a ? Math.min(g, a.y - a.r * 1.25) : g; };
 /** Те, кто ходит по земле, не заходят под кнопки палочки и хлопушки: u (0..1) → x между ними */
 function walkX(u: number) {
   const A = G.HR, z = G.zones, k = G.uiA;

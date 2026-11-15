@@ -1,5 +1,5 @@
 import { AC, initAudio } from '../../core/audio';
-import { H, S, TAU, W, advance, clamp, ctx, cv, dist, easeOutBack, pick, pointer, rand, resizeCanvas, t, SAFE } from '../../core/canvas';
+import { H, S, SAFE, TAU, W, advance, clamp, ctx, cv, dist, easeOutBack, pick, pointer, rand, resizeCanvas, t } from '../../core/canvas';
 import { circle, drawButton } from '../../core/draw';
 import { addP, drawParticles, updateParticles } from '../../core/particles';
 import { PICK_COLOR, flyHouse, flyPos, houseAt, iconHouse, launchHouse, pickIcon, updateFly } from './buildings';
@@ -19,11 +19,13 @@ function layout() {
   planet.x = W / 2; planet.y = H * 0.56; planet.r = Math.min(W * 0.2, 135 * S);
   ringed.x = W * 0.13; ringed.y = H * 0.2; ringed.r = 34 * S;
   const br = Math.max(38, 48 * S);
-  Object.assign(btn.launch, { x: W - br - 24, y: H - br - 24, r: br });
-  Object.assign(btn.house, { x: W - br * 3.4 - 24, y: H - br - 24, r: br });
-  Object.assign(btn.night, { x: br + 24, y: H - br - 24, r: br });
+  // кнопки — внутри безопасной области (чёлка, полоска «домой» на iPhone)
+  const R0 = W - SAFE.r, B0 = H - SAFE.b;
+  Object.assign(btn.launch, { x: R0 - br - 24, y: B0 - br - 24, r: br });
+  Object.assign(btn.house, { x: R0 - br * 3.4 - 24, y: B0 - br - 24, r: br });
+  Object.assign(btn.night, { x: SAFE.l + br + 24, y: B0 - br - 24, r: br });
   placePicks();
-  const sr = br * 0.55; Object.assign(btn.sound, { x: W - sr - 18, y: sr + 18, r: sr });
+  const sr = br * 0.55; Object.assign(btn.sound, { x: R0 - sr - 18, y: SAFE.t + sr + 18, r: sr });
   for (const s of bigStars) { s.x = s.fx * W; s.y = s.fy * H; }
   for (const b of babies) {
     b.x = clamp(b.x, 0, W); b.y = clamp(b.y, 0, H); b.wTimer = 0;
@@ -132,7 +134,7 @@ function frame(now) {
 cv.addEventListener('pointerdown', e => {
   if (!G.started || G.trans) return;
   initAudio();
-  const x = (e.clientX - SAFE.l), y = (e.clientY - SAFE.t); pointer.x = x; pointer.y = y;
+  const x = e.clientX, y = e.clientY; pointer.x = x; pointer.y = y;
   const h = G.scene === 'space' ? hit(x, y) : hitRoom(x, y);
   if (G.scene === 'space' && picker.open && !(h && (h.k === 'pick' || (h.k === 'btn' && (h.o === 'house' || h.o === 'sound'))))) { picker.open = false; sfx.boop(); return; }
   if (h && h.k === 'baby') { G.drag = { b: h.o, sx: x, sy: y, moved: false }; try { cv.setPointerCapture(e.pointerId); } catch (_) {} return; }
@@ -140,14 +142,14 @@ cv.addEventListener('pointerdown', e => {
 });
 
 cv.addEventListener('pointermove', e => {
-  pointer.x = (e.clientX - SAFE.l); pointer.y = (e.clientY - SAFE.t); pointer.moved = true;
+  pointer.x = e.clientX; pointer.y = e.clientY; pointer.moved = true;
   if (G.drag) {
-    if (!G.drag.moved && dist((e.clientX - SAFE.l), (e.clientY - SAFE.t), G.drag.sx, G.drag.sy) > 10) { G.drag.moved = true; startDrag(G.drag.b); }
-    if (G.drag.moved) moveDrag(G.drag.b, (e.clientX - SAFE.l), (e.clientY - SAFE.t));
+    if (!G.drag.moved && dist(e.clientX, e.clientY, G.drag.sx, G.drag.sy) > 10) { G.drag.moved = true; startDrag(G.drag.b); }
+    if (G.drag.moved) moveDrag(G.drag.b, e.clientX, e.clientY);
   }
   if (G.started && performance.now() - pointer.lastSpark > 35) {
     pointer.lastSpark = performance.now();
-    addP({ kind: 'spark', x: (e.clientX - SAFE.l) + rand(-4, 4), y: (e.clientY - SAFE.t) + rand(-4, 4), vx: rand(-20, 20) * S, vy: rand(10, 40) * S, life: rand(0.4, 0.8), size: rand(3, 6) * S, color: pick(['#fff', '#ffe27a', '#c9e8ff', '#ffc4e1']), rot: rand(0, TAU), vr: rand(-4, 4), g: 0 });
+    addP({ kind: 'spark', x: e.clientX + rand(-4, 4), y: e.clientY + rand(-4, 4), vx: rand(-20, 20) * S, vy: rand(10, 40) * S, life: rand(0.4, 0.8), size: rand(3, 6) * S, color: pick(['#fff', '#ffe27a', '#c9e8ff', '#ffc4e1']), rot: rand(0, TAU), vr: rand(-4, 4), g: 0 });
   }
 });
 
@@ -155,7 +157,7 @@ function endDrag(e) {
   if (!G.drag) return;
   const { b, moved } = G.drag; G.drag = null;
   if (!moved) { if (G.scene === 'space') tapBaby(b); else tapRoomBaby(b); }
-  else dropBaby(b, (e.clientX - SAFE.l), (e.clientY - SAFE.t));
+  else dropBaby(b, e.clientX, e.clientY);
 }
 
 cv.addEventListener('pointerup', endDrag);

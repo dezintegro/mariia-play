@@ -8,8 +8,8 @@ export let W = 0, H = 0, DPR = 1, S = 1, BR = 26;
 /** время сцены в секундах */
 export let t = 0;
 export function advance(dt: number) { t += dt; }
-/** Отступы от «чёлки», строки статуса и полоски «домой» (iPhone): холст ставится внутрь безопасной области.
- *  Координаты пальца в сценах — относительно холста: (e.clientX - SAFE.l, e.clientY - SAFE.t). */
+/** Отступы от «чёлки», строки статуса и полоски «домой» (iPhone). Холст — на весь экран (фон рисуется и под ними),
+ *  а кнопки и панели сцены ставят внутрь безопасной области: от SAFE.l/SAFE.t до W-SAFE.r/H-SAFE.b. */
 export const SAFE = { t: 0, r: 0, b: 0, l: 0 };
 /** Открыто с иконки на домашнем экране (без панелей браузера) */
 export const STANDALONE = (() => { try { return matchMedia('(display-mode: standalone)').matches || !!(navigator as any).standalone; } catch (e) { return false; } })();
@@ -29,9 +29,8 @@ export function resizeCanvas() {
   // области и задаём холсту явно в пикселях — тогда картинка не растягивается и не уходит под панели.
   const vv = window.visualViewport;
   readSafe();
-  W = Math.round(vv ? vv.width : innerWidth) - SAFE.l - SAFE.r; H = Math.round(vv ? vv.height : innerHeight) - SAFE.t - SAFE.b;
+  W = Math.round(vv ? vv.width : innerWidth); H = Math.round(vv ? vv.height : innerHeight);
   DPR = Math.min(window.devicePixelRatio || 1, 2);
-  cv.style.left = SAFE.l + 'px'; cv.style.top = SAFE.t + 'px';
   cv.style.width = W + 'px'; cv.style.height = H + 'px';
   cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR); ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
   S = Math.min(W, H) / 720; BR = 26 * S;

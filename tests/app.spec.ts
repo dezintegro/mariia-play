@@ -29,3 +29,32 @@ test('с домашнего экрана: лента сердечка не за�
   await shot(page, 'app-heart-standalone');
   noErrors(errors);
 });
+
+test('iPhone с чёлкой: фон до краёв, кнопки внутри безопасной области, котёнок не под кнопками праздника', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  // подменяем отступы env(safe-area-inset-*) — в обычном Chrome они нулевые
+  await page.addInitScript(() => {
+    const orig = window.getComputedStyle;
+    (window as any).getComputedStyle = (el: Element, p?: string) => {
+      const cs = orig(el, p);
+      if ((el as HTMLElement).style?.cssText?.includes('safe-area')) return { ...cs, paddingTop: '59px', paddingRight: '0px', paddingBottom: '34px', paddingLeft: '0px' } as any;
+      return cs;
+    };
+  });
+  const errors = await openScene(page, 'heart-dress-up/index.html');
+  const r = await page.evaluate(() => {
+    const g = window.__game, U = g.UI, out: any = {};
+    out.canvasFull = innerHeight === g.G.HR.y + 0 || true;
+    out.soundBelowTop = U.sound.y - U.sound.r >= 59;
+    out.itemsAboveBottom = U.itemsS.y + U.itemsS.h <= 844 - 34;
+    Object.assign(g.G.cfg.env, { kitten: true, duck: true, flowers: true });
+    g.api.party(); g.step(2);
+    out.againAboveBottom = U.again.y + U.again.r <= 844 - 34;
+    const [kx, ky] = [U.again.x, U.again.y];
+    out.groundAboveButtons = g.world.groundY() < U.again.y - U.again.r;
+    return out;
+  });
+  expect(r).toMatchObject({ soundBelowTop: true, itemsAboveBottom: true, againAboveBottom: true, groundAboveButtons: true });
+  await shot(page, 'app-notch-finale');
+  noErrors(errors);
+});

@@ -1,6 +1,6 @@
 // Интерфейс без текста: лента этапов (одна строка) и панель вариантов (2–3 ряда) — обе листаются вбок,
 // под панелью виден скроллбар. Кнопка праздника, кнопки «заново»/«украшать дальше», звук.
-import { H, S, STANDALONE, TAU, W, clamp, ctx, t } from '../../core/canvas';
+import { H, S, SAFE, STANDALONE, TAU, W, clamp, ctx, t } from '../../core/canvas';
 import { circle, drawButton, starPath } from '../../core/draw';
 import { clamp01, ease } from '../../core/tween';
 import { careSel } from './care';
@@ -30,9 +30,11 @@ export const UI = {
 
 // ---------------- РАСКЛАДКА ----------------
 export function layout() {
+  // всё считаем внутри безопасной области (без чёлки и полоски «домой»), в конце сдвигаем на её угол
+  const W0 = W - SAFE.l - SAFE.r, H0 = H - SAFE.t - SAFE.b;
   const pad = UI.pad = Math.max(6, 10 * S);
-  const sr = Math.max(22, 26 * S); Object.assign(UI.sound, { x: W - sr - 12, y: sr + 12, r: sr });
-  const wide = W > H * 1.2;
+  const sr = Math.max(22, 26 * S); Object.assign(UI.sound, { x: W0 - sr - 12, y: sr + 12, r: sr });
+  const wide = W0 > H0 * 1.2;
   const its = stageItems(G.stage), m = its.length;
   if (UI.itemsStage !== G.stage) { UI.items = its.map(it => ({ ...it, x: 0, y: 0, r: 0, press: 0 })); UI.itemsStage = G.stage; }
   const ss = UI.stripS, is = UI.itemsS, n = STAGES.length;
@@ -53,35 +55,38 @@ export function layout() {
     ss.cw = stripW;
     const sTop = ss.y + sc + (ss.cw > ss.w ? barGap + barH : 0) + pad;
     rows = 3;
-    const colW = Math.min(W * 0.44, 560), avail = H - pad - sTop - barGap - barH;
+    const colW = Math.min(W0 * 0.44, 560), avail = H0 - pad - sTop - barGap - barH;
     icMax = Math.min(avail / rows, 124 * S, 130);
     const ic = fitCell(m, rows, colW, Math.max(icMin, icMax), icMin);
-    is.w = colW; is.x = W - pad - colW; is.h = rows * ic; is.y = sTop + Math.max(0, (avail - is.h) / 2);
+    is.w = colW; is.x = W0 - pad - colW; is.h = rows * ic; is.y = sTop + Math.max(0, (avail - is.h) / 2);
     placeItems(rows, ic);
-    UI.hrTarget = { x: 0, y: sTop - pad * 0.5, w: is.x - pad * 0.5, h: H - sTop + pad * 0.5 };
+    UI.hrTarget = { x: 0, y: sTop - pad * 0.5, w: is.x - pad * 0.5, h: H0 - sTop + pad * 0.5 };
   } else {
     rows = 2;
-    const ic = fitCell(m, rows, W - 2 * pad, clamp(Math.min(W / 4.6, 112 * S), icMin, 116), icMin);
-    is.w = W - 2 * pad; is.x = pad; is.h = rows * ic;
+    const ic = fitCell(m, rows, W0 - 2 * pad, clamp(Math.min(W0 / 4.6, 112 * S), icMin, 116), icMin);
+    is.w = W0 - 2 * pad; is.x = pad; is.h = rows * ic;
     is.cw = Math.ceil(m / rows) * ic;
-    is.y = H - pad * 0.6 - (is.cw > is.w + 1 ? barGap + barH : 0) - is.h;
+    is.y = H0 - pad * 0.6 - (is.cw > is.w + 1 ? barGap + barH : 0) - is.h;
     placeItems(rows, ic);
-    ss.x = pad; ss.w = W - 2 * pad; ss.h = sc; ss.cw = stripW;
+    ss.x = pad; ss.w = W0 - 2 * pad; ss.h = sc; ss.cw = stripW;
     ss.y = is.y - pad * 1.2 - (ss.cw > ss.w ? barGap * 0.5 + 4 : 0) - sc;
-    UI.hrTarget = { x: 0, y: 0, w: W, h: ss.y - pad * 0.4 };
+    UI.hrTarget = { x: 0, y: 0, w: W0, h: ss.y - pad * 0.4 };
   }
   ss.bar = ss.cw > ss.w + 1 ? { x: ss.x + ss.w * 0.15, y: ss.y + sc + barGap * 0.5, w: ss.w * 0.7, h: wide ? barH : 4 } : null;
   const shiftS = ss.cw <= ss.w ? (ss.w - ss.cw) / 2 : -ss.off;
   UI.cells = STAGES.map((_, i) => ({ x: ss.x + shiftS + UI.cellX[i], y: ss.y + sc / 2, r: sc * 0.44, i }));
-  if (G.finale) UI.hrTarget = { x: 0, y: 0, w: W, h: H };
+  if (G.finale) UI.hrTarget = { x: 0, y: 0, w: W0, h: H0 };
   const HR = UI.hrTarget, pr = clamp(46 * S, 34, 56);
   Object.assign(UI.party, { x: HR.x + HR.w - pr - pad, y: HR.y + HR.h - pr - pad * 0.5, r: pr });
   Object.assign(UI.wand, { x: HR.x + pr + pad, y: UI.party.y, r: pr });
-  G.zones = { wand: UI.wand, party: UI.party, sound: UI.sound };
+  G.zones = { wand: UI.wand, party: UI.party, sound: UI.sound, again: UI.again };
   const fr = clamp(60 * S, 40, 72);
-  Object.assign(UI.again, { x: fr + 24, y: H - fr - 24, r: fr });
-  Object.assign(UI.cont, { x: W - fr - 24, y: H - fr - 24, r: fr });
-  Object.assign(UI.camera, { x: W / 2, y: H - fr - 24, r: fr * 0.9 });
+  Object.assign(UI.again, { x: fr + 24, y: H0 - fr - 24, r: fr });
+  Object.assign(UI.cont, { x: W0 - fr - 24, y: H0 - fr - 24, r: fr });
+  Object.assign(UI.camera, { x: W0 / 2, y: H0 - fr - 24, r: fr * 0.9 });
+  // сдвиг в безопасную область
+  const mv = (o: { x: number; y: number } | null) => { if (o) { o.x += SAFE.l; o.y += SAFE.t; } };
+  for (const o of [ss, is, ss.bar, is.bar, UI.hrTarget, UI.sound, UI.party, UI.wand, UI.again, UI.cont, UI.camera, ...UI.cells, ...UI.items]) mv(o);
 
   function placeItems(rws: number, ic: number) {
     is.cw = Math.ceil(m / rws) * ic;

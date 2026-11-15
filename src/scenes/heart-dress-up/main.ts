@@ -1,6 +1,6 @@
 // «Сердечко-модница»: украшаем сердце с глазками по этапам, в конце — праздник.
 import { AC, initAudio, soundOn, toggleSound } from '../../core/audio';
-import { H, S, TAU, W, advance, clamp, ctx, cv, pick, pointer, rand, resizeCanvas, t, SAFE } from '../../core/canvas';
+import { H, S, TAU, W, advance, clamp, ctx, cv, pick, pointer, rand, resizeCanvas, t } from '../../core/canvas';
 import { drawButton } from '../../core/draw';
 import { addP, burst, drawParticles, updateParticles } from '../../core/particles';
 import { Live, drawHeart } from './heart';
@@ -11,7 +11,7 @@ import { careAct, careHeartTap, careLive, careStageChange, careXform, drawCareBa
 import { partAt, react, reactXform, updateReact } from './reactions';
 import { MINI_COLORS, miniHeart } from './things';
 import { UI, drawUI, hitUI, iconAgain, iconBrush, iconCamera, iconSound, isSel, layout, maxOff, revealItem, revealStage, updateScroll } from './ui';
-import { babyPos, drawBg, drawEnvBack, drawEnvFront, env, hitWorld, tapWorld, updateWorld } from './world';
+import { babyPos, drawBg, groundY, drawEnvBack, drawEnvFront, env, hitWorld, tapWorld, updateWorld } from './world';
 
 const hs = G.hs;
 
@@ -402,24 +402,24 @@ export function swipe(x: number, y: number, dx: number) { down(x, y); for (let i
 cv.addEventListener('pointerdown', e => {
   if (!G.started) return;
   initAudio();
-  pointer.x = (e.clientX - SAFE.l); pointer.y = (e.clientY - SAFE.t);
-  down((e.clientX - SAFE.l), (e.clientY - SAFE.t));
+  pointer.x = e.clientX; pointer.y = e.clientY;
+  down(e.clientX, e.clientY);
   if (drag) try { cv.setPointerCapture(e.pointerId); } catch (_) {}
 });
-cv.addEventListener('pointerup', e => up((e.clientX - SAFE.l), (e.clientY - SAFE.t)));
-cv.addEventListener('pointercancel', e => { if (drag) { drag.moved = true; up((e.clientX - SAFE.l), (e.clientY - SAFE.t)); } });
+cv.addEventListener('pointerup', e => up(e.clientX, e.clientY));
+cv.addEventListener('pointercancel', e => { if (drag) { drag.moved = true; up(e.clientX, e.clientY); } });
 // тачпад/колёсико: двумя пальцами вбок (или вверх-вниз) листает ленту под курсором
 cv.addEventListener('wheel', e => {
   e.preventDefault();
-  const h = hitUI((e.clientX - SAFE.l), (e.clientY - SAFE.t)), s = h && h.s; if (!s) return;
+  const h = hitUI(e.clientX, e.clientY), s = h && h.s; if (!s) return;
   s.off = Math.max(0, Math.min(maxOff(s), s.off + (Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY))); s.vel = 0;
 }, { passive: false });
 cv.addEventListener('pointermove', e => {
-  pointer.x = (e.clientX - SAFE.l); pointer.y = (e.clientY - SAFE.t); pointer.moved = true;
-  if (drag) moveDrag((e.clientX - SAFE.l));
+  pointer.x = e.clientX; pointer.y = e.clientY; pointer.moved = true;
+  if (drag) moveDrag(e.clientX);
   if (G.started && performance.now() - pointer.lastSpark > 35) {
     pointer.lastSpark = performance.now();
-    addP({ kind: Math.random() < 0.3 ? 'heart' : 'spark', x: (e.clientX - SAFE.l) + rand(-4, 4), y: (e.clientY - SAFE.t) + rand(-4, 4), vx: rand(-20, 20) * S, vy: rand(10, 40) * S, life: rand(0.4, 0.8), size: rand(3, 6) * S, color: pick(['#fff', '#ffe27a', '#ffc4e1', '#ff8fc8']), rot: rand(0, TAU), vr: rand(-4, 4), g: 0 });
+    addP({ kind: Math.random() < 0.3 ? 'heart' : 'spark', x: e.clientX + rand(-4, 4), y: e.clientY + rand(-4, 4), vx: rand(-20, 20) * S, vy: rand(10, 40) * S, life: rand(0.4, 0.8), size: rand(3, 6) * S, color: pick(['#fff', '#ffe27a', '#ffc4e1', '#ff8fc8']), rot: rand(0, TAU), vr: rand(-4, 4), g: 0 });
   }
 });
 cv.addEventListener('pointerleave', () => { pointer.x = -9999; pointer.y = -9999; });
@@ -447,7 +447,7 @@ requestAnimationFrame(frame);
 
 // Ручка для автотестов (tests/heart-dress-up.spec.ts)
 (window as any).__game = {
-  G, UI, env, paused: false, world: { babyPos },
+  G, UI, env, paused: false, world: { babyPos, groundY },
   step(sec: number) { for (let i = 0; i < Math.round(sec * 60); i++) { advance(1 / 60); update(1 / 60); } draw(); },
   pause(on = true) { paused = on; },
   audio() { return AC ? AC.state : 'none'; },
