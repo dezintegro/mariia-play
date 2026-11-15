@@ -1,6 +1,6 @@
 // Интерфейс без текста: лента этапов (одна строка) и панель вариантов (2–3 ряда) — обе листаются вбок,
 // под панелью виден скроллбар. Кнопка праздника, кнопки «заново»/«украшать дальше», звук.
-import { H, S, TAU, W, clamp, ctx, t } from '../../core/canvas';
+import { H, S, STANDALONE, TAU, W, clamp, ctx, t } from '../../core/canvas';
 import { circle, drawButton, starPath } from '../../core/draw';
 import { clamp01, ease } from '../../core/tween';
 import { careSel } from './care';
@@ -42,13 +42,14 @@ export function layout() {
   // ячейки ленты: в портрете не меньше 72px (ленту можно листать), на широком — ужимаются до 70, чтобы влезть без прокрутки
   const gapK = 0.35, gaps = 2;
   let sc = wide ? clamp(80 * S, 70, 88) : clamp(76 * S, 72, 84);
-  if (wide) { const sw = UI.sound.x - UI.sound.r - pad * 2.5, need = (n + gaps * gapK) * sc; if (need > sw) sc = Math.max(70, sw / (n + gaps * gapK)); }
+  if (wide) { const sw = UI.sound.x - UI.sound.r - pad * 2.5 - (STANDALONE ? 50 : 0), need = (n + gaps * gapK) * sc; if (need > sw) sc = Math.max(70, sw / (n + gaps * gapK)); }
   UI.cellX = []; { let x = 0; for (let i = 0; i < n; i++) { if (i === DRESS_N || STAGES[i].id === 'album') x += sc * gapK; UI.cellX.push(x + sc / 2); x += sc; } }
   const stripW = UI.cellX[n - 1] + sc / 2;
   const barH = 8, barGap = 6; // скроллбар тонкий на вид, но ловится с запасом (см. hitUI)
   let rows: number, icMax: number, icMin = 66;
   if (wide) {
-    ss.x = pad; ss.w = UI.sound.x - UI.sound.r - pad * 1.5 - pad; ss.h = sc; ss.y = pad * 0.6;
+    // в приложении с домашнего экрана слева вверху кнопка «домой» (HTML) — лента начинается правее
+    ss.x = pad + (STANDALONE ? 50 : 0); ss.w = UI.sound.x - UI.sound.r - pad * 1.5 - ss.x; ss.h = sc; ss.y = pad * 0.6;
     ss.cw = stripW;
     const sTop = ss.y + sc + (ss.cw > ss.w ? barGap + barH : 0) + pad;
     rows = 3;
