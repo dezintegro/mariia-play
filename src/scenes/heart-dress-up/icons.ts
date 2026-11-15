@@ -65,7 +65,7 @@ export function itemIcon(id: string, it: Item, r: number) {
   if (it.kind === 'photo') { ctx.fillStyle = '#ffeef6'; circle(0, 0, r); const p = G.album.find(q => String(q.id) === it.k); if (p) { ctx.save(); ctx.rotate(-0.08); photoFrame(p.cfg, r * 0.52); ctx.restore(); } return; }
   if (it.kind === 'none') { ctx.fillStyle = '#fff4f9'; circle(0, 0, r); noneIcon(r); return; }
   if (id === 'env') return envIcon(it.k, r);
-  if (id === 'bg') return bgIcon(it, r);
+  if (id === 'bg' || id === 'land') return bgIcon(it, r);
   if (id === 'color') return colorIcon(it.k, r);
   iconBgFill(r);
   heartIcon(id, { ...G.cfg, [id]: it.k }, r);

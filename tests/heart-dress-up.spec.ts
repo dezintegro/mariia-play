@@ -40,9 +40,14 @@ test('этапы: выбор деталей, «без этого», окруже
     tapItem('sparkles'); // повторный тап — выключить
     out.env = Object.keys(g.G.cfg.env).filter(k => g.G.cfg.env[k]).sort();
     g.step(4); out.bubbles = g.env.bubbles.length;
-    // фон: цвет + детали
+    // фон — только цвета неба (один выбор), пейзаж — детали (несколько сразу)
     tapStage(10); out.stageBg = g.G.stage;
-    tapItem('sky'); for (const k of ['clouds', 'rainbow', 'sun', 'hills']) tapItem(k);
+    out.bgKinds = [...new Set(g.UI.items.map((i: any) => i.kind))];
+    tapItem('sky');
+    tapStage(11); out.stageLand = g.G.stage;
+    out.landKinds = [...new Set(g.UI.items.map((i: any) => i.kind))];
+    for (const k of ['clouds', 'rainbow', 'sun', 'hills', 'moon']) tapItem(k);
+    tapItem('moon'); // повторный тап — убрать
     out.bg = g.G.cfg.bg; out.bgd = Object.keys(g.G.cfg.bgd).filter(k => g.G.cfg.bgd[k]).sort();
     g.step(1.5);
     return out;
@@ -51,7 +56,7 @@ test('этапы: выбор деталей, «без этого», окруже
     def: { color: 'red', eyes: 'round' }, color: 'purple', stage1: 1, noNoneOnEyes: true, eyes: 'sparkle',
     stageHair: 6, hair1: 'crown', hair2: null,
     cfg: { color: 'purple', eyes: 'sparkle', lashes: 'long', nose: 'heart', mouth: 'cat', cheeks: 'blush', hair: 'pigtails', earrings: 'pearl', necklace: 'locket', bg: 'pink' },
-    env: ['babies', 'balloons', 'bubbles', 'butterflies', 'flowers'], stageBg: 10, bg: 'sky', bgd: ['clouds', 'hills', 'rainbow', 'sun'],
+    env: ['babies', 'balloons', 'bubbles', 'butterflies', 'flowers'], stageBg: 10, bgKinds: ['bgcolor'], stageLand: 11, landKinds: ['none', 'bgd'], bg: 'sky', bgd: ['clouds', 'hills', 'rainbow', 'sun'],
   });
   expect(r.bubbles).toBeGreaterThan(0);
   await shot(page, 'heart-decorated');
@@ -109,7 +114,7 @@ test('узкий экран (портрет телефона): 2 ряда вар
   const r = await page.evaluate(() => {
     const g = window.__game, A = g.api, U = g.UI, out: any = {};
     g.G.cfg.hair = 'long'; g.G.cfg.earrings = 'cherry'; g.G.cfg.necklace = 'pearls';
-    A.goStage(10); g.step(1);
+    A.goStage(6); g.step(1);
     const is = U.itemsS;
     out.rows = new Set(U.items.map((i: any) => Math.round(i.y))).size;
     out.scrollable = is.cw > is.w && !!is.bar;
@@ -117,20 +122,20 @@ test('узкий экран (портрет телефона): 2 ряда вар
     const h = g.G.heart; out.heartAbovePanel = h.y + h.R < U.stripS.y && U.stripS.y + U.stripS.h < is.y;
     out.stripScroll = U.stripS.cw > U.stripS.w && !!U.stripS.bar;
     // свайп по панели листает и ничего не выбирает
-    const bg = g.G.cfg.bg, first = U.items[0];
+    const hair = g.G.cfg.hair, first = U.items[0];
     A.swipe(is.x + is.w * 0.8, first.y, -is.w * 0.5); g.step(0.05);
-    out.offAfterSwipe = is.off > 10; out.bgSame = g.G.cfg.bg === bg;
+    out.offAfterSwipe = is.off > 10; out.bgSame = g.G.cfg.hair === hair;
     g.step(2); out.offClamped = is.off <= is.cw - is.w + 0.5;
     // тап по скроллбару в конце дорожки — лента в конце
     A.tapAt(is.bar.x + is.bar.w - 2, is.bar.y + is.bar.h / 2); g.step(0.5); out.barEnd = Math.abs(is.off - (is.cw - is.w)) < 2;
     // последний этап на ленте доступен после прокрутки ленты
     A.swipe(U.stripS.x + U.stripS.w * 0.8, U.stripS.y + U.stripS.h / 2, -600); g.step(1);
-    const c = U.cells[10]; out.lastCellVisible = c.x + c.r <= U.stripS.x + U.stripS.w + 1;
+    const c = U.cells[11]; out.lastCellVisible = c.x + c.r <= U.stripS.x + U.stripS.w + 1;
     A.tapAt(c.x, c.y); out.stage = g.G.stage;
     A.goStage(6); g.step(1);
     return out;
   });
-  expect(r).toEqual({ rows: 2, scrollable: true, minR: r.minR, heartAbovePanel: true, stripScroll: true, offAfterSwipe: true, bgSame: true, offClamped: true, barEnd: true, lastCellVisible: true, stage: 10 });
+  expect(r).toEqual({ rows: 2, scrollable: true, minR: r.minR, heartAbovePanel: true, stripScroll: true, offAfterSwipe: true, bgSame: true, offClamped: true, barEnd: true, lastCellVisible: true, stage: 11 });
   expect(r.minR).toBeGreaterThanOrEqual(28);
   await shot(page, 'heart-portrait');
   noErrors(errors);
@@ -144,7 +149,7 @@ test('прокрутка вариантов — только когда они �
     const errors = await openScene(page, PAGE);
     const r = await page.evaluate(() => {
       const g = window.__game, U = g.UI, res: any[] = [];
-      for (let s = 0; s < 11; s++) {
+      for (let s = 0; s < 12; s++) {
         g.api.goStage(s); g.step(0.1);
         const is = U.itemsS, vis = U.items.every((it: any) => it.x - it.r >= is.x - 1 && it.x + it.r <= is.x + is.w + 1);
         res.push({ s, n: U.items.length, bar: !!is.bar, vis, minR: Math.min(...U.items.map((i: any) => i.r)) });
@@ -162,45 +167,111 @@ test('волшебная палочка, фото-альбом и безопас
   const errors = await openScene(page, PAGE);
   const r = await page.evaluate(() => {
     const g = window.__game, A = g.api, U = g.UI, G = g.G, out: any = {};
-    const ALB = 14;
-    // наряд руками → палочка сначала бережёт его в альбом, потом колдует
+    const ALB = 15;
+    // наряд руками → палочка его не трогает, поэтому и в альбом перед ней ничего не кладётся
     A.goStage(0); g.step(0.5); const pur = U.items.find((i: any) => i.k === 'purple'); A.tapAt(pur.x, pur.y);
-    out.dirty = G.dirty;
+    out.dirty = G.dirty; out.hand = [...G.byHand];
     out.hitWand = A.hitAt(U.wand.x, U.wand.y)?.k;
+    const before = JSON.stringify(G.cfg);
     A.tapAt(U.wand.x, U.wand.y); out.wandOn = !!G.wand; out.albumAfterWand = G.album.length;
-    g.step(0.6); out.spinning = G.hs.spinT < 0.7 || true;
-    g.step(3); out.wandDone = G.wand === null; out.changed = G.cfg.color !== 'purple' || G.cfg.hair !== null || G.cfg.eyes !== 'round';
+    out.noColorClick = !G.wand.seq.some((q: any) => q[0] === 'color');
+    g.step(3); out.wandDone = G.wand === null; out.changed = JSON.stringify(G.cfg) !== before; out.color = G.cfg.color;
     out.envSome = Object.values(G.cfg.env).some(Boolean);
-    // повторная палочка: случайный наряд в альбом не кладётся
-    A.wand(); g.step(4); out.albumAfter2 = G.album.length;
-    // альбом: фотоаппарат кладёт текущее сердце, тап по фото возвращает его
+    A.wand(); g.step(4); out.albumAfter2 = G.album.length; out.dirtyAfterWand = G.dirty;
+    // альбом: фотоаппарат кладёт текущее сердце (вместе с метками «моё»), тап по фото возвращает его
     A.goStage(ALB); g.step(0.5);
     out.first = U.items[0].kind;
     A.tapAt(U.items[0].x, U.items[0].y); out.flash = G.flash > 0; out.albumN = G.album.length;
+    out.photoHand = G.album[0].hand;
     g.step(1); const snap = JSON.stringify(G.cfg);
     out.photos = U.items.filter((i: any) => i.kind === 'photo').length;
-    // палочка могла уже надеть ушки (набор «зайка») — тогда другая причёска
     A.goStage(6); A.choose({ kind: 'single', k: G.cfg.hair === 'bunny' ? 'crown' : 'bunny' }); A.goStage(ALB); g.step(0.5);
+    out.handBeforeLoad = [...G.byHand].sort();
     const ph = U.items[1]; A.tapAt(ph.x, ph.y); g.step(0.3);
-    out.restored = JSON.stringify(G.cfg) === snap;
-    out.sel = U.items.filter((i: any) => i.kind === 'photo').length;
-    // «заново» в празднике: сначала фото в альбом
-    A.goStage(1); g.step(0.3); A.choose({ kind: 'single', k: G.cfg.eyes === 'cat' ? 'glasses' : 'cat' }); const before = G.album.length;
+    out.restored = JSON.stringify(G.cfg) === snap; out.handAfterLoad = [...G.byHand];
+    // «заново» в празднике: сначала фото в альбом, метки «моё» снимаются
+    A.goStage(1); g.step(0.3); A.choose({ kind: 'single', k: G.cfg.eyes === 'cat' ? 'glasses' : 'cat' }); const n0 = G.album.length;
     A.party(); g.step(2); out.hitCamera = A.hitAt(U.camera.x, U.camera.y)?.k;
-    A.tapAt(U.again.x, U.again.y); out.albumAfterAgain = G.album.length - before; out.reset = G.cfg.eyes === 'round';
+    A.tapAt(U.again.x, U.again.y); out.albumAfterAgain = G.album.length - n0; out.reset = G.cfg.eyes === 'round'; out.handAfterAgain = G.byHand.size;
     g.step(1);
     return out;
   });
-  expect(r).toMatchObject({ dirty: true, hitWand: 'wand', wandOn: true, albumAfterWand: 1, wandDone: true, changed: true, envSome: true, albumAfter2: 1,
-    first: 'camera', flash: true, albumN: 2, photos: 2, restored: true, hitCamera: 'camera', albumAfterAgain: 1, reset: true });
-  // альбом переживает перезагрузку
+  expect(r).toMatchObject({ dirty: true, hand: ['color'], hitWand: 'wand', wandOn: true, albumAfterWand: 0, noColorClick: true, wandDone: true, changed: true, color: 'purple', envSome: true,
+    albumAfter2: 0, dirtyAfterWand: true, first: 'camera', flash: true, albumN: 1, photoHand: ['color'], photos: 1,
+    handBeforeLoad: ['color', 'hair'], restored: true, handAfterLoad: ['color'], hitCamera: 'camera', albumAfterAgain: 1, reset: true, handAfterAgain: 0 });
+  // альбом и снятые метки переживают перезагрузку
   await page.reload(); await page.waitForFunction(() => window.__game);
-  expect(await page.evaluate(() => window.__game.G.album.length)).toBe(4); // фиолетовое, случайное с фото, с ушками (сбережено при загрузке фото), с кошачьими глазами
-  await page.evaluate(() => { const g = window.__game; g.start(); g.api.goStage(14); g.step(1); });
+  expect(await page.evaluate(() => [window.__game.G.album.length, window.__game.G.byHand.size])).toEqual([3, 0]); // фото с фотоаппарата, с ушками (сбережено при загрузке фото), с кошачьими глазами
+  await page.evaluate(() => { const g = window.__game; g.start(); g.api.goStage(15); g.step(1); });
   await page.waitForTimeout(700);
   await shot(page, 'heart-album');
   await page.evaluate(() => { const g = window.__game; g.api.goStage(2); g.api.wand(); g.step(0.5); });
   await shot(page, 'heart-wand');
+  noErrors(errors);
+});
+
+test('палочка не трогает разделы, выбранные руками (и после перезагрузки); метка «моё»; «заново» снимает метки', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const errors = await openScene(page, PAGE);
+  const r = await page.evaluate(() => {
+    const g = window.__game, A = g.api, U = g.UI, G = g.G, out: any = {};
+    const tapItem = (k: string | null) => { const i = U.items.findIndex((q: any) => q.k === k); A.revealItem(i); const it = U.items[i]; A.tapAt(it.x, it.y); g.step(0.1); };
+    A.goStage(0); g.step(0.3); tapItem('green');
+    A.goStage(6); g.step(0.3); tapItem(null);        // «без этого» руками — тоже выбор
+    A.goStage(10); g.step(0.3); tapItem('pink');     // повторный тап по уже выбранному цвету фона — тоже «моё»
+    A.goStage(11); g.step(0.3); tapItem('moon');
+    out.hand = [...G.byHand].sort();
+    const keep = () => G.cfg.color === 'green' && G.cfg.hair === null && G.cfg.bg === 'pink' && JSON.stringify(G.cfg.bgd) === '{"moon":true}';
+    let ok = 0, other = new Set<string>();
+    for (let i = 0; i < 25; i++) {
+      A.wand();
+      if (G.wand && G.wand.seq.some((q: any) => ['color', 'hair', 'bg', 'bgd'].includes(q[0]))) out.badClick = true;
+      g.step(3.5); if (keep()) ok++; other.add(G.cfg.eyes + G.cfg.nose + G.cfg.necklace);
+    }
+    out.ok = ok; out.variety = other.size > 5;
+    A.goStage(0); g.step(1.5);
+    return out;
+  });
+  expect(r).toEqual({ hand: ['bg', 'color', 'hair', 'land'], ok: 25, variety: true });
+  await shot(page, 'heart-hand-badges-390x844');
+
+  // после перезагрузки метки на месте, палочка их по-прежнему обходит
+  await page.reload(); await page.waitForFunction(() => window.__game);
+  const r2 = await page.evaluate(() => {
+    const g = window.__game, A = g.api, G = g.G, out: any = {}; g.start();
+    out.hand = [...G.byHand].sort();
+    let ok = 0;
+    for (let i = 0; i < 10; i++) { A.wand(); g.step(3.5); if (G.cfg.color === 'green' && G.cfg.hair === null && G.cfg.bgd.moon && Object.keys(G.cfg.bgd).filter(k => G.cfg.bgd[k]).length === 1) ok++; }
+    out.ok = ok;
+    // руками выбрано всё: палочка крутит сердце и смеётся, но наряд не меняет
+    for (const id of ['color', 'eyes', 'lashes', 'nose', 'mouth', 'cheeks', 'hair', 'earrings', 'necklace', 'env', 'bg', 'land']) G.byHand.add(id);
+    const snap = JSON.stringify(G.cfg);
+    A.wand(); out.spin = G.hs.spinT < 0.1; out.noWandSeq = G.wand === null; g.step(3); out.same = JSON.stringify(G.cfg) === snap;
+    // «заново» снимает все метки — палочка снова меняет всё
+    A.restart(); out.handAfterRestart = G.byHand.size; g.step(1);
+    const fresh = JSON.stringify(G.cfg); A.wand(); out.wandWorks = !!G.wand; g.step(3.5); out.changedAfterRestart = JSON.stringify(G.cfg) !== fresh;
+    return out;
+  });
+  expect(r2).toEqual({ hand: ['bg', 'color', 'hair', 'land'], ok: 10, spin: true, noWandSeq: true, same: true, handAfterRestart: 0, wandWorks: true, changedAfterRestart: true });
+  await page.reload(); await page.waitForFunction(() => window.__game);
+  expect(await page.evaluate(() => window.__game.G.byHand.size)).toBe(0);
+  noErrors(errors);
+});
+
+test('метка «моё» на ноутбуке: лента из 16 разделов', async ({ page }) => {
+  const errors = await openScene(page, PAGE);
+  const r = await page.evaluate(() => {
+    const g = window.__game, A = g.api, U = g.UI, G = g.G;
+    A.goStage(0); A.choose({ kind: 'single', k: 'blue' }); A.goStage(11); A.choose({ kind: 'bgd', k: 'rainbow' });
+    A.wand(); g.step(4); A.goStage(10); g.step(1);
+    const ss = U.stripS;
+    return { n: U.cells.length, fits: ss.cw <= ss.w, minCell: Math.min(...U.cells.map((c: any) => c.r * 2)), hand: [...G.byHand].sort() };
+  });
+  expect(r.n).toBe(16);
+  expect(r.minCell).toBeGreaterThanOrEqual(60);
+  expect(r.hand).toEqual(['color', 'land']);
+  console.log(`1280x800: лента ${r.fits ? 'влезает без прокрутки' : 'листается'}, ячейка ${r.minCell.toFixed(0)}px`);
+  await shot(page, 'heart-hand-badges-1280x800');
   noErrors(errors);
 });
 
@@ -355,7 +426,7 @@ test('рот: выбирается, звёздочка не на улыбке, �
   const errors = await openScene(page, PAGE);
   const r = await page.evaluate(() => {
     const g = window.__game, A = g.api, U = g.UI, G = g.G, out: any = {};
-    out.loaded = { color: G.cfg.color, mouth: G.cfg.mouth, album: G.album[0].cfg.mouth };
+    out.loaded = { color: G.cfg.color, mouth: G.cfg.mouth, album: G.album[0].cfg.mouth, hand: G.byHand.size, photoHand: G.album[0].hand };
     const mi = g.UI.cells.findIndex((c: any) => c.i === 4); out.mi = mi;
     A.tapAt(U.cells[4].x, U.cells[4].y); g.step(0.5);
     out.noNone = !U.items.some((i: any) => i.kind === 'none'); out.n = U.items.length;
@@ -368,8 +439,25 @@ test('рот: выбирается, звёздочка не на улыбке, �
     G.cfg.mouth = 'tongue'; g.step(1);
     return out;
   });
-  expect(r).toEqual({ loaded: { color: 'blue', mouth: 'smile', album: 'smile' }, mi: 4, noNone: true, n: 10, selSmile: true, mouth: 'tongue', act: 'mouth:tongue' });
+  expect(r).toEqual({ loaded: { color: 'blue', mouth: 'smile', album: 'smile', hand: 0, photoHand: [] }, mi: 4, noNone: true, n: 10, selSmile: true, mouth: 'tongue', act: 'mouth:tongue' });
   await shot(page, 'heart-mouth');
+  noErrors(errors);
+});
+
+test('старое сохранение с общим «фоном»: открывается на «фоне», детали пейзажа на месте', async ({ page }) => {
+  await page.addInitScript(() => {
+    if (sessionStorage.getItem('seeded')) return; sessionStorage.setItem('seeded', '1');
+    localStorage.setItem('mariia-play:heart-dress-up', JSON.stringify({ cfg: { color: 'pink', bg: 'night', bgd: { moon: true, castle: true }, env: {} }, stage: 10, stageId: 'bg', album: [], dirty: true }));
+  });
+  const errors = await openScene(page, PAGE);
+  const r = await page.evaluate(() => {
+    const g = window.__game, G = g.G, U = g.UI;
+    g.step(0.5);
+    const bgCell = U.cells.findIndex((c: any) => c.i === 10);
+    return { stage: G.stage, bg: G.cfg.bg, bgd: Object.keys(G.cfg.bgd).sort(), hand: G.byHand.size, items: U.items.length, bgCell };
+  });
+  expect(r).toEqual({ stage: 10, bg: 'night', bgd: ['castle', 'moon'], hand: 0, items: 8, bgCell: 10 });
+  await shot(page, 'heart-old-bg-save');
   noErrors(errors);
 });
 

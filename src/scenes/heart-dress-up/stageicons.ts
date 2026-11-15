@@ -88,6 +88,13 @@ export function stageIcon(i: number, r: number) {
   } else if (id === 'env') {
     bgFill(r, '#d3edff', '#ffe0ee'); bubble(r * 0.42, -r * 0.35, r * 0.24); bubble(-r * 0.5, -r * 0.4, r * 0.14); miniHeart(-r * 0.05, r * 0.15, r * 0.42, MINI_COLORS[0]);
   } else if (id === 'bg') {
+    // фон: круг-палитра из цветов неба (розовое, голубое, мятное, лимонное, сиреневое, ночное) — без предметов, чтобы не путать с пейзажем
+    const cols = ['#ffc2dc', '#9dd3ff', '#a9ecd2', '#ffe27a', '#cbb3ff', '#4a3a92'];
+    cols.forEach((col, k) => { ctx.fillStyle = col; ctx.beginPath(); ctx.moveTo(0, 0); ctx.arc(0, 0, r, -Math.PI / 2 + k * TAU / 6, -Math.PI / 2 + (k + 1) * TAU / 6); ctx.closePath(); ctx.fill(); });
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = r * 0.06;
+    for (let k = 0; k < 6; k++) { const a = -Math.PI / 2 + k * TAU / 6; ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r); ctx.stroke(); }
+    ctx.fillStyle = '#fff'; circle(0, 0, r * 0.3); ctx.fillStyle = '#fff6c0'; circle(r * 0.3, -r * 0.5, r * 0.05);
+  } else if (id === 'land') {
     bgFill(r, '#bfe6ff', '#ffd6ea');
     sun(-r * 0.3, -r * 0.3, r * 0.26, 0, 0); ctx.fillStyle = '#9fe08a'; hillsPath(-r, r, r * 0.35, r, r * 0.1, 0.5); ctx.fill(); cloud(r * 0.35, -r * 0.05, r * 0.3, false);
   }

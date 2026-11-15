@@ -6,7 +6,7 @@ import { addP, burst, drawParticles, updateParticles } from '../../core/particle
 import { COLORS, Live, drawHeart } from './heart';
 import { photoFrame } from './icons';
 import { PENTA, musicBeat, sfx, updMusic } from './sounds';
-import { ALBUM_MAX, DRESS_N, G, Item, SETS, STAGES, defaultCfg, load, sameCfg, save, setCfg, stageItems } from './state';
+import { ALBUM_MAX, BG_COLORS, DRESS_N, G, Item, SETS, STAGES, cfgKeyOf, defaultCfg, load, sameCfg, save, setCfg } from './state';
 import { careAct, careHeartTap, careLive, careStageChange, careXform, drawCareBack, drawCareFront, drawCareOverlay, hitCare, tapCare, updateCare } from './care';
 import { hasReaction, partAt, react, reactXform, updateReact } from './reactions';
 import { MINI_COLORS, miniHeart } from './things';
@@ -88,6 +88,8 @@ export function choose(it: Item & { x?: number; y?: number; press?: number }) {
   if (it.kind === 'camera') { takePhoto(fromX, fromY); return; }
   if (it.kind === 'photo') { loadPhoto(+(it.k as string)); return; }
   if (G.wand) return; // палочка ещё колдует
+  // любой ручной выбор в разделе (и «без этого», и повторный тап по надетому) — раздел «мой», палочка его не трогает
+  if (!G.byHand.has(id)) { G.byHand.add(id); save(); }
   const sparkTo = (px: number, py: number, col = '#fff6a8') => {
     for (let i = 0; i < 10; i++) { const k = i / 10; addP({ kind: 'spark', x: fromX + (px - fromX) * k, y: fromY + (py - fromY) * k, vx: rand(-30, 30) * S, vy: rand(-30, 30) * S, life: 0.3 + k * 0.5, size: rand(5, 9) * S, color: col, rot: rand(0, TAU), vr: 4, g: 0 }); }
     burst(px, py, 'spark', 14, { color: col, speed: 220 });
@@ -95,6 +97,7 @@ export function choose(it: Item & { x?: number; y?: number; press?: number }) {
   const idx = st.opts.indexOf(it.k as string);
   if (it.kind === 'none') {
     if (id === 'env') { if (!Object.values(c.env).some(Boolean)) return wiggleOnly(); c.env = {}; env.bubbles.length = 0; }
+    else if (id === 'land') { if (!Object.values(c.bgd).some(Boolean)) return wiggleOnly(); c.bgd = {}; }
     else { if (c[id] == null) return wiggleOnly(); c[id] = null; }
     sfx.poof(); burst(hx, hy, 'smoke', 8, { color: '#ffffff', speed: 120, size: 22 }); hs.wgT = 0;
   } else if (it.kind === 'single') {
@@ -138,7 +141,7 @@ export function startFinale() {
 }
 export function restart() {
   keepInAlbum(); // «заново» ничего не теряет: наряд уже в альбоме
-  G.finale = null; G.cfg = defaultCfg(); G.dirty = false; G.stage = 0; G.stageT = 0; env.bubbles.length = 0;
+  G.finale = null; G.cfg = defaultCfg(); G.dirty = false; G.byHand.clear(); G.stage = 0; G.stageT = 0; env.bubbles.length = 0;
   burst(G.heart.x, G.heart.y, 'smoke', 12, { color: '#ffffff', speed: 200, size: 26 }); sfx.poof(); sfx.wheee(); happy(true); save();
 }
 // ---------------- ФОТО-АЛЬБОМ ----------------
@@ -148,7 +151,7 @@ function addPhoto(): boolean {
   G.dirty = false;
   if (G.album.some(p => sameCfg(p.cfg, G.cfg))) return false;
   photoId = Math.max(photoId, ...G.album.map(p => p.id)) + 1;
-  G.album.unshift({ id: photoId, cfg: JSON.parse(JSON.stringify(G.cfg)) });
+  G.album.unshift({ id: photoId, cfg: JSON.parse(JSON.stringify(G.cfg)), hand: [...G.byHand] });
   G.album.length = Math.min(G.album.length, ALBUM_MAX);
   UI.itemsStage = -1; // в панели альбома поменялись кнопки
   return true;
@@ -162,17 +165,17 @@ export function takePhoto(fx = G.heart.x, fy = G.heart.y) {
   if (!added) burst(fx, fy, 'spark', 8, { speed: 160 });
   save();
 }
-/** Наряд сделан руками — молча сберечь его в альбом (перед «заново» и палочкой) */
+/** Наряд сделан руками — молча сберечь его в альбом (перед «заново» и загрузкой фото; палочка ручное не трогает — перед ней не нужно) */
 function keepInAlbum() {
   if (!G.dirty) return;
   if (addPhoto()) G.photoFly = { cfg: JSON.parse(JSON.stringify(G.cfg)), t: 0, x0: G.heart.x, y0: G.heart.y, R0: G.heart.R };
 }
-/** Тап по фото в альбоме: это сердце возвращается */
+/** Тап по фото в альбоме: это сердце возвращается вместе со своими метками «моё» (что было выбрано руками, когда снимали) */
 export function loadPhoto(id: number) {
   const p = G.album.find(q => q.id === id); if (!p) return;
   if (sameCfg(p.cfg, G.cfg)) return wiggleOnly();
   keepInAlbum();
-  G.cfg = Object.assign(defaultCfg(), JSON.parse(JSON.stringify(p.cfg))); G.dirty = false;
+  G.cfg = Object.assign(defaultCfg(), JSON.parse(JSON.stringify(p.cfg))); G.dirty = false; G.byHand = new Set(p.hand || []);
   for (const k of ['hair', 'eyes', 'nose', 'mouth', 'cheeks', 'lashes', 'earrings', 'necklace']) hs.pop[k] = 0;
   burst(G.heart.x, G.heart.y, 'smoke', 10, { color: '#ffffff', speed: 180, size: 24 });
   burst(G.heart.x, G.heart.y - G.heart.R * 0.3, 'heart', 12, { speed: 260, up: -80 });
@@ -198,13 +201,14 @@ function drawPhotoFly() {
 const WAND_P: Record<string, number> = { lashes: 0.7, nose: 0.7, cheeks: 0.7, hair: 0.85, earrings: 0.65, necklace: 0.65 };
 /** Разделы, где палочка может заменить деталь набора на «базовую» (первые варианты раздела) */
 const SWAP_IDS = ['eyes', 'lashes', 'nose', 'mouth', 'cheeks', 'hair', 'earrings', 'necklace'];
-/** Наряд для палочки: ~70% — готовый образ из SETS с 1–2 заменами на базовые варианты, ~30% — полный случай */
-export function wandCfg(rnd = Math.random): Record<string, any> {
+/** Наряд для палочки: ~70% — готовый образ из SETS с 1–2 заменами на базовые варианты, ~30% — полный случай.
+ *  hand — ручные разделы: их палочка всё равно не наденет, поэтому замены «на базовые» тратятся только на остальные. */
+export function wandCfg(rnd = Math.random, hand: Set<string> = new Set()): Record<string, any> {
   const pk = <T,>(a: T[]) => a[Math.floor(rnd() * a.length)];
   if (rnd() < 0.7) {
     const c = setCfg(pk(SETS));
-    const n = 1 + (rnd() < 0.5 ? 1 : 0), ids = SWAP_IDS.slice();
-    for (let j = 0; j < n; j++) {
+    const n = 1 + (rnd() < 0.5 ? 1 : 0), ids = SWAP_IDS.filter(id => !hand.has(id));
+    for (let j = 0; j < n && ids.length; j++) {
       const id = ids.splice(Math.floor(rnd() * ids.length), 1)[0], st = STAGES.find(q => q.id === id);
       const basic = st.opts.slice(0, id === 'eyes' ? 3 : 4).filter(o => o !== c[id]);
       c[id] = pk(basic);
@@ -215,27 +219,36 @@ export function wandCfg(rnd = Math.random): Record<string, any> {
   for (let i = 0; i < DRESS_N; i++) {
     const st = STAGES[i];
     if (st.id === 'env') { const on: Record<string, boolean> = {}; for (const k of st.opts) if (rnd() < 0.25) on[k] = true; if (!Object.keys(on).length) on[pk(st.opts)] = true; c.env = on; continue; }
-    if (st.id === 'bg') { c.bg = pk(stageItems(i).filter(q => q.kind === 'bgcolor')).k; const d: Record<string, boolean> = {}; for (let j = 0; j < 2; j++) if (rnd() < 0.6) d[pk(stageItems(i).filter(q => q.kind === 'bgd')).k as string] = true; c.bgd = d; continue; }
+    if (st.id === 'bg') { c.bg = pk(Object.keys(BG_COLORS)); continue; }
+    if (st.id === 'land') { const d: Record<string, boolean> = {}; for (let j = 0; j < 2; j++) if (rnd() < 0.6) d[pk(st.opts)] = true; c.bgd = d; continue; }
     c[st.id] = rnd() < (WAND_P[st.id] ?? 1) ? pk(st.opts) : null;
   }
   return c;
 }
-/** Наряд палочкой: детали «прощёлкиваются» по очереди, сердце крутится */
+/** Наряд палочкой: меняет только разделы, не выбранные руками. Детали «прощёлкиваются» по очереди, сердце крутится. */
 export function wand() {
   if (G.wand || G.finale) return;
-  keepInAlbum();
   UI.wand.press = 1;
-  let c = wandCfg();
-  for (let k = 0; k < 5 && sameCfg({ ...defaultCfg(), ...c }, G.cfg); k++) c = wandCfg(); // не повторять текущий наряд
-  const seq: [string, any][] = [];
-  for (let i = 0; i < DRESS_N; i++) {
-    const id = STAGES[i].id;
-    if (id === 'bg') { seq.push(['bg', c.bg]); seq.push(['bgd', c.bgd]); }
-    else seq.push([id, c[id] ?? null]);
-  }
-  G.wand = { t: 0, seq, i: 0 };
+  const free = STAGES.slice(0, DRESS_N).map(s => cfgKeyOf(s.id)).filter((_, i) => !G.byHand.has(STAGES[i].id));
+  const merged = (c: Record<string, any>) => { const m = { ...G.cfg }; for (const k of free) m[k] = c[k] ?? null; return m; };
+  let c = wandCfg(Math.random, G.byHand);
+  for (let k = 0; k < 6 && sameCfg(merged(c), G.cfg); k++) c = wandCfg(Math.random, G.byHand); // не повторять текущий наряд
+  // «щёлкают» только детали, которые правда меняются
+  const seq: [string, any][] = free.map(k => [k, c[k] ?? null] as [string, any]).filter(([k, v]) => JSON.stringify(v) !== JSON.stringify(G.cfg[k] ?? null));
   hs.spinT = 0; sfx.wand(); hs.mouth = 1;
   burst(G.heart.x, G.heart.y, 'spark', 30, { speed: 380, color: '#fff6a8' });
+  if (!seq.length) { wandJoy(); return; }
+  G.wand = { t: 0, seq, i: 0 };
+}
+/** Всё выбрано руками — палочке нечего менять: только радость. Сердце крутится, смеётся, сыплются звёзды и сердечки,
+ *  а одна из надетых деталей показывает свою реакцию — наряд при этом не меняется. */
+function wandJoy() {
+  const { x, y, R } = G.heart;
+  sfx.giggle(); hs.love = 1.2; hs.swingV += 4;
+  burst(x, y - R * 0.6, 'heart', 14, { speed: 300, up: -120, color: '#ff5c9a' });
+  burst(x, y - R * 0.2, 'confetti', 18, { speed: 320, g: 300 });
+  const worn = SWAP_IDS.filter(id => G.cfg[id] != null);
+  if (worn.length) { const id = pick(worn); react(id, G.cfg[id], 'tap'); }
 }
 function updateWand(dt: number) {
   const Wd = G.wand; if (!Wd) return;
@@ -251,7 +264,8 @@ function updateWand(dt: number) {
     Wd.i++;
   }
   if (Wd.i >= Wd.seq.length && Wd.t > 0.35 + Wd.seq.length * 0.12 + 0.2) {
-    G.wand = null; G.dirty = false; sfx.tada(); happy(true); hs.love = 1;
+    // G.dirty не сбрасываем: ручные разделы на месте, перед «заново» наряд по-прежнему стоит сберечь
+    G.wand = null; sfx.tada(); happy(true); hs.love = 1;
     burst(G.heart.x, G.heart.y - G.heart.R * 0.4, 'heart', 14, { speed: 300, up: -100 });
     save();
   }

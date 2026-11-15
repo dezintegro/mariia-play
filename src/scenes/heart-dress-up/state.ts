@@ -2,6 +2,19 @@
 
 import { CARE_OPTS } from './careopts';
 
+/** Цвет фона: верх и низ градиента */
+export const BG_COLORS: Record<string, [string, string]> = {
+  pink: ['#ffe6f2', '#ffc2dc'],
+  sky: ['#d3edff', '#9dd3ff'],
+  lilac: ['#efe4ff', '#cbb3ff'],
+  mint: ['#defcf0', '#a9ecd2'],
+  peach: ['#fff0dc', '#ffc79f'],
+  night: ['#231c5c', '#4a3a92'],
+  sunset: ['#ffc46b', '#d98ad8'],
+  lemon: ['#fffbd8', '#ffe27a'],
+};
+export const BG_DETAILS = ['clouds', 'rainbow', 'sun', 'hills', 'moon', 'garland', 'tree', 'castle', 'sea'];
+
 // Порядок вариантов: сначала простые «базовые» (подходят почти ко всему), дальше характерные и шуточные.
 // Старые варианты, убранные из панели (нос button, ожерелье key/hearts), по-прежнему рисуются — сохранённые наряды не ломаются.
 /** Этапы по порядку. optional — можно «без этого»; multi — можно выбрать несколько сразу; care — уход (еда, ванна, сон). */
@@ -17,7 +30,9 @@ export const STAGES = [
   { id: 'earrings', optional: true, opts: ['pearl', 'studheart', 'studgem', 'hoop', 'drop', 'bow', 'star', 'butterfly', 'cherry', 'bell', 'feather', 'icecream'] },
   { id: 'necklace', optional: true, opts: ['pearls', 'tone', 'heartchain', 'gem', 'ribbon', 'locket', 'beads', 'flowers', 'shells', 'bowtie', 'scarf', 'candy'] },
   { id: 'env', optional: true, multi: true, opts: ['babies', 'bubbles', 'butterflies', 'balloons', 'sparkles', 'flowers', 'kitten', 'fish', 'duck'] },
-  { id: 'bg', opts: [] as string[] },
+  // фон — цвет неба (один выбор), пейзаж — детали фона (несколько сразу); в cfg это bg и bgd
+  { id: 'bg', opts: Object.keys(BG_COLORS) },
+  { id: 'land', optional: true, multi: true, opts: BG_DETAILS },
   { id: 'food', care: true, opts: CARE_OPTS.food },
   { id: 'bath', care: true, opts: CARE_OPTS.bath },
   { id: 'sleep', care: true, opts: CARE_OPTS.sleep },
@@ -25,19 +40,9 @@ export const STAGES = [
 ] as { id: string; optional?: boolean; multi?: boolean; care?: boolean; opts: string[] }[];
 /** Сколько этапов — наряд (дальше уход и альбом) */
 export const DRESS_N = STAGES.findIndex(s => s.care);
+/** Где в cfg лежит выбор раздела: у пейзажа — bgd, у остальных — по id раздела */
+export const cfgKeyOf = (id: string) => id === 'land' ? 'bgd' : id;
 
-/** Цвет фона: верх и низ градиента */
-export const BG_COLORS: Record<string, [string, string]> = {
-  pink: ['#ffe6f2', '#ffc2dc'],
-  sky: ['#d3edff', '#9dd3ff'],
-  lilac: ['#efe4ff', '#cbb3ff'],
-  mint: ['#defcf0', '#a9ecd2'],
-  peach: ['#fff0dc', '#ffc79f'],
-  night: ['#231c5c', '#4a3a92'],
-  sunset: ['#ffc46b', '#d98ad8'],
-  lemon: ['#fffbd8', '#ffe27a'],
-};
-export const BG_DETAILS = ['clouds', 'rainbow', 'sun', 'hills', 'moon', 'garland', 'tree', 'castle', 'sea'];
 
 /** Готовые образы для волшебной палочки: все детали наряда + окружение + фон подобраны друг к другу */
 export const SETS: Record<string, any>[] = [
@@ -64,10 +69,9 @@ export function stageItems(s: number): Item[] {
   const st = STAGES[s];
   if (st.care) return st.opts.map(k => ({ kind: 'care', k }) as Item);
   if (st.id === 'album') return [{ kind: 'camera', k: null }, ...G.album.map(p => ({ kind: 'photo', k: String(p.id) }) as Item)];
-  if (st.id === 'bg') return [...Object.keys(BG_COLORS).map(k => ({ kind: 'bgcolor', k }) as Item), ...BG_DETAILS.map(k => ({ kind: 'bgd', k }) as Item)];
-  const out: Item[] = [];
+  const out: Item[] = [], kind = st.id === 'bg' ? 'bgcolor' : st.id === 'land' ? 'bgd' : st.multi ? 'toggle' : 'single';
   if (st.optional) out.push({ kind: 'none', k: null });
-  for (const k of st.opts) out.push({ kind: st.multi ? 'toggle' : 'single', k });
+  for (const k of st.opts) out.push({ kind, k });
   return out;
 }
 
@@ -82,9 +86,11 @@ export const G = {
   cfg: defaultCfg(),
   finale: null as null | { t: number; conf: number },
   /** фото-альбом: сохранённые наряды (новые — первыми) */
-  album: [] as { id: number; cfg: Record<string, any> }[],
-  /** наряд меняли руками после последнего фото/палочки — значит, его стоит сберечь в альбом */
+  album: [] as { id: number; cfg: Record<string, any>; hand: string[] }[],
+  /** наряд меняли руками после последнего фото — значит, перед «заново» его стоит сберечь в альбом */
   dirty: false,
+  /** разделы наряда (id из STAGES), выбранные руками: палочка их не трогает, на ленте — метка «моё» */
+  byHand: new Set<string>(),
   /** волшебная палочка: по очереди «прощёлкивает» детали */
   wand: null as null | { t: number; seq: [string, any][]; i: number },
   flash: 0,                      // вспышка фотоаппарата
@@ -107,7 +113,8 @@ export function stageHas(s: number) {
   const st = STAGES[s], id = st.id, c = G.cfg;
   if (st.care || id === 'album') return false;
   if (id === 'env') return Object.values(c.env).some(Boolean);
-  if (id === 'bg') return c.bg !== 'pink' || Object.values(c.bgd).some(Boolean);
+  if (id === 'bg') return c.bg !== 'pink';
+  if (id === 'land') return Object.values(c.bgd).some(Boolean);
   if (id === 'color') return c.color !== 'red';
   if (id === 'eyes') return c.eyes !== 'round';
   if (id === 'mouth') return (c.mouth || 'smile') !== 'smile';
@@ -119,7 +126,7 @@ export const decorated = () => STAGES.reduce((n, _, i) => n + (stageHas(i) ? 1 :
 const KEY = 'mariia-play:heart-dress-up';
 export const ALBUM_MAX = 12;
 export function save() {
-  try { localStorage.setItem(KEY, JSON.stringify({ cfg: G.cfg, stage: G.stage, stageId: STAGES[G.stage].id, album: G.album, dirty: G.dirty })); } catch (e) { /* без сохранения — не страшно */ }
+  try { localStorage.setItem(KEY, JSON.stringify({ cfg: G.cfg, stage: G.stage, stageId: STAGES[G.stage].id, album: G.album, dirty: G.dirty, byHand: [...G.byHand] })); } catch (e) { /* без сохранения — не страшно */ }
 }
 export function load() {
   try {
@@ -127,9 +134,13 @@ export function load() {
     if (d && d.cfg) { G.cfg = Object.assign(defaultCfg(), d.cfg); G.stage = Math.max(0, Math.min(STAGES.length - 1, d.stage | 0));
       // этап по имени: старые сохранения хранят только номер, а после нового раздела номера сдвинулись
       const si = STAGES.findIndex(s => s.id === d.stageId); if (si >= 0) G.stage = si; }
-    if (d && Array.isArray(d.album)) G.album = d.album.filter((p: any) => p && p.cfg).map((p: any) => ({ id: +p.id || 0, cfg: Object.assign(defaultCfg(), p.cfg) })).slice(0, ALBUM_MAX);
-    if (d) G.dirty = !!d.dirty;
+    if (d && Array.isArray(d.album)) G.album = d.album.filter((p: any) => p && p.cfg).map((p: any) => ({ id: +p.id || 0, cfg: Object.assign(defaultCfg(), p.cfg), hand: handIds(p.hand) })).slice(0, ALBUM_MAX);
+    if (d) { G.dirty = !!d.dirty; G.byHand = new Set(handIds(d.byHand)); } // старые сохранения без byHand — ручных разделов нет
   } catch (e) { /* ок */ }
+}
+/** Метки «моё» из сохранения: только существующие разделы наряда */
+export function handIds(a: any): string[] {
+  return Array.isArray(a) ? a.filter(id => { const i = STAGES.findIndex(s => s.id === id); return i >= 0 && i < DRESS_N; }) : [];
 }
 /** Одинаковые ли наряды (для альбома: не хранить два одинаковых фото) */
 export const sameCfg = (a: Record<string, any>, b: Record<string, any>) => cfgKey(a) === cfgKey(b);

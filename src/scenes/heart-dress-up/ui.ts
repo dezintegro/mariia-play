@@ -139,7 +139,7 @@ export function revealStage(i: number) {
 export function isSel(it: Item) {
   const c = G.cfg, id = STAGES[G.stage].id;
   if (it.kind === 'single') return c[id] === it.k;
-  if (it.kind === 'none') return id === 'env' ? !Object.values(c.env).some(Boolean) : c[id] == null;
+  if (it.kind === 'none') return id === 'env' ? !Object.values(c.env).some(Boolean) : id === 'land' ? !Object.values(c.bgd).some(Boolean) : c[id] == null;
   if (it.kind === 'toggle') return !!c.env[it.k];
   if (it.kind === 'bgcolor') return c.bg === it.k;
   if (it.kind === 'bgd') return !!c.bgd[it.k];
@@ -199,11 +199,12 @@ export function drawUI() {
   }
   for (const c of UI.cells) {
     if (c.x < ss.x - c.r * 1.3 || c.x > ss.x + ss.w + c.r * 1.3) continue;
-    // текущий — крупнее с жёлтой каймой; украшенный — показывает выбранное и зелёную звёздочку; пустой — бледнее
-    const st = STAGES[c.i], cur = c.i === G.stage, has = stageHas(c.i), empty = !has && !st.care && st.id !== 'album';
+    // текущий — крупнее с жёлтой каймой; украшенный — зелёная звёздочка, выбранный руками — розовое сердечко «моё»; пустой — бледнее
+    const st = STAGES[c.i], cur = c.i === G.stage, has = stageHas(c.i), mine = c.i < DRESS_N && G.byHand.has(st.id), empty = !has && !mine && !st.care && st.id !== 'album';
     const s = cur ? 1.12 + Math.sin(t * 4) * 0.025 : 1;
     iconCircle(c.x, c.y, c.r, s, cur ? '#ffcf3f' : empty ? '#eadbe3' : '#ffffff', c.r * (cur ? 0.14 : 0.08), r => stageIconFor(c.i, r), empty && !cur ? 0.6 : 1);
-    if (has) doneBadge(c.x + c.r * 0.72 * s, c.y - c.r * 0.66 * s, c.r * 0.27);
+    if (mine) mineBadge(c.x + c.r * 0.72 * s, c.y - c.r * 0.66 * s, c.r * 0.27);
+    else if (has) doneBadge(c.x + c.r * 0.72 * s, c.y - c.r * 0.66 * s, c.r * 0.27);
   }
   ctx.restore();
   edgeHint(ss); drawBar(ss, '#ffb3d1');
@@ -239,6 +240,14 @@ function doneBadge(x: number, y: number, r: number) {
   ctx.fillStyle = '#fff'; circle(0, 0, r * 1.12);
   ctx.fillStyle = '#2ec46b'; circle(0, 0, r);
   ctx.fillStyle = '#fff'; starPath(5, r * 0.62, r * 0.27); ctx.fill();
+  ctx.restore();
+}
+/** «Моё — выбрала сама»: розовый кружок с белым сердечком на месте звёздочки (палочка такие разделы не трогает) */
+function mineBadge(x: number, y: number, r: number) {
+  ctx.save(); ctx.translate(x, y);
+  ctx.fillStyle = '#fff'; circle(0, 0, r * 1.12);
+  ctx.fillStyle = '#ff4f9a'; circle(0, 0, r);
+  smallHeart(0, r * 0.06, r * 0.62, '#fff');
   ctx.restore();
 }
 /** Волшебная палочка: звезда на палочке и искорки */
