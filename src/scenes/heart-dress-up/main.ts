@@ -4,11 +4,14 @@ import { H, S, TAU, W, advance, clamp, ctx, cv, pick, pointer, rand, resizeCanva
 import { drawButton } from '../../core/draw';
 import { addP, burst, drawParticles, updateParticles } from '../../core/particles';
 import { Live, drawHeart } from './heart';
+import { photoFrame } from './icons';
 import { PENTA, musicBeat, sfx, updMusic } from './sounds';
-import { G, Item, STAGES, defaultCfg, load, save } from './state';
+import { ALBUM_MAX, DRESS_N, G, Item, STAGES, defaultCfg, load, sameCfg, save, stageItems } from './state';
+import { careAct, careHeartTap, careLive, careStageChange, careXform, drawCareBack, drawCareFront, drawCareOverlay, hitCare, tapCare, updateCare } from './care';
+import { partAt, react, reactXform, updateReact } from './reactions';
 import { MINI_COLORS, miniHeart } from './things';
-import { UI, drawUI, hitUI, iconAgain, iconBrush, iconSound, isSel, layout, maxOff, revealItem, revealStage, updateScroll } from './ui';
-import { drawBg, drawEnvBack, drawEnvFront, env, hitWorld, tapWorld, updateWorld } from './world';
+import { UI, drawUI, hitUI, iconAgain, iconBrush, iconCamera, iconSound, isSel, layout, maxOff, revealItem, revealStage, updateScroll } from './ui';
+import { babyPos, drawBg, drawEnvBack, drawEnvFront, env, hitWorld, tapWorld, updateWorld } from './world';
 
 const hs = G.hs;
 
@@ -25,7 +28,9 @@ function heartXform() {
   let sc = 1 + beat * 0.025;
   if (G.finale) { const f = G.finale.t * 4.2; rot += Math.sin(f) * 0.12; dy -= Math.abs(Math.sin(f)) * 0.1 * R; sq += Math.cos(f * 2) * 0.03; }
   sc *= 1 + Math.sin(t * 1.3) * 0.008;
-  return { x, y: y + dy, R, rot, sx: sc * (1 + sq), sy: sc * (1 - sq) };
+  if (hs.spinT < 0.7) { const p = hs.spinT / 0.7; rot += TAU * (p * p * (3 - 2 * p)); dy -= Math.sin(p * Math.PI) * 0.15 * R; } // палочка: сердце крутится
+  const ra = reactXform(R), ca = careXform(R);
+  return { x, y: y + dy + ra.dy + ca.dy, R, rot: rot + ra.rot + ca.rot, sx: sc * (1 + sq) * ra.sx * ca.sx, sy: sc * (1 - sq) * ra.sy * ca.sy };
 }
 
 function drawBigHeart() {
@@ -33,13 +38,14 @@ function drawBigHeart() {
   // мягкая тень на земле
   ctx.fillStyle = 'rgba(120,40,80,0.12)'; ctx.beginPath(); ctx.ellipse(X.x, G.heart.y + 1.02 * X.R, 0.55 * X.R * (1 - (G.heart.y - X.y) / X.R * 0.5), 0.07 * X.R, 0, 0, TAU); ctx.fill();
   ctx.save(); ctx.translate(X.x, X.y + 0.95 * X.R); ctx.rotate(X.rot); ctx.scale(X.sx, X.sy); ctx.translate(0, -0.95 * X.R);
-  const L: Live = { lx: hs.lx, ly: hs.ly, blink: hs.blink, mouth: hs.mouth, love: hs.love, swing: hs.swing, pop: hs.pop, live: true };
+  const L: Live = { lx: hs.lx, ly: hs.ly, blink: hs.blink, mouth: hs.mouth, love: hs.love, swing: hs.swing, pop: hs.pop, live: true, act: hs.act };
+  careLive(L);
   drawHeart(G.cfg, X.R, L);
   ctx.restore();
 }
 
 function updateHeart(dt: number) {
-  hs.sqT += dt; hs.jT += dt; hs.wgT += dt; hs.beatT += dt;
+  hs.sqT += dt; hs.jT += dt; hs.wgT += dt; hs.beatT += dt; hs.spinT += dt;
   hs.love = Math.max(0, hs.love - dt * 0.45); hs.mouth = Math.max(0, hs.mouth - dt * 1.2);
   if (G.finale) hs.mouth = Math.max(hs.mouth, musicBeat() % 4 < 2 ? 0.6 : 0.15);
   hs.blinkT -= dt; if (hs.blinkT <= 0) { hs.blink = 1; hs.blinkT = rand(2.5, 5); } hs.blink = Math.max(0, hs.blink - dt * 6);
@@ -55,9 +61,15 @@ function updateHeart(dt: number) {
 /** Сердце радуется: подпрыгнуть и сплющиться */
 function happy(big = false) { hs.sqT = 0; hs.swingV += 3; hs.mouth = 1; if (big) hs.jT = 0; }
 
-/** Тап по сердцу: 3 реакции по кругу */
-export function tapHeart() {
-  const r = hs.react++ % 3, { x, y, R } = G.heart;
+/** Тап по сердцу: по надетой детали — её своя реакция, иначе 3 реакции по кругу */
+export function tapHeart(px?: number, py?: number) {
+  if (careHeartTap()) return;
+  const { x, y, R } = G.heart;
+  if (px != null && !G.finale) {
+    const part = partAt(G.cfg, (px - x) / R, (py - y) / R);
+    if (part && G.cfg[part] != null) { react(part, G.cfg[part], 'tap'); return; }
+  }
+  const r = hs.react++ % 3;
   if (r === 0) { hs.jT = 0; hs.sqT = 0; hs.mouth = 1; hs.swingV += 4; sfx.giggle(); burst(x, y - R * 0.5, 'spark', 10, { speed: 200 }); }
   else if (r === 1) { hs.wgT = 0; hs.mouth = 0.6; hs.swingV += 6; sfx.boing(); burst(x, y, 'confetti', 14, { speed: 260, g: 300 }); }
   else { hs.love = 1.6; hs.sqT = 0; sfx.kiss(); sfx.beat(); addP({ kind: 'bigheart', x, y: y - R * 0.1, vx: 0, vy: -30 * S, life: 1, size: R * 0.5, color: 'rgba(255,90,150,0.5)', rot: 0, vr: 0, g: 0 }); burst(x, y - R * 0.3, 'heart', 10, { color: '#ff5c9a', up: -100, speed: 180 }); }
@@ -71,6 +83,10 @@ export function choose(it: Item & { x?: number; y?: number; press?: number }) {
   const st = STAGES[G.stage], id = st.id, c = G.cfg, { x: hx, y: hy, R } = G.heart;
   if (it.press != null) it.press = 1;
   const fromX = it.x ?? hx, fromY = it.y ?? hy;
+  if (it.kind === 'care') { careAct(id, it.k as string, fromX, fromY); return; }
+  if (it.kind === 'camera') { takePhoto(fromX, fromY); return; }
+  if (it.kind === 'photo') { loadPhoto(+(it.k as string)); return; }
+  if (G.wand) return; // палочка ещё колдует
   const sparkTo = (px: number, py: number, col = '#fff6a8') => {
     for (let i = 0; i < 10; i++) { const k = i / 10; addP({ kind: 'spark', x: fromX + (px - fromX) * k, y: fromY + (py - fromY) * k, vx: rand(-30, 30) * S, vy: rand(-30, 30) * S, life: 0.3 + k * 0.5, size: rand(5, 9) * S, color: col, rot: rand(0, TAU), vr: 4, g: 0 }); }
     burst(px, py, 'spark', 14, { color: col, speed: 220 });
@@ -84,7 +100,7 @@ export function choose(it: Item & { x?: number; y?: number; press?: number }) {
     if (c[id] === it.k) return wiggleOnly();
     c[id] = it.k; hs.pop[id] = 0;
     const [px, py] = PART_AT[id] || [0, 0];
-    sfx.pick(idx + G.stage); sfx.magic(); happy(id === 'color'); sparkTo(hx + px * R, hy + py * R);
+    sfx.pick(idx + G.stage); sparkTo(hx + px * R, hy + py * R); react(id, it.k as string, 'pick');
   } else if (it.kind === 'toggle') {
     c.env[it.k] = !c.env[it.k];
     if (c.env[it.k]) { sfx.pick(idx + 3); sfx.magic(); happy(); burst(hx, hy, 'heart', 12, { speed: 300, up: -80 }); if (it.k === 'balloons') env.balloons.forEach(b => { b.fly = 0; b.grow = 0; }); }
@@ -97,12 +113,13 @@ export function choose(it: Item & { x?: number; y?: number; press?: number }) {
     if (c.bgd[it.k]) { sfx.chime(PENTA[(G.stageT * 7 | 0) % PENTA.length]); sfx.magic(); happy(); burst(fromX, fromY, 'spark', 16, { speed: 300 }); }
     else sfx.poof();
   }
-  save();
+  G.dirty = true; save();
 }
 function wiggleOnly() { hs.wgT = 0; hs.mouth = 0.7; sfx.giggle(1.2); }
 
 export function goStage(i: number) {
   if (i === G.stage) { sfx.boop(); return; }
+  careStageChange(STAGES[G.stage].id, STAGES[i].id);
   G.stage = i; G.stageT = 0; sfx.stage(i); hs.swingV += 2; save();
   showSelected(); revealStage(i);
 }
@@ -119,9 +136,104 @@ export function startFinale() {
   burst(W / 2, H / 2, 'confetti', 60, { speed: 600, g: 400, size: 12 });
 }
 export function restart() {
-  G.finale = null; G.cfg = defaultCfg(); G.stage = 0; G.stageT = 0; env.bubbles.length = 0;
+  keepInAlbum(); // «заново» ничего не теряет: наряд уже в альбоме
+  G.finale = null; G.cfg = defaultCfg(); G.dirty = false; G.stage = 0; G.stageT = 0; env.bubbles.length = 0;
   burst(G.heart.x, G.heart.y, 'smoke', 12, { color: '#ffffff', speed: 200, size: 26 }); sfx.poof(); sfx.wheee(); happy(true); save();
 }
+// ---------------- ФОТО-АЛЬБОМ ----------------
+let photoId = 0;
+/** Положить текущий наряд в альбом (если такого фото ещё нет). Возвращает, добавлено ли. */
+function addPhoto(): boolean {
+  G.dirty = false;
+  if (G.album.some(p => sameCfg(p.cfg, G.cfg))) return false;
+  photoId = Math.max(photoId, ...G.album.map(p => p.id)) + 1;
+  G.album.unshift({ id: photoId, cfg: JSON.parse(JSON.stringify(G.cfg)) });
+  G.album.length = Math.min(G.album.length, ALBUM_MAX);
+  UI.itemsStage = -1; // в панели альбома поменялись кнопки
+  return true;
+}
+/** Щёлк! Вспышка, фото уменьшается и улетает в альбом */
+export function takePhoto(fx = G.heart.x, fy = G.heart.y) {
+  const added = addPhoto();
+  G.flash = 1; sfx.shutter();
+  G.photoFly = { cfg: JSON.parse(JSON.stringify(G.cfg)), t: 0, x0: G.heart.x, y0: G.heart.y, R0: G.heart.R };
+  hs.mouth = 1; hs.sqT = 0;
+  if (!added) burst(fx, fy, 'spark', 8, { speed: 160 });
+  save();
+}
+/** Наряд сделан руками — молча сберечь его в альбом (перед «заново» и палочкой) */
+function keepInAlbum() {
+  if (!G.dirty) return;
+  if (addPhoto()) G.photoFly = { cfg: JSON.parse(JSON.stringify(G.cfg)), t: 0, x0: G.heart.x, y0: G.heart.y, R0: G.heart.R };
+}
+/** Тап по фото в альбоме: это сердце возвращается */
+export function loadPhoto(id: number) {
+  const p = G.album.find(q => q.id === id); if (!p) return;
+  if (sameCfg(p.cfg, G.cfg)) return wiggleOnly();
+  keepInAlbum();
+  G.cfg = Object.assign(defaultCfg(), JSON.parse(JSON.stringify(p.cfg))); G.dirty = false;
+  for (const k of ['hair', 'eyes', 'nose', 'cheeks', 'lashes', 'earrings', 'necklace']) hs.pop[k] = 0;
+  burst(G.heart.x, G.heart.y, 'smoke', 10, { color: '#ffffff', speed: 180, size: 24 });
+  burst(G.heart.x, G.heart.y - G.heart.R * 0.3, 'heart', 12, { speed: 260, up: -80 });
+  sfx.poof(); sfx.tinkle(); happy(true); save();
+}
+/** Где в интерфейсе «живёт» альбом — туда улетает фото */
+function albumSpot(): [number, number] {
+  const i = STAGES.findIndex(s => s.id === 'album'), c = UI.cells[i];
+  if (G.stage === i && UI.items[1]) return [UI.items[1].x, UI.items[1].y];
+  return c ? [c.x, c.y] : [W - 40, 40];
+}
+function drawPhotoFly() {
+  const P = G.photoFly; if (!P) return;
+  const k = Math.min(1, P.t / 0.9), e = k * k * (3 - 2 * k), [tx, ty] = albumSpot();
+  const x = P.x0 + (tx - P.x0) * e, y = P.y0 + (ty - P.y0) * e - Math.sin(k * Math.PI) * 60 * S;
+  const R = P.R0 * (1 - e * 0.85) * (P.t < 0.15 ? 1 + (0.15 - P.t) * 0.6 : 1);
+  ctx.save(); ctx.globalAlpha = k > 0.85 ? (1 - k) / 0.15 : 1; ctx.translate(x, y); ctx.rotate(Math.sin(k * Math.PI) * 0.3);
+  photoFrame(P.cfg, R);
+  ctx.restore();
+}
+
+// ---------------- ВОЛШЕБНАЯ ПАЛОЧКА ----------------
+const WAND_P: Record<string, number> = { lashes: 0.7, nose: 0.7, cheeks: 0.7, hair: 0.85, earrings: 0.65, necklace: 0.65 };
+/** Случайный наряд: детали «прощёлкиваются» по очереди, сердце крутится */
+export function wand() {
+  if (G.wand || G.finale) return;
+  keepInAlbum();
+  UI.wand.press = 1;
+  const seq: [string, any][] = [];
+  for (let i = 0; i < DRESS_N; i++) {
+    const st = STAGES[i];
+    if (st.id === 'env') { const on: Record<string, boolean> = {}; for (const k of st.opts) if (Math.random() < 0.25) on[k] = true; if (!Object.keys(on).length) on[pick(st.opts)] = true; seq.push(['env', on]); continue; }
+    if (st.id === 'bg') { seq.push(['bg', pick(stageItems(i).filter(q => q.kind === 'bgcolor')).k]); const d: Record<string, boolean> = {}; for (let j = 0; j < 2; j++) if (Math.random() < 0.6) d[pick(stageItems(i).filter(q => q.kind === 'bgd')).k as string] = true; seq.push(['bgd', d]); continue; }
+    const p = WAND_P[st.id] ?? 1, cur = G.cfg[st.id];
+    let v = Math.random() < p ? pick(st.opts) : null;
+    if (v === cur && v != null) v = pick(st.opts.filter(o => o !== cur));
+    seq.push([st.id, v]);
+  }
+  G.wand = { t: 0, seq, i: 0 };
+  hs.spinT = 0; sfx.wand(); hs.mouth = 1;
+  burst(G.heart.x, G.heart.y, 'spark', 30, { speed: 380, color: '#fff6a8' });
+}
+function updateWand(dt: number) {
+  const Wd = G.wand; if (!Wd) return;
+  Wd.t += dt;
+  while (Wd.i < Wd.seq.length && Wd.t > 0.35 + Wd.i * 0.12) {
+    const [k, v] = Wd.seq[Wd.i];
+    if (k === 'env') { G.cfg.env = v; env.bubbles.length = 0; }
+    else if (k === 'bgd') G.cfg.bgd = v;
+    else { G.cfg[k] = v; hs.pop[k] = 0; }
+    sfx.pick(Wd.i * 2);
+    const [px, py] = PART_AT[k] || [rand(-1, 1), rand(-1, 0.5)], { x, y, R } = G.heart;
+    burst(x + px * R, y + py * R, 'spark', 8, { speed: 200, color: pick(['#fff6a8', '#ffc4e1', '#c9f0ff']) });
+    Wd.i++;
+  }
+  if (Wd.i >= Wd.seq.length && Wd.t > 0.35 + Wd.seq.length * 0.12 + 0.2) {
+    G.wand = null; G.dirty = false; sfx.tada(); happy(true); hs.love = 1;
+    burst(G.heart.x, G.heart.y - G.heart.R * 0.4, 'heart', 14, { speed: 300, up: -100 });
+    save();
+  }
+}
+
 export function cont() { G.finale = null; G.stageT = 0; sfx.next(); happy(); }
 export function party() { UI.party.press = 1; startFinale(); }
 
@@ -167,7 +279,9 @@ function placeHeart(dt: number) {
 }
 
 function update(dt: number) {
-  G.stageT += dt;
+  G.stageT += dt; G.flash = Math.max(0, G.flash - dt * 3);
+  if (G.photoFly) { G.photoFly.t += dt; if (G.photoFly.t > 0.9) G.photoFly = null; }
+  updateReact(dt); updateCare(dt); updateWand(dt);
   G.uiA += ((G.finale ? 0 : 1) - G.uiA) * Math.min(1, dt * 6);
   updateScroll(dt); layout(); placeHeart(dt);
   updateHeart(dt); updateWorld(dt); updateFinale(dt); updateParticles(dt);
@@ -176,20 +290,31 @@ function update(dt: number) {
 
 function draw() {
   drawBg();
+  // окружение не залезает на панели: рисуем только в области сердца
+  ctx.save(); ctx.beginPath(); ctx.rect(G.HR.x, G.HR.y, G.HR.w, G.HR.h); ctx.clip();
   drawEnvBack();
+  drawCareBack();
+  ctx.restore();
   drawRing(true);
   drawBigHeart();
+  drawCareFront();
+  ctx.save(); ctx.beginPath(); ctx.rect(G.HR.x, G.HR.y, G.HR.w, G.HR.h); ctx.clip();
   drawEnvFront(!G.finale);
+  ctx.restore();
   drawRing(false);
+  drawCareOverlay();
   drawParticles();
   drawUI();
+  drawPhotoFly();
   if (G.finale && G.finale.t > 1.2) {
     const a = Math.min(1, (G.finale.t - 1.2) * 3);
     ctx.save(); ctx.globalAlpha = a;
     drawButton(UI.again, '#ffa53d', iconAgain, false);
     drawButton(UI.cont, '#ff7aa8', iconBrush, true);
+    drawButton(UI.camera, '#5ab4ff', iconCamera, false);
     ctx.restore();
   }
+  if (G.flash > 0) { ctx.fillStyle = `rgba(255,255,255,${G.flash * 0.85})`; ctx.fillRect(0, 0, W, H); }
   drawButton(UI.sound, 'rgba(120,40,80,0.25)', r => iconSound(r, soundOn), false);
 }
 
@@ -210,6 +335,7 @@ function inHeart(x: number, y: number) {
 /** Что под точкой: интерфейс → то, что перед сердцем → сердце → позади → фон */
 export function hitAt(x: number, y: number): any {
   const u = hitUI(x, y); if (u) return u;
+  const cr = hitCare(x, y); if (cr) return cr;
   const f = hitWorld(x, y, true); if (f) return f;
   if (inHeart(x, y)) return { k: 'heart' };
   return hitWorld(x, y, false);
@@ -222,12 +348,15 @@ export function act(h: any, x: number, y: number) {
   switch (h.k) {
     case 'sound': toggleSound(); UI.sound.press = 1; break;
     case 'party': party(); break;
+    case 'wand': wand(); break;
+    case 'camera': UI.camera.press = 1; takePhoto(UI.camera.x, UI.camera.y); break;
+    case 'care': tapCare(h, x, y); break;
     case 'stage': goStage(h.i); break;
     case 'item': choose(h.it); break;
     case 'again': UI.again.press = 1; restart(); break;
     case 'cont': UI.cont.press = 1; cont(); break;
     case 'panel': case 'bar': burst(x, y, 'spark', 4, { speed: 80 }); sfx.boop(); break;
-    case 'heart': tapHeart(); break;
+    case 'heart': tapHeart(x, y); break;
     default: tapWorld(h, x, y);
   }
 }
@@ -315,10 +444,10 @@ requestAnimationFrame(frame);
 
 // Ручка для автотестов (tests/heart-dress-up.spec.ts)
 (window as any).__game = {
-  G, UI, env, paused: false,
+  G, UI, env, paused: false, world: { babyPos },
   step(sec: number) { for (let i = 0; i < Math.round(sec * 60); i++) { advance(1 / 60); update(1 / 60); } draw(); },
   pause(on = true) { paused = on; },
   audio() { return AC ? AC.state : 'none'; },
   start() { G.started = true; document.getElementById('start')!.classList.add('hide'); },
-  api: { tapAt, swipe, hitAt, choose, party, goStage, revealItem, startFinale, restart, cont, tapHeart, layout },
+  api: { tapAt, swipe, hitAt, choose, party, goStage, revealItem, startFinale, restart, cont, tapHeart, layout, wand, takePhoto, loadPhoto },
 };

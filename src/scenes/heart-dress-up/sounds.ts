@@ -28,6 +28,10 @@ export const sfx = {
   fanfare() { [523, 659, 784].forEach((f, i) => tone(f, 0.14, { type: 'triangle', vol: 0.12, delay: i * 0.12 })); tone(1047, 0.6, { type: 'triangle', vol: 0.12, delay: 0.36 }); tone(784, 0.6, { vol: 0.06, delay: 0.36 }); },
   rustle() { whoosh(0.5, 0.12); for (let i = 0; i < 4; i++) tone(rand(1200, 2000), 0.05, { vol: 0.03, delay: i * 0.08 }); },
   plop() { tone(500, 0.12, { slide: 180, vol: 0.16 }); },
+  /** щелчок затвора: шорох + два щелчка */
+  shutter() { whoosh(0.12, 0.12); tone(1800, 0.03, { type: 'square', vol: 0.06 }); tone(1200, 0.04, { type: 'square', vol: 0.06, delay: 0.07 }); tone(880, 0.3, { vol: 0.05, delay: 0.12 }); },
+  /** волшебная палочка: «вжух» и звёздный перезвон вверх-вниз */
+  wand() { whoosh(0.5, 0.1); [1568, 2093, 2637, 3136, 2637, 2093].forEach((f, i) => tone(f, 0.3, { vol: 0.05, delay: i * 0.05 })); tone(300, 0.5, { type: 'triangle', slide: 1500, vol: 0.08 }); },
   tada() { [523, 659, 784, 1047, 1319, 1568].forEach((f, i) => tone(f, 0.35, { type: 'triangle', vol: 0.12, delay: i * 0.07 })); tone(1047, 1.0, { vol: 0.08, delay: 0.45 }); tone(1319, 1.0, { vol: 0.06, delay: 0.45 }); tone(1568, 1.0, { vol: 0.05, delay: 0.45 }); },
 };
 

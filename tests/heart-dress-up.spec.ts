@@ -91,11 +91,11 @@ test('мини-интеракции: сердце 3 реакции, малыши
     A.tapAt(h.x, h.y); g.step(0.1); out.r2 = hs.wgT < 0.5;
     A.tapAt(h.x, h.y); g.step(0.1); out.r3 = hs.love > 0.5;
     // малыш-сердечко подпрыгивает (пузыри и бабочки убираем, чтобы случайно не оказались перед ним)
-    g.env.babies[0].u = 0.08; g.step(0.05);
-    const W = g.G.HR; const bx = W.x + g.env.babies[0].u * W.w;
-    const target = A.hitAt(bx, W.y + W.h * 0.95 - Math.max(24, h.R * 0.17) * 0.95);
+    g.env.babies[0].u = 0.02; g.step(0.05);
+    const [bx, by] = g.world.babyPos(g.env.babies[0]);
+    const target = A.hitAt(bx, by);
     out.babyHit = target?.k;
-    if (target?.k === 'baby') { A.tapAt(bx, W.y + W.h * 0.95 - Math.max(24, h.R * 0.17) * 0.95); out.babyJump = target.o.jump < 0.1; }
+    if (target?.k === 'baby') { A.tapAt(bx, by); out.babyJump = target.o.jump < 0.1; }
     return out;
   });
   expect(r).toMatchObject({ hitHeart: 'heart', r1: true, r2: true, r3: true, babyHit: 'baby', babyJump: true, hadBubbles: true });

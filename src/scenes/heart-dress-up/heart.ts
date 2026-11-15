@@ -26,7 +26,9 @@ const baseOf = (c: string) => (COLORS[c] || COLORS.red)[0];
 const INK = '#45182e';
 
 /** Живое состояние: куда смотрит, моргание, открытый рот, «влюблённость», качание серёжек, появление деталей */
-export interface Live { lx: number; ly: number; blink: number; mouth: number; love: number; swing: number; pop: Record<string, number>; live?: boolean }
+export interface Live { lx: number; ly: number; blink: number; mouth: number; love: number; swing: number; pop: Record<string, number>; live?: boolean;
+  /** идёт своя реакция на деталь (reactions.ts): id этапа, вариант, время с начала, с */
+  act?: { id: string; k: string; t: number } | null }
 export const STILL: Live = { lx: 0, ly: 0.15, blink: 0, mouth: 0, love: 0, swing: 0, pop: {} };
 
 /** Деталь «выпрыгивает» после выбора: масштаб от якоря (ax, ay) */

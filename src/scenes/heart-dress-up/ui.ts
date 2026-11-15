@@ -3,9 +3,10 @@
 import { H, S, TAU, W, clamp, ctx, t } from '../../core/canvas';
 import { circle, drawButton, starPath } from '../../core/draw';
 import { clamp01, ease } from '../../core/tween';
-import { itemIcon } from './icons';
-import { stageIcon } from './stageicons';
-import { G, Item, STAGES, stageHas, stageItems } from './state';
+import { careSel } from './care';
+import { iconCamera, itemIcon, stageIconFor } from './icons';
+export { iconCamera };
+import { DRESS_N, G, Item, STAGES, decorated, sameCfg, stageHas, stageItems } from './state';
 import { smallHeart } from './things';
 
 type Btn = { x: number; y: number; r: number; press: number; shake: number };
@@ -20,7 +21,9 @@ export const UI = {
   cells: [] as { x: number; y: number; r: number; i: number }[],
   items: [] as (Item & { x: number; y: number; r: number; press: number })[],
   itemsStage: -1,
-  party: mk(), sound: mk(), again: mk(), cont: mk(),
+  party: mk(), wand: mk(), sound: mk(), again: mk(), cont: mk(), camera: mk(),
+  /** x центра ячейки i на ленте этапов без учёта прокрутки (между нарядом, уходом и альбомом — промежутки) */
+  cellX: [] as number[],
   hrTarget: { x: 0, y: 0, w: 0, h: 0 },
   pad: 10,
 };
@@ -36,12 +39,17 @@ export function layout() {
   // Порядок сверху вниз: лента разделов, под ней варианты раздела.
   // Широкий экран: лента — строкой сверху, варианты — 3 ряда справа от сердца.
   // Узкий (телефон стоя): обе панели внизу, варианты — 2 ряда у самого края.
-  const sc = wide ? clamp(80 * S, 70, 88) : clamp(72 * S, 64, 80);
+  // ячейки ленты: в портрете не меньше 72px (ленту можно листать), на широком — ужимаются до 70, чтобы влезть без прокрутки
+  const gapK = 0.35, gaps = 2;
+  let sc = wide ? clamp(80 * S, 70, 88) : clamp(76 * S, 72, 84);
+  if (wide) { const sw = UI.sound.x - UI.sound.r - pad * 2.5, need = (n + gaps * gapK) * sc; if (need > sw) sc = Math.max(70, sw / (n + gaps * gapK)); }
+  UI.cellX = []; { let x = 0; for (let i = 0; i < n; i++) { if (i === DRESS_N || STAGES[i].id === 'album') x += sc * gapK; UI.cellX.push(x + sc / 2); x += sc; } }
+  const stripW = UI.cellX[n - 1] + sc / 2;
   const barH = 8, barGap = 6; // скроллбар тонкий на вид, но ловится с запасом (см. hitUI)
   let rows: number, icMax: number, icMin = 66;
   if (wide) {
     ss.x = pad; ss.w = UI.sound.x - UI.sound.r - pad * 1.5 - pad; ss.h = sc; ss.y = pad * 0.6;
-    ss.cw = n * sc;
+    ss.cw = stripW;
     const sTop = ss.y + sc + (ss.cw > ss.w ? barGap + barH : 0) + pad;
     rows = 3;
     const colW = Math.min(W * 0.44, 560), avail = H - pad - sTop - barGap - barH;
@@ -57,19 +65,22 @@ export function layout() {
     is.cw = Math.ceil(m / rows) * ic;
     is.y = H - pad * 0.6 - (is.cw > is.w + 1 ? barGap + barH : 0) - is.h;
     placeItems(rows, ic);
-    ss.x = pad; ss.w = W - 2 * pad; ss.h = sc; ss.cw = n * sc;
+    ss.x = pad; ss.w = W - 2 * pad; ss.h = sc; ss.cw = stripW;
     ss.y = is.y - pad * 1.2 - (ss.cw > ss.w ? barGap * 0.5 + 4 : 0) - sc;
     UI.hrTarget = { x: 0, y: 0, w: W, h: ss.y - pad * 0.4 };
   }
   ss.bar = ss.cw > ss.w + 1 ? { x: ss.x + ss.w * 0.15, y: ss.y + sc + barGap * 0.5, w: ss.w * 0.7, h: wide ? barH : 4 } : null;
   const shiftS = ss.cw <= ss.w ? (ss.w - ss.cw) / 2 : -ss.off;
-  UI.cells = STAGES.map((_, i) => ({ x: ss.x + shiftS + (i + 0.5) * sc, y: ss.y + sc / 2, r: sc * 0.46, i }));
+  UI.cells = STAGES.map((_, i) => ({ x: ss.x + shiftS + UI.cellX[i], y: ss.y + sc / 2, r: sc * 0.44, i }));
   if (G.finale) UI.hrTarget = { x: 0, y: 0, w: W, h: H };
   const HR = UI.hrTarget, pr = clamp(46 * S, 34, 56);
   Object.assign(UI.party, { x: HR.x + HR.w - pr - pad, y: HR.y + HR.h - pr - pad * 0.5, r: pr });
+  Object.assign(UI.wand, { x: HR.x + pr + pad, y: UI.party.y, r: pr });
+  G.zones = { wand: UI.wand, party: UI.party, sound: UI.sound };
   const fr = clamp(60 * S, 40, 72);
   Object.assign(UI.again, { x: fr + 24, y: H - fr - 24, r: fr });
   Object.assign(UI.cont, { x: W - fr - 24, y: H - fr - 24, r: fr });
+  Object.assign(UI.camera, { x: W / 2, y: H - fr - 24, r: fr * 0.9 });
 
   function placeItems(rws: number, ic: number) {
     is.cw = Math.ceil(m / rws) * ic;
@@ -113,9 +124,9 @@ export function revealItem(i: number) {
   is.vel = 0; layout();
 }
 export function revealStage(i: number) {
-  const ss = UI.stripS, sc = ss.h, x = (i + 0.5) * sc - ss.off;
-  if (x - sc < 0) ss.off = clamp((i - 0.5) * sc, 0, maxOff(ss));
-  else if (x + sc > ss.w) ss.off = clamp((i + 1.5) * sc - ss.w, 0, maxOff(ss));
+  const ss = UI.stripS, sc = ss.h, cx = UI.cellX[i] ?? (i + 0.5) * sc, x = cx - ss.off;
+  if (x - sc < 0) ss.off = clamp(cx - sc, 0, maxOff(ss));
+  else if (x + sc > ss.w) ss.off = clamp(cx + sc - ss.w, 0, maxOff(ss));
 }
 
 // ---------------- ВЫБРАНО ЛИ ----------------
@@ -126,14 +137,16 @@ export function isSel(it: Item) {
   if (it.kind === 'toggle') return !!c.env[it.k];
   if (it.kind === 'bgcolor') return c.bg === it.k;
   if (it.kind === 'bgd') return !!c.bgd[it.k];
+  if (it.kind === 'care') return careSel(id, it.k as string);
+  if (it.kind === 'photo') { const p = G.album.find(q => String(q.id) === it.k); return !!p && sameCfg(p.cfg, c); }
   return false;
 }
 
 // ---------------- РИСОВАНИЕ ----------------
 function roundRect(x: number, y: number, w: number, h: number, r: number) { ctx.beginPath(); ctx.roundRect(x, y, w, h, r); }
 
-function iconCircle(x: number, y: number, r: number, s: number, ring: string, ringW: number, draw: (r: number) => void) {
-  ctx.save(); ctx.translate(x, y); ctx.scale(s, s);
+function iconCircle(x: number, y: number, r: number, s: number, ring: string, ringW: number, draw: (r: number) => void, alpha = 1) {
+  ctx.save(); ctx.translate(x, y); ctx.scale(s, s); ctx.globalAlpha *= alpha;
   ctx.fillStyle = 'rgba(120,40,80,0.18)'; circle(0, r * 0.07, r);
   ctx.save(); ctx.beginPath(); ctx.arc(0, 0, r, 0, TAU); ctx.clip(); draw(r); ctx.restore();
   ctx.strokeStyle = ring; ctx.lineWidth = ringW; ctx.beginPath(); ctx.arc(0, 0, r - ringW / 2, 0, TAU); ctx.stroke();
@@ -161,22 +174,36 @@ function edgeHint(s: Scroller) {
 export function drawUI() {
   if (G.uiA < 0.01) return;
   ctx.save(); ctx.globalAlpha = G.uiA;
-  const night = G.cfg.bg === 'night', pad = UI.pad, plate = night ? 'rgba(20,10,60,0.5)' : 'rgba(255,255,255,0.72)';
+  const night = G.cfg.bg === 'night', pad = UI.pad, plate = night ? 'rgba(20,10,60,0.62)' : 'rgba(255,255,255,0.86)';
+  // плотная подложка с тенью: панели не теряются на пёстром фоне
+  const plateRect = (x: number, y: number, w: number, h: number, r: number) => {
+    ctx.save(); ctx.shadowColor = 'rgba(90,20,60,0.22)'; ctx.shadowBlur = 14; ctx.shadowOffsetY = 3;
+    ctx.fillStyle = plate; roundRect(x, y, w, h, r); ctx.fill(); ctx.restore();
+    if (night) { ctx.strokeStyle = 'rgba(255,255,255,0.35)'; ctx.lineWidth = 2; roundRect(x, y, w, h, r); ctx.stroke(); }
+  };
   // лента этапов
   const ss = UI.stripS;
-  ctx.fillStyle = plate; roundRect(ss.x - pad * 0.3, ss.y - pad * 0.2, ss.w + pad * 0.6, ss.h + pad * 0.4, ss.h / 2); ctx.fill();
+  plateRect(ss.x - pad * 0.3, ss.y - pad * 0.2, ss.w + pad * 0.6, ss.h + pad * 0.4, ss.h / 2);
   ctx.save(); ctx.beginPath(); ctx.rect(ss.x, ss.y - pad, ss.w, ss.h + pad * 2); ctx.clip();
+  // промежутки между нарядом, уходом и альбомом — тонкие точки-разделители
+  for (const i of [DRESS_N, STAGES.length - 1]) {
+    const a = UI.cells[i - 1], b = UI.cells[i]; if (!a || !b) continue;
+    ctx.fillStyle = night ? 'rgba(255,255,255,0.4)' : 'rgba(200,120,160,0.45)';
+    for (const dy of [-0.35, 0, 0.35]) circle((a.x + b.x) / 2, a.y + dy * a.r, Math.max(2, a.r * 0.07));
+  }
   for (const c of UI.cells) {
     if (c.x < ss.x - c.r * 1.3 || c.x > ss.x + ss.w + c.r * 1.3) continue;
-    const cur = c.i === G.stage, s = cur ? 1.08 + Math.sin(t * 4) * 0.03 : 0.98;
-    iconCircle(c.x, c.y, c.r, s, cur ? '#ffcf3f' : '#ffffff', c.r * (cur ? 0.14 : 0.08), r => stageIcon(c.i, r));
-    if (stageHas(c.i) && STAGES[c.i].optional) smallHeart(c.x + c.r * 0.72 * s, c.y - c.r * 0.62 * s, c.r * 0.22, '#ff3f8a');
+    // текущий — крупнее с жёлтой каймой; украшенный — показывает выбранное и зелёную звёздочку; пустой — бледнее
+    const st = STAGES[c.i], cur = c.i === G.stage, has = stageHas(c.i), empty = !has && !st.care && st.id !== 'album';
+    const s = cur ? 1.12 + Math.sin(t * 4) * 0.025 : 1;
+    iconCircle(c.x, c.y, c.r, s, cur ? '#ffcf3f' : empty ? '#eadbe3' : '#ffffff', c.r * (cur ? 0.14 : 0.08), r => stageIconFor(c.i, r), empty && !cur ? 0.6 : 1);
+    if (has) doneBadge(c.x + c.r * 0.72 * s, c.y - c.r * 0.66 * s, c.r * 0.27);
   }
   ctx.restore();
   edgeHint(ss); drawBar(ss, '#ffb3d1');
   // панель вариантов
   const is = UI.itemsS;
-  ctx.fillStyle = plate; roundRect(is.x - pad * 0.4, is.y - pad * 0.4, is.w + pad * 0.8, is.h + pad * 0.8, 26 * S + 8); ctx.fill();
+  plateRect(is.x - pad * 0.4, is.y - pad * 0.4, is.w + pad * 0.8, is.h + pad * 0.8, 26 * S + 8);
   const id = STAGES[G.stage].id;
   ctx.save(); ctx.beginPath(); ctx.rect(is.x, is.y - pad * 0.4, is.w, is.h + pad * 0.8); ctx.clip();
   UI.items.forEach((it, i) => {
@@ -185,16 +212,39 @@ export function drawUI() {
     const ap = ease.outBack(clamp01((G.stageT - i * 0.03) / 0.3)), sel = isSel(it);
     const s = Math.max(0.01, ap) * (1 - it.press * 0.15) * (sel ? 1.04 : 0.94), y = it.y + (sel ? Math.sin(t * 4 + i) * 2 * S : 0);
     iconCircle(it.x, y, it.r, s, sel ? '#ffcf3f' : '#ffffff', it.r * (sel ? 0.13 : 0.07), r => itemIcon(id, it, r));
-    if (sel && it.kind !== 'none') { // значок «выбрано» — сердечко
+    if (sel && it.kind !== 'none' && it.kind !== 'care') { // значок «выбрано» — сердечко
       ctx.save(); ctx.translate(it.x + it.r * 0.7 * s, y - it.r * 0.7 * s);
       ctx.fillStyle = '#fff'; circle(0, 0, it.r * 0.24); smallHeart(0, it.r * 0.02, it.r * 0.17, '#ff3f8a'); ctx.restore();
     }
   });
   ctx.restore();
   edgeHint(is); drawBar(is, '#ff7aa8');
-  // праздник
-  drawButton(UI.party, '#ffb928', iconParty, true);
+  // праздник: когда украшено 3 раздела и больше — хлопушка пульсирует и светится, зовёт
+  const ready = decorated() >= 3;
+  if (ready) { const g = 0.5 + 0.5 * Math.sin(t * 3); ctx.fillStyle = `rgba(255,230,120,${0.25 + 0.25 * g})`; circle(UI.party.x, UI.party.y, UI.party.r * (1.18 + 0.1 * g)); }
+  drawButton(UI.party, '#ffb928', iconParty, ready);
+  drawButton(UI.wand, '#b57cff', iconWand, false);
   ctx.restore();
+}
+
+/** «Раздел украшен»: зелёный кружок с белой звёздочкой (сердечко — только у выбранной вещи) */
+function doneBadge(x: number, y: number, r: number) {
+  ctx.save(); ctx.translate(x, y);
+  ctx.fillStyle = '#fff'; circle(0, 0, r * 1.12);
+  ctx.fillStyle = '#2ec46b'; circle(0, 0, r);
+  ctx.fillStyle = '#fff'; starPath(5, r * 0.62, r * 0.27); ctx.fill();
+  ctx.restore();
+}
+/** Волшебная палочка: звезда на палочке и искорки */
+export function iconWand(R: number) {
+  ctx.save(); ctx.rotate(0.6);
+  ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.roundRect(-R * 0.06, -R * 0.1, R * 0.12, R * 0.62, R * 0.05); ctx.fill();
+  ctx.fillStyle = '#ff7aa8'; ctx.fillRect(-R * 0.06, R * 0.32, R * 0.12, R * 0.08);
+  ctx.translate(0, -R * 0.2); ctx.rotate(Math.sin(t * 2) * 0.15);
+  ctx.fillStyle = '#ffe14d'; starPath(5, R * 0.34, R * 0.15); ctx.fill(); ctx.strokeStyle = '#fff'; ctx.lineWidth = R * 0.05; ctx.stroke();
+  ctx.restore();
+  ctx.fillStyle = '#fff';
+  for (let i = 0; i < 3; i++) { const a = t * 2 + i * 2.1; ctx.save(); ctx.translate(-R * 0.4 + Math.cos(a) * R * 0.08, -R * 0.35 + i * R * 0.3); starPath(4, R * (0.08 + 0.03 * Math.sin(a * 2)), R * 0.03); ctx.fill(); ctx.restore(); }
 }
 
 /** Праздник: хлопушка с конфетти */
@@ -241,10 +291,11 @@ const inRect = (r: { x: number; y: number; w: number; h: number }, x: number, y:
 export function hitUI(x: number, y: number): any {
   if (inBtn(UI.sound, x, y, 1.2)) return { k: 'sound' };
   if (G.finale) {
-    if (G.finale.t > 1.2) { if (inBtn(UI.again, x, y)) return { k: 'again' }; if (inBtn(UI.cont, x, y)) return { k: 'cont' }; }
+    if (G.finale.t > 1.2) { if (inBtn(UI.again, x, y)) return { k: 'again' }; if (inBtn(UI.cont, x, y)) return { k: 'cont' }; if (inBtn(UI.camera, x, y)) return { k: 'camera' }; }
     return null;
   }
   if (inBtn(UI.party, x, y)) return { k: 'party' };
+  if (inBtn(UI.wand, x, y)) return { k: 'wand' };
   const ss = UI.stripS, is = UI.itemsS, pad = UI.pad;
   if (ss.bar && inRect(ss.bar, x, y, 9)) return { k: 'bar', s: ss };
   if (is.bar && inRect(is.bar, x, y, 14)) return { k: 'bar', s: is };

@@ -2,7 +2,9 @@
 import { TAU, ctx, t } from '../../core/canvas';
 import { circle } from '../../core/draw';
 import { STILL, drawHeart } from './heart';
-import { BG_COLORS, G, Item, STAGES } from './state';
+import { careIcon, careStageIcon } from './care';
+import { stageIcon } from './stageicons';
+import { BG_COLORS, G, Item, STAGES, stageHas } from './state';
 import { MINI_COLORS, balloon, bubble, butterfly, castle, cloud, duck, fish, garland, hillsPath, kitten, miniHeart, moon, rainbowArc, sea, smallHeart, sparkleStar, stemFlower, sun, tree } from './things';
 import { FISH_COLS } from './world';
 // ---------------- ЗНАЧКИ ----------------
@@ -58,6 +60,9 @@ function colorIcon(k: string, r: number) { iconBgFill(r); heartIcon('color', { .
 
 /** Значок варианта (рисуется в (0,0), радиус r, уже обрезан кругом) */
 export function itemIcon(id: string, it: Item, r: number) {
+  if (it.kind === 'care') return careIcon(id, it.k as string, r);
+  if (it.kind === 'camera') { const g = ctx.createLinearGradient(0, -r, 0, r); g.addColorStop(0, '#8fd0ff'); g.addColorStop(1, '#4a9df0'); ctx.fillStyle = g; circle(0, 0, r); iconCamera(r * 1.15); return; }
+  if (it.kind === 'photo') { ctx.fillStyle = '#ffeef6'; circle(0, 0, r); const p = G.album.find(q => String(q.id) === it.k); if (p) { ctx.save(); ctx.rotate(-0.08); photoFrame(p.cfg, r * 0.52); ctx.restore(); } return; }
   if (it.kind === 'none') { ctx.fillStyle = '#fff4f9'; circle(0, 0, r); noneIcon(r); return; }
   if (id === 'env') return envIcon(it.k, r);
   if (id === 'bg') return bgIcon(it, r);
@@ -66,23 +71,47 @@ export function itemIcon(id: string, it: Item, r: number) {
   heartIcon(id, { ...G.cfg, [id]: it.k }, r);
 }
 
-/** Значок этапа на ленте: показывает, ЧТО украшаем на этом шаге */
-const REP: Record<string, string> = { eyes: 'sparkle', lashes: 'long', nose: 'clown', cheeks: 'blush', hair: 'bow', earrings: 'cherry', necklace: 'pearls' };
-export function stageIcon(i: number, r: number) {
-  const id = STAGES[i].id;
-  if (id === 'color') {
-    ctx.fillStyle = '#fff'; circle(0, 0, r);
-    smallHeart(-r * 0.38, r * 0.2, r * 0.3, '#ff4d6d', -0.3); smallHeart(r * 0.38, r * 0.2, r * 0.3, '#59a8ff', 0.3); smallHeart(0, -r * 0.2, r * 0.34, '#ffd23f');
-    return;
-  }
-  if (id === 'env') { iconBgFill(r); bubble(r * 0.4, -r * 0.35, r * 0.24); miniHeart(-r * 0.1, r * 0.12, r * 0.42, MINI_COLORS[0]); return; }
-  if (id === 'bg') {
-    const g = ctx.createLinearGradient(0, -r, 0, r); g.addColorStop(0, '#bfe6ff'); g.addColorStop(1, '#ffd6ea'); ctx.fillStyle = g; circle(0, 0, r);
-    sun(-r * 0.3, -r * 0.3, r * 0.26, 0, 0); ctx.fillStyle = '#9fe08a'; hillsPath(-r, r, r * 0.35, r, r * 0.1, 0.5); ctx.fill(); cloud(r * 0.35, -r * 0.05, r * 0.3, false);
-    return;
-  }
-  iconBgFill(r);
-  const base = { color: G.cfg.color, eyes: 'round', env: {}, bgd: {} } as Record<string, any>;
-  heartIcon(id, { ...base, [id]: REP[id] }, r);
+/** Значок раздела на ленте: украшенный — показывает выбранное, иначе — общий значок раздела */
+export function stageIconFor(i: number, r: number) {
+  const st = STAGES[i], id = st.id, c = G.cfg;
+  if (st.care) return careStageIcon(id, r);
+  if (id === 'album') return albumIcon(r);
+  if (!stageHas(i)) return stageIcon(i, r);
+  if (id === 'color') return colorIcon(c.color, r);
+  if (id === 'env') return envIcon(Object.keys(c.env).find(k => c.env[k]) as string, r);
+  if (id === 'bg') { const d = Object.keys(c.bgd).find(k => c.bgd[k]); return bgIcon(c.bg === 'pink' && d ? { kind: 'bgd', k: d } : { kind: 'bgcolor', k: c.bg }, r); }
+  return itemIcon(id, { kind: 'single', k: c[id] }, r);
 }
 
+// ---------------- АЛЬБОМ ----------------
+/** Фото-полароид с сердцем в (0,0); R — радиус сердца на фото */
+export function photoFrame(cfg: Record<string, any>, R: number) {
+  const w = R * 2.7, h = R * 3.05, top = -h / 2;
+  ctx.fillStyle = 'rgba(80,20,50,0.25)'; ctx.beginPath(); ctx.roundRect(-w / 2 + R * 0.06, top + R * 0.08, w, h, R * 0.12); ctx.fill();
+  ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.roundRect(-w / 2, top, w, h, R * 0.12); ctx.fill();
+  const iw = w - R * 0.3, ih = R * 2.35, ix = -iw / 2, iy = top + R * 0.15;
+  ctx.save(); ctx.beginPath(); ctx.rect(ix, iy, iw, ih); ctx.clip();
+  const [c0, c1] = BG_COLORS[cfg.bg] || BG_COLORS.pink, g = ctx.createLinearGradient(0, iy, 0, iy + ih); g.addColorStop(0, c0); g.addColorStop(1, c1);
+  ctx.fillStyle = g; ctx.fillRect(ix, iy, iw, ih);
+  ctx.translate(0, iy + ih * 0.56); drawHeart(cfg, R * 0.78, STILL);
+  ctx.restore();
+}
+/** Значок альбома: два полароида веером, на верхнем — последнее фото */
+function albumIcon(r: number) {
+  ctx.fillStyle = '#fff4f9'; circle(0, 0, r);
+  const last = G.album[0];
+  ctx.save(); ctx.rotate(-0.25); ctx.translate(-r * 0.12, r * 0.02);
+  ctx.fillStyle = 'rgba(80,20,50,0.2)'; ctx.fillRect(-r * 0.36, -r * 0.42, r * 0.76, r * 0.88);
+  ctx.fillStyle = '#ffe1ef'; ctx.fillRect(-r * 0.38, -r * 0.44, r * 0.76, r * 0.86); ctx.restore();
+  ctx.save(); ctx.rotate(0.15); ctx.translate(r * 0.1, 0);
+  if (last) photoFrame(last.cfg, r * 0.27);
+  else { ctx.fillStyle = '#fff'; ctx.fillRect(-r * 0.36, -r * 0.42, r * 0.72, r * 0.84); ctx.fillStyle = '#ffe6f2'; ctx.fillRect(-r * 0.3, -r * 0.36, r * 0.6, r * 0.56); smallHeart(0, -r * 0.08, r * 0.2, '#ff4d6d'); }
+  ctx.restore();
+}
+/** Фотоаппарат (белый, для цветной кнопки) */
+export function iconCamera(R: number) {
+  ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.roundRect(-R * 0.5, -R * 0.28, R, R * 0.66, R * 0.12); ctx.fill();
+  ctx.beginPath(); ctx.roundRect(-R * 0.18, -R * 0.42, R * 0.36, R * 0.2, R * 0.05); ctx.fill();
+  ctx.fillStyle = '#2c69c9'; circle(0, R * 0.05, R * 0.24); ctx.fillStyle = '#9fd0ff'; circle(0, R * 0.05, R * 0.15);
+  ctx.fillStyle = '#fff'; circle(-R * 0.05, 0, R * 0.05); ctx.fillStyle = '#ff5c9a'; circle(R * 0.36, -R * 0.15, R * 0.06);
+}

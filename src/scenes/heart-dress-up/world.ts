@@ -37,12 +37,20 @@ export const env = {
 const on = (k: string) => !!G.cfg.env[k];
 const bgOn = (k: string) => !!G.cfg.bgd[k];
 export const groundY = () => G.HR.y + G.HR.h * 0.95;
+/** Те, кто ходит по земле, не заходят под кнопки палочки и хлопушки: u (0..1) → x между ними */
+function walkX(u: number) {
+  const A = G.HR, z = G.zones, k = G.uiA;
+  const x0 = z.wand ? A.x + (z.wand.x + z.wand.r * 1.3 - A.x) * k : A.x, x1 = z.party ? A.x + A.w - (A.x + A.w - (z.party.x - z.party.r * 1.3)) * k : A.x + A.w;
+  return x0 + u * Math.max(0, x1 - x0);
+}
+/** Верх свободен от кнопки звука? Если она внутри области сердца — сколько отступить вниз */
+function soundBottom() { const s = G.zones.sound; return s && s.y - s.r < G.HR.y + G.HR.h * 0.3 && s.x > G.HR.x + G.HR.w * 0.5 ? s.y + s.r : -1; }
 const miniR = () => Math.max(24, G.heart.R * 0.17);
 
 // ---------------- ПОЗИЦИИ ----------------
 export function babyPos(b: any): [number, number] {
   const r = miniR(), hop = Math.abs(Math.sin(b.ph)) * r * 0.25, j = b.jump < 0.6 ? Math.sin(b.jump / 0.6 * Math.PI) * r * 1.6 : 0;
-  return [G.HR.x + b.u * G.HR.w, groundY() - r * 0.95 - hop - j];
+  return [walkX(b.u), groundY() - r * 0.95 - hop - j];
 }
 export function bubblePos(b: any): [number, number] { return [G.HR.x + b.u * G.HR.w + Math.sin(t * 1.5 + b.ph) * 14 * S, G.HR.y + b.v * G.HR.h]; }
 export function flyPos(f: any): [number, number] { return [G.HR.x + f.u * G.HR.w, G.HR.y + f.v * G.HR.h + Math.sin(t * 3 + f.ph) * 8 * S]; }
@@ -54,13 +62,13 @@ export function balloonPos(b: any): [number, number] {
   return [x + Math.sin(t * 0.9 + b.ph) * r * 0.12, y];
 }
 export function sparkPos(s: any): [number, number] { const R = G.heart.R; return [G.heart.x + Math.cos(s.a + t * 0.15) * s.d * R, G.heart.y - 0.1 * R + Math.sin(s.a + t * 0.15) * s.d * R * 0.85]; }
-export function flowerPos(f: any): [number, number] { return [G.HR.x + f.u * G.HR.w, groundY() + 4 * S]; }
+export function flowerPos(f: any): [number, number] { return [walkX(f.u), groundY() + 4 * S]; }
 const flowerS = () => Math.max(14, G.heart.R * 0.1);
 // котёнок сидит слева у кончика сердца
 const kitS = () => Math.max(20, G.heart.R * 0.15);
 export function kittenPos(): [number, number] {
   const s = kitS(), k = env.kitten, j = k.jump < 0.6 ? Math.sin(k.jump / 0.6 * Math.PI) * s * 1.2 : 0;
-  const x = Math.max(G.HR.x + s * 1.2, G.heart.x - G.heart.R * 0.78);
+  const x = Math.max(walkX(0) + s * 1.2, G.heart.x - G.heart.R * 0.78);
   return [x, groundY() + 2 * S - j];
 }
 const fishS = () => Math.max(16, G.heart.R * 0.11);
@@ -68,12 +76,12 @@ export function fishPos(f: any): [number, number] { return [G.HR.x + f.u * G.HR.
 const duckS = () => Math.max(20, G.heart.R * 0.14);
 export function duckPos(): [number, number] {
   const d = env.duck, s = duckS(), j = d.jump < 0.5 ? Math.sin(d.jump / 0.5 * Math.PI) * s * 0.9 : 0;
-  return [G.HR.x + d.u * G.HR.w, groundY() + 3 * S - j];
+  return [walkX(d.u), groundY() + 3 * S - j];
 }
 export function cloudPos(c: any): [number, number] { return [-0.15 * W + ((c.u % 1.3 + 1.3) % 1.3) * W, G.HR.y + c.v * G.HR.h - c.bounce * 20 * S]; }
 const sunR = () => Math.max(30, 46 * S);
 export function sunPos(): [number, number] { const r = sunR(); return [G.HR.x + r * 1.9, G.HR.y + r * 1.9]; }
-export function moonPos(): [number, number] { const r = sunR() * 0.9; return [G.HR.x + G.HR.w - r * 2.2, G.HR.y + r * 2.4 - env.moon.hop * 12 * S]; }
+export function moonPos(): [number, number] { const r = sunR() * 0.9, sb = soundBottom(); return [G.HR.x + G.HR.w - r * 2.2, Math.max(G.HR.y + r * 2.4, sb + r * 1.4) - env.moon.hop * 12 * S]; }
 export function rainbowGeo() { const R = G.heart.R; return { cx: G.heart.x, cy: G.heart.y + 0.75 * R, r: R * 2.05, w: R * 0.55 }; }
 export const hillTop = () => G.HR.y + G.HR.h * 0.86;
 // замок справа вдали, дерево слева, море по низу, гирлянда сверху
@@ -82,7 +90,7 @@ export function castlePos(): [number, number] { const s = castleS(); return [G.H
 const treeS = () => Math.max(34, Math.min(G.HR.h * 0.15, G.HR.w * 0.11));
 export function treePos(): [number, number] { const s = treeS(); return [G.HR.x + s * 0.95, groundY()]; }
 export const seaTop = () => G.HR.y + G.HR.h * 0.92;
-const garGeo = () => ({ x0: G.HR.x + 6 * S, x1: G.HR.x + G.HR.w - 6 * S, y: G.HR.y + Math.max(8, 10 * S), sag: Math.max(14, G.HR.h * 0.04), fs: Math.max(14, 20 * S) });
+const garGeo = () => ({ x0: G.HR.x + 6 * S, x1: soundBottom() > 0 ? G.zones.sound.x - G.zones.sound.r * 1.4 : G.HR.x + G.HR.w - 6 * S, y: G.HR.y + Math.max(8, 10 * S), sag: Math.max(14, G.HR.h * 0.04), fs: Math.max(14, 20 * S) });
 
 // ---------------- ОБНОВЛЕНИЕ ----------------
 export function updateWorld(dt: number) {
