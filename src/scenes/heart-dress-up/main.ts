@@ -28,16 +28,17 @@ function heartXform() {
   let sc = 1 + beat * 0.025;
   if (G.finale) { const f = G.finale.t * 4.2; rot += Math.sin(f) * 0.12; dy -= Math.abs(Math.sin(f)) * 0.1 * R; sq += Math.cos(f * 2) * 0.03; }
   sc *= 1 + Math.sin(t * 1.3) * 0.008;
-  if (hs.spinT < 0.7) { const p = hs.spinT / 0.7; rot += TAU * (p * p * (3 - 2 * p)); dy -= Math.sin(p * Math.PI) * 0.15 * R; } // палочка: сердце крутится
+  let spin = 0; // палочка: сердце крутится вокруг своего центра
+  if (hs.spinT < 0.7) { const p = hs.spinT / 0.7; spin = TAU * (p * p * (3 - 2 * p)); dy -= Math.sin(p * Math.PI) * 0.15 * R; }
   const ra = reactXform(R), ca = careXform(R);
-  return { x, y: y + dy + ra.dy + ca.dy, R, rot: rot + ra.rot + ca.rot, sx: sc * (1 + sq) * ra.sx * ca.sx, sy: sc * (1 - sq) * ra.sy * ca.sy };
+  return { x, y: y + dy + ra.dy + ca.dy, R, spin, rot: rot + ra.rot + ca.rot, sx: sc * (1 + sq) * ra.sx * ca.sx, sy: sc * (1 - sq) * ra.sy * ca.sy };
 }
 
 function drawBigHeart() {
   const X = heartXform();
   // мягкая тень на земле
   ctx.fillStyle = 'rgba(120,40,80,0.12)'; ctx.beginPath(); ctx.ellipse(X.x, G.heart.y + 1.02 * X.R, 0.55 * X.R * (1 - (G.heart.y - X.y) / X.R * 0.5), 0.07 * X.R, 0, 0, TAU); ctx.fill();
-  ctx.save(); ctx.translate(X.x, X.y + 0.95 * X.R); ctx.rotate(X.rot); ctx.scale(X.sx, X.sy); ctx.translate(0, -0.95 * X.R);
+  ctx.save(); ctx.translate(X.x, X.y + 0.95 * X.R); ctx.rotate(X.rot); ctx.scale(X.sx, X.sy); ctx.translate(0, -0.95 * X.R); if (X.spin) ctx.rotate(X.spin);
   const L: Live = { lx: hs.lx, ly: hs.ly, blink: hs.blink, mouth: hs.mouth, love: hs.love, swing: hs.swing, pop: hs.pop, live: true, act: hs.act };
   careLive(L);
   drawHeart(G.cfg, X.R, L);

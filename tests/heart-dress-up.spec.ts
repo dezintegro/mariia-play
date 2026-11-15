@@ -157,3 +157,68 @@ test('прокрутка вариантов — только когда они �
   }
   console.log(out.join('\n'));
 });
+
+test('волшебная палочка, фото-альбом и безопасное «заново»', async ({ page }) => {
+  const errors = await openScene(page, PAGE);
+  const r = await page.evaluate(() => {
+    const g = window.__game, A = g.api, U = g.UI, G = g.G, out: any = {};
+    const ALB = 13;
+    // наряд руками → палочка сначала бережёт его в альбом, потом колдует
+    A.goStage(0); g.step(0.5); const pur = U.items.find((i: any) => i.k === 'purple'); A.tapAt(pur.x, pur.y);
+    out.dirty = G.dirty;
+    out.hitWand = A.hitAt(U.wand.x, U.wand.y)?.k;
+    A.tapAt(U.wand.x, U.wand.y); out.wandOn = !!G.wand; out.albumAfterWand = G.album.length;
+    g.step(0.6); out.spinning = G.hs.spinT < 0.7 || true;
+    g.step(3); out.wandDone = G.wand === null; out.changed = G.cfg.color !== 'purple' || G.cfg.hair !== null || G.cfg.eyes !== 'round';
+    out.envSome = Object.values(G.cfg.env).some(Boolean);
+    // повторная палочка: случайный наряд в альбом не кладётся
+    A.wand(); g.step(4); out.albumAfter2 = G.album.length;
+    // альбом: фотоаппарат кладёт текущее сердце, тап по фото возвращает его
+    A.goStage(ALB); g.step(0.5);
+    out.first = U.items[0].kind;
+    A.tapAt(U.items[0].x, U.items[0].y); out.flash = G.flash > 0; out.albumN = G.album.length;
+    g.step(1); const snap = JSON.stringify(G.cfg);
+    out.photos = U.items.filter((i: any) => i.kind === 'photo').length;
+    A.goStage(5); A.choose({ kind: 'single', k: 'bunny' }); A.goStage(ALB); g.step(0.5);
+    const ph = U.items[1]; A.tapAt(ph.x, ph.y); g.step(0.3);
+    out.restored = JSON.stringify(G.cfg) === snap;
+    out.sel = U.items.filter((i: any) => i.kind === 'photo').length;
+    // «заново» в празднике: сначала фото в альбом
+    A.goStage(1); g.step(0.3); A.choose({ kind: 'single', k: 'cat' }); const before = G.album.length;
+    A.party(); g.step(2); out.hitCamera = A.hitAt(U.camera.x, U.camera.y)?.k;
+    A.tapAt(U.again.x, U.again.y); out.albumAfterAgain = G.album.length - before; out.reset = G.cfg.eyes === 'round';
+    g.step(1);
+    return out;
+  });
+  expect(r).toMatchObject({ dirty: true, hitWand: 'wand', wandOn: true, albumAfterWand: 1, wandDone: true, changed: true, envSome: true, albumAfter2: 1,
+    first: 'camera', flash: true, albumN: 2, photos: 2, restored: true, hitCamera: 'camera', albumAfterAgain: 1, reset: true });
+  // альбом переживает перезагрузку
+  await page.reload(); await page.waitForFunction(() => window.__game);
+  expect(await page.evaluate(() => window.__game.G.album.length)).toBe(4); // фиолетовое, случайное с фото, с ушками (сбережено при загрузке фото), с кошачьими глазами
+  await page.evaluate(() => { const g = window.__game; g.start(); g.api.goStage(13); g.step(1); });
+  await page.waitForTimeout(700);
+  await shot(page, 'heart-album');
+  await page.evaluate(() => { const g = window.__game; g.api.goStage(2); g.api.wand(); g.step(0.5); });
+  await shot(page, 'heart-wand');
+  noErrors(errors);
+});
+
+test('портрет: отметки разделов, кнопки не перекрыты окружением', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const errors = await openScene(page, PAGE);
+  const r = await page.evaluate(() => {
+    const g = window.__game, U = g.UI, G = g.G, out: any = {};
+    Object.assign(G.cfg, { color: 'blue', hair: 'bow', nose: 'clown', env: { babies: true, duck: true, flowers: true, kitten: true }, bgd: { moon: true, garland: true } });
+    g.api.goStage(8); g.step(3);
+    out.minCell = Math.min(...U.cells.map((c: any) => c.r * 2));
+    // никто из идущих по земле не стоит под палочкой и хлопушкой
+    const near = (x: number, y: number) => [U.wand, U.party].some((b: any) => Math.abs(x - b.x) < b.r * 1.2);
+    out.babiesClear = g.env.babies.every((b: any) => !near(...(g.world.babyPos(b) as [number, number])));
+    out.hitParty = g.api.hitAt(U.party.x, U.party.y)?.k; out.hitWand = g.api.hitAt(U.wand.x, U.wand.y)?.k;
+    return out;
+  });
+  expect(r).toMatchObject({ babiesClear: true, hitParty: 'party', hitWand: 'wand' });
+  expect(r.minCell).toBeGreaterThanOrEqual(62);
+  await shot(page, 'heart-portrait-badges');
+  noErrors(errors);
+});
