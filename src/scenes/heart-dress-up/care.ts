@@ -17,38 +17,59 @@ import { Xf } from './reactions';
 import { PENTA, sfx } from './sounds';
 import { G } from './state';
 import { apple, bubble, moon, smallHeart, sparkleStar, sun } from './things';
+import { UI } from './ui';
 
 // ---------------- СОСТОЯНИЕ ----------------
-type Clump = { fx: number; fy: number; r: number; t: number; sub: [number, number, number][] };
+type Clump = { fx: number; fy: number; r: number; t: number; sub: [number, number, number][]; wash?: number };
 type Bub = { x: number; y: number; r: number; vy: number; ph: number; t: number };
 type Star = { u: number; v: number; s: number; tw: number; ph: number };
 
-/** День → любимая еда (каждый день другая: шаг 5 взаимно прост с числом угощений) */
-function favOfDay() {
-  const d = Math.floor((Date.now() - new Date().getTimezoneOffset() * 60000) / 86400000), F = CARE_OPTS.food;
-  return F[((d * 5) % F.length + F.length) % F.length];
+/** Номер дня (по местному времени) */
+const dayNo = () => Math.floor((Date.now() - new Date().getTimezoneOffset() * 60000) / 86400000);
+/** День → любимая еда (каждый день другая: шаг 5 взаимно прост с числом угощений); off — сдвиг для «смешной» еды дня */
+function foodOfDay(off = 0) {
+  const F = CARE_OPTS.food;
+  return F[((dayNo() * 5 + off) % F.length + F.length) % F.length];
 }
+/** Предмет, который «уходит»: out — время с начала ухода (undefined — на месте) */
+type Leaving = { out?: number };
+const OUT = 0.5;
+/** Отправить предмет уходить (если ещё не уходит) */
+const leave = (o: Leaving | null) => { if (o && o.out == null) o.out = 0; };
+/** На месте и не уходит */
+const here = (o: Leaving | null) => !!o && o.out == null;
+/** 1 → 0 за время ухода */
+const stay = (o: Leaving) => o.out == null ? 1 : 1 - clamp01(o.out / OUT);
 
 export const care = {
-  fav: favOfDay(), favFound: false, eaten: 0,
-  /** угощения в полёте к рту */
-  fly: [] as { k: string; x0: number; y0: number; t: number }[],
+  fav: foodOfDay(), funny: foodOfDay(4), favFound: false,
+  /** угощения в полёте: к рту (park < 0) или на «место ожидания» park */
+  fly: [] as { k: string; x0: number; y0: number; t: number; dur: number; park: number }[],
+  /** угощения ждут своей очереди рядом с сердцем */
+  wait: [] as { k: string; park: number; t: number }[],
   /** сейчас жуёт: t — время с момента, как еда во рту */
   eat: null as null | { k: string; t: number; fav: boolean; grim: boolean; bites: number; done: boolean },
+  /** кнопка угощения «пружинит» — очередь полна */
+  bounce: null as null | { k: string; t: number },
   foamOn: false, foam: [] as Clump[],
-  shower: 0, drops: [] as { x: number; y: number; vy: number; stop: number }[], dropT: 0, splashT: 0,
+  shower: 0, drops: [] as { x: number; y: number; vy: number; stop: number }[], dropT: 0, splashT: 0, washT: 0,
+  /** сердце мокрое после душа (сек. до высыхания) */
+  wet: 0,
   duck: null as null | { t: number; jump: number },
   bubbles: [] as Bub[],
-  sponge: null as null | { t: number; e: number },
-  towel: null as null | { t: number },
+  /** dry — на сухом сердце: не «блеск чистоты», а смешная реакция */
+  sponge: null as null | { t: number; e: number; dry: boolean },
+  towel: null as null | { t: number; dry: boolean },
   shine: 0,
   sleep: false, sleepT: 0, night: 0, stir: 9, zT: 0,
-  /** просыпается: время с начала потягушек (9 — не идёт) */
-  wake: 9, morning: 9, sunLaugh: 0,
-  teddy: null as null | { t: number; hug: number },
-  lamp: null as null | { t: number; hue: number; stars: Star[] },
-  blanket: null as null | { t: number; tuck: number },
-  box: null as null | { t: number; spin: number; boost: number },
+  /** просыпается: время с начала потягушек (9 — не идёт, < 0 — ещё ждёт своего шага утра); loud — с «доброе утро» */
+  wake: 9, wakeLoud: true,
+  /** утро по шагам (время с солнца, 9 — нет утра) */
+  morning: 9, sunLaugh: 0,
+  teddy: null as null | ({ t: number; hug: number; wave: number } & Leaving),
+  lamp: null as null | ({ t: number; hue: number; stars: Star[] } & Leaving),
+  blanket: null as null | ({ t: number; tuck: number } & Leaving),
+  box: null as null | ({ t: number; spin: number; boost: number } & Leaving),
   /** последняя добавка к форме сердца (чтобы рисовать пену/еду там, где сердце сейчас) */
   dy: 0,
 };
@@ -70,7 +91,7 @@ function sideX(dir: number, k: number, half: number) {
   const x0 = Math.max(A.x, z.wand ? z.wand.x + z.wand.r * 1.2 : A.x), x1 = Math.min(A.x + A.w, z.party ? z.party.x - z.party.r * 1.2 : A.x + A.w);
   return clamp(G.heart.x + dir * k * R(), x0 + half, Math.max(x0 + half, x1 - half));
 }
-const duckS = () => Math.max(34, R() * 0.24);
+const duckS = () => Math.max(34, R() * 0.28);
 const duckPos = (): [number, number] => [sideX(1, 0.85, duckS() * 0.7), floorY() - (C.duck && C.duck.jump < 0.5 ? Math.sin(C.duck.jump / 0.5 * Math.PI) * duckS() * 0.8 : 0)];
 const teddyS = () => Math.max(36, R() * 0.26);
 const teddyPos = (): [number, number] => [sideX(1, 0.8, teddyS() * 0.9), floorY()];
@@ -79,13 +100,19 @@ const boxPos = (): [number, number] => [sideX(-1, 0.62, boxS() * 0.8), floorY()]
 const lampS = () => Math.max(30, R() * 0.15);
 /** ночник висит на шнурке слева вверху, у левого «плеча» сердца */
 const lampPos = (): [number, number] => { const s = lampS(); return [Math.max(G.HR.x + s * 1.4, G.heart.x - 1.0 * R()), Math.max(G.HR.y + s * 2.6, G.heart.y - 0.72 * R())]; };
-const showerPos = (): [number, number] => [G.heart.x + 0.05 * R(), Math.max(G.HR.y + 0.12 * R(), G.heart.y - 1.32 * R())];
+const showerS = () => Math.max(20, R() * 0.22);
+const showerPos = (): [number, number] => [G.heart.x + 0.05 * R(), Math.max(G.HR.y + showerS() * 0.9, G.heart.y - 1.32 * R())];
+const spongeS = () => Math.max(28, R() * 0.24);
 /** Солнышко «доброго утра» выглядывает справа вверху (под кнопкой звука, если она в области сердца) */
 function sunPos(): [number, number] {
-  const r = sunR(), k = ease.outBack(clamp01(C.morning / 0.8)), A = G.HR, sd = G.zones.sound;
+  const r = sunR(), m = C.morning, k = ease.outBack(clamp01(m / 0.8)), A = G.HR, sd = G.zones.sound;
   const below = sd && sd.y - sd.r < A.y + r * 3.5 && sd.x > A.x + A.w * 0.5 ? sd.y + sd.r + r * 0.3 : A.y;
-  return [A.x + A.w - r * 1.9, Math.max(A.y, below) + r * 1.8 + (1 - k) * r * 2];
+  // в конце утра солнышко уплывает вправо-вверх за край
+  const go = ease.inOut(clamp01((m - M.sunGo) / (M.end - M.sunGo)));
+  return [A.x + A.w - r * 1.9 + go * r * 3.2, Math.max(A.y, below) + r * 1.8 + (1 - k) * r * 2 - go * r * 2.6];
 }
+/** Шаги утра (сек. от тапа по солнышку) */
+const M = { box: 0.35, lamp: 0.8, stretch: 1.25, teddyWave: 1.9, teddy: 2.45, sunGo: 2.6, end: 3.3 };
 const sunR = () => Math.max(32, R() * 0.2);
 const sleeping = () => C.sleep;
 
@@ -115,6 +142,12 @@ const snd = {
   hug() { tone(392, 0.25, { type: 'triangle', vol: 0.08 }); tone(523, 0.4, { type: 'triangle', vol: 0.08, delay: 0.18 }); sfx.kiss(); },
   click() { tone(1500, 0.03, { type: 'square', vol: 0.04 }); tone(880, 0.3, { vol: 0.06, delay: 0.05 }); },
   twinkle() { const f = pick(PENTA) * 2; tone(f, 0.6, { vol: 0.05 }); tone(f * 1.5, 0.4, { vol: 0.025, delay: 0.08 }); },
+  /** «глык» — проглотил */
+  gulp() { tone(420, 0.12, { slide: 180, vol: 0.12 }); tone(260, 0.1, { type: 'triangle', slide: 160, vol: 0.08, delay: 0.1 }); },
+  /** «м-м!» с полным ртом и пружинка кнопки */
+  full() { tone(300, 0.14, { type: 'triangle', slide: 360, vol: 0.09 }); tone(360, 0.18, { type: 'triangle', slide: 280, vol: 0.09, delay: 0.16 }); tone(160, 0.35, { slide: 420, vol: 0.12, delay: 0.02 }); },
+  /** сухая губка скрипит */
+  squeakDry() { for (let i = 0; i < 3; i++) tone(rand(1700, 2300), 0.06, { type: 'square', slide: rand(1200, 2600), vol: 0.025, delay: i * 0.08 }); },
 };
 const CRUNCHY: Record<string, boolean> = { cookie: true, carrot: true, apple: true, candy: true, watermelon: true };
 
@@ -142,11 +175,17 @@ function updLullaby(on: boolean, bells: boolean) {
 
 // ---------------- РИСОВАЛКИ ----------------
 const INK = '#45182e';
-/** Угощение с центром (0,0), «радиус» s; bites — сколько откушено (0..3) */
+/** Размер угощения у рта: множитель к 0.17R (клубника меньше яблока, арбуз — самый большой) */
+const FOOD_K: Record<string, number> = { candy: 0.85, strawberry: 0.85, cookie: 1.0, donut: 1.2, apple: 1.35, cupcake: 1.3, carrot: 1.35, icecream: 1.65, watermelon: 1.8 };
+/** Верхний край угощения в долях s — оттуда откусывают, им угощение касается рта */
+const FOOD_TOP: Record<string, number> = { strawberry: -0.6, cupcake: -0.72, icecream: -0.85, cookie: -0.8, watermelon: -0.3, candy: -0.45, apple: -0.52, carrot: -0.5, donut: -0.8 };
+const foodS = (k: string) => R() * 0.17 * (FOOD_K[k] || 1);
+/** Угощение с центром (0,0), «радиус» s; bites — сколько откушено (0..3), откусы сверху */
 function food(k: string, s: number, bites = 0) {
   ctx.save();
-  // откусы: каждый следующий — ещё одна круглая выемка (клипы пересекаются)
-  const B: [number, number, number][] = [[0.62, -0.5, 0.36], [0.72, 0.25, 0.34], [-0.1, -0.78, 0.34]];
+  // откусы: каждый следующий — ещё одна круглая выемка сверху (клипы пересекаются)
+  const top = FOOD_TOP[k] ?? -0.7;
+  const B: [number, number, number][] = [[0, top + 0.02, 0.36], [0.4, top + 0.12, 0.34], [-0.4, top + 0.12, 0.34]];
   for (let i = 0; i < Math.min(3, bites); i++) {
     const [bx, by, br] = B[i];
     // «зубчики» откуса: три кружка, каждый — отдельный клип (наложенные кружки в одном evenodd-пути взаимно гасятся)
@@ -467,21 +506,69 @@ export function careSel(stage: string, k: string): boolean {
   if (stage === 'bath') return k === 'foam' ? C.foamOn : k === 'rubberduck' ? !!C.duck : false;
   if (stage === 'sleep') {
     if (k === 'moon') return C.sleep;
-    if (k === 'teddy') return !!C.teddy;
-    if (k === 'nightlight') return !!C.lamp;
-    if (k === 'blanket') return !!C.blanket;
-    if (k === 'lullaby') return !!C.box;
+    if (k === 'teddy') return here(C.teddy);
+    if (k === 'nightlight') return here(C.lamp);
+    if (k === 'blanket') return here(C.blanket);
+    if (k === 'lullaby') return here(C.box);
   }
   return false;
 }
 
 // ---------------- ДЕЙСТВИЯ ----------------
+function happy(jump = false) { const hs = G.hs; hs.sqT = 0; hs.mouth = 1; hs.swingV += 3; if (jump) hs.jT = 0; }
+
+// ----- еда -----
+/** Сколько угощений может ждать (в полёте и рядом с сердцем), не считая того, что во рту */
+const MAXQ = 3;
+/** Где угощение держится у рта: верхним краем у рта, само ниже (не закрывает глаза); откусанное подтягивается выше */
+function holdPos(k: string, bites = 0): [number, number] {
+  const [mx, my] = mouthPos();
+  return [mx, my + 0.03 * R() - ((FOOD_TOP[k] ?? -0.7) + bites * 0.14) * foodS(k)];
+}
+/** Место ожидания в очереди: сбоку от сердца */
+function parkPos(i: number): [number, number] {
+  const P = [[0.95, 0.4], [-0.95, 0.4], [0.98, 0.78]][i % 3], half = foodS('watermelon') * 0.5;
+  return [sideX(Math.sign(P[0]), Math.abs(P[0]), half), hp(0, P[1])[1] + Math.sin(t * 3 + i * 2) * 0.02 * R()];
+}
+const PARK_K = 0.62;
+type Fly = typeof C.fly[number];
+/** Где сейчас летящее угощение: x, y, размер, доля пути */
+function flyPos(f: Fly): [number, number, number, number] {
+  const k = clamp01(f.t / f.dur), e = ease.inOut(k), [tx, ty] = f.park < 0 ? holdPos(f.k) : parkPos(f.park), long = f.dur > 0.5;
+  const x = f.x0 + (tx - f.x0) * e, y = f.y0 + (ty - f.y0) * e - Math.sin(k * Math.PI) * R() * (long ? 0.6 : 0.25);
+  const s0 = long ? Math.max(22, 30 * S) : foodS(f.k) * PARK_K, s1 = foodS(f.k) * (f.park < 0 ? 1 : PARK_K);
+  return [x, y, (s0 * (1 - k) + s1 * k) * (k < 0.15 && long ? 0.6 + k / 0.15 * 0.4 : 1), k];
+}
+function feed(k: string, x: number, y: number) {
+  if (C.fly.length + C.wait.length >= MAXQ) { C.bounce = { k, t: 0 }; snd.full(); G.hs.wgT = 0; return; } // рот занят: кнопка пружинит
+  let park = -1;
+  if (C.eat || C.fly.length || C.wait.length) {
+    const used = [...C.fly.map(f => f.park), ...C.wait.map(w => w.park)];
+    park = [0, 1, 2].find(i => !used.includes(i)) ?? 0;
+  }
+  C.fly.push({ k, x0: x, y0: y, t: 0, dur: 0.7, park }); snd.fly();
+}
+function startEat(k: string) {
+  const fav = k === C.fav;
+  C.eat = { k, t: 0, fav, grim: !fav && k === C.funny, bites: 0, done: false };
+}
+/** Проглотить всё сразу (уходим из еды, засыпаем): глык — и ничего не осталось */
+function swallow() {
+  if (!C.eat && !C.fly.length && !C.wait.length) return;
+  for (const f of C.fly) { const [x, y] = flyPos(f); burst(x, y, 'spark', 4, { speed: 120, color: '#fff6a8' }); }
+  for (const w of C.wait) { const [x, y] = parkPos(w.park); burst(x, y, 'spark', 4, { speed: 120, color: '#fff6a8' }); }
+  C.eat = null; C.fly.length = 0; C.wait.length = 0; C.bounce = null;
+  snd.gulp(); G.hs.mouth = Math.max(G.hs.mouth, 0.5);
+}
+
+// ----- ванна -----
 const FOAM_AT: [number, number][] = [[-0.6, -0.82], [-0.28, -0.74], [0.3, -0.76], [0.62, -0.82], [0.88, -0.48], [-0.88, -0.45], [0, -0.52], [-0.95, -0.05], [0.95, -0.08], [0.55, 0.55], [-0.55, 0.55], [0, 0.82]];
 function makeClump(fx: number, fy: number, delay = 0): Clump {
   const sub: [number, number, number][] = [], n = 4 + (Math.random() * 3 | 0);
   for (let i = 0; i < n; i++) { const a = rand(0, TAU), d = rand(0, 0.11); sub.push([Math.cos(a) * d, Math.sin(a) * d * 0.7, rand(0.06, 0.1)]); }
   return { fx, fy, r: 0.17, t: -delay, sub };
 }
+function foamGone() { if (!C.foam.length && C.foamOn) { C.foamOn = false; G.hs.sqT = 0; G.hs.mouth = 1; sfx.giggle(1.1); } }
 function popClump(c: Clump, loud = true) {
   const i = C.foam.indexOf(c); if (i < 0) return;
   C.foam.splice(i, 1);
@@ -489,39 +576,65 @@ function popClump(c: Clump, loud = true) {
   burst(x, y, 'smoke', 5, { color: '#ffffff', speed: 90, size: 12 });
   burst(x, y, 'spark', 4, { color: '#bfe8ff', speed: 140, size: 6 });
   if (loud) sfx.pop(rand(0.8, 1.4));
-  if (!C.foam.length && C.foamOn) { C.foamOn = false; G.hs.sqT = 0; G.hs.mouth = 1; sfx.giggle(1.1); }
+  foamGone();
 }
-function popAllFoam() { for (const c of [...C.foam]) popClump(c, false); C.foamOn = false; }
-function happy(jump = false) { const hs = G.hs; hs.sqT = 0; hs.mouth = 1; hs.swingV += 3; if (jump) hs.jT = 0; }
+/** Сухое ли сердце (нет пены, не мокрое после душа) — тогда губка и полотенце просто щекочут */
+const dry = () => C.wet <= 0 && !C.foam.length && C.shower <= 0;
+/** Уходим из ванны: пена, пузыри и капли лопаются, уточка уплывает */
+function bathExit() {
+  let any = false;
+  for (const c of C.foam) { const [x, y] = hp(c.fx, c.fy); burst(x, y, 'smoke', 2, { color: '#ffffff', speed: 70, size: 10 }); any = true; }
+  C.foam.length = 0; C.foamOn = false;
+  if (C.duck) { const [dx, dy] = duckPos(); burst(dx, dy - duckS() * 0.6, 'smoke', 5, { color: '#fff', speed: 110, size: 14 }); C.duck = null; any = true; }
+  for (const b of C.bubbles) if (b.t > 0) { burst(b.x + Math.sin(b.ph) * b.r * 0.4, b.y, 'spark', 4, { color: pick(['#ffffff', '#bfe8ff', '#ffc4e1']), speed: 140 }); any = true; }
+  C.bubbles.length = 0;
+  C.drops.forEach((d, i) => { if (i % 3 === 0) burst(d.x, d.y, 'spark', 1, { color: '#9fdcff', speed: 80, size: 4 }); });
+  C.drops.length = 0; C.shower = 0; C.sponge = null; C.towel = null; C.wet = 0;
+  if (any) sfx.pop(1.2);
+}
 
+// ----- сон -----
 function goSleep() {
-  C.sleep = true; C.sleepT = 0; C.stir = 9; C.wake = 9; C.zT = 0.8;
+  swallow(); // не ест во сне: сначала глотает
+  if (C.morning < 9) { const [sx, sy] = sunPos(); burst(sx, sy, 'spark', 10, { color: '#ffe27a', speed: 180 }); } // солнышко сразу прячется
+  C.sleep = true; C.sleepT = 0; C.stir = 9; C.wake = 9; C.morning = 9; C.zT = 0.8;
   snd.yawn(); snd.sleepy();
 }
-/** Проснуться: потягушки, зевок, «доброе утро», выглядывает солнышко */
-function wakeUp(withSun = true) {
+/** Утро по шагам (~3 с): солнышко выглядывает, ночь светлеет, шкатулка закрывается, ночник уезжает,
+ *  сердце потягивается и сбрасывает одеяло, мишка машет и уходит, солнышко уплывает за край */
+function morning() {
   const was = C.sleep;
-  C.sleep = false; C.stir = 9;
-  if (C.blanket) { C.blanket = null; sfx.rustle(); }
-  if (withSun) { C.wake = was ? 0 : 0.9; C.morning = 0; snd.yawn(); }
-  else C.wake = 9;
+  C.sleep = false; C.stir = 9; C.morning = 0; C.sunLaugh = 0;
+  C.wake = was ? -M.stretch : 9; C.wakeLoud = true;
+  sfx.tinkle();
+}
+/** Тихо проснуться без солнышка (ушли из раздела, палочка, праздник): предметы плавно уезжают */
+function wakeQuiet() {
+  if (C.sleep) { C.wake = 0; C.wakeLoud = false; }
+  C.sleep = false; C.stir = 9; C.morning = 9;
+  leave(C.teddy); leave(C.lamp); leave(C.blanket); leave(C.box);
+}
+/** Спящее сердце сонно моргает и бормочет (тап по нему или по луне) */
+function stir() {
+  if (C.stir <= 1.0) return;
+  C.stir = 0; snd.mumble(); G.hs.swingV += 1;
+  const { x, y, R: Rr } = G.heart;
+  addP({ kind: 'z', x: x + 0.45 * Rr, y: y - 0.5 * Rr, vx: 25 * S, vy: -40 * S, life: 1.8, size: Math.max(16, Rr * 0.13), color: '#fff6c0', rot: 0, vr: 0, g: 0 });
 }
 
 /** Тап по кнопке варианта; (x, y) — где кнопка: оттуда, например, летит еда */
 export function careAct(stage: string, k: string, x: number, y: number) {
   const { x: hx, y: hy } = G.heart, Rr = R();
-  if (stage === 'food') {
-    if (C.fly.length >= 4) return;
-    C.fly.push({ k, x0: x, y0: y, t: 0 }); snd.fly();
-    return;
-  }
+  if (stage === 'food') { feed(k, x, y); return; }
   if (stage === 'bath') {
     if (k === 'foam') {
-      if (C.foamOn) { popAllFoam(); sfx.poof(); return; }
-      C.foamOn = true; C.foam = FOAM_AT.map(([fx, fy], i) => makeClump(fx + rand(-0.04, 0.04), fy + rand(-0.03, 0.03), i * 0.05));
+      if (C.foamOn) { // ещё пены: шапки копятся
+        for (let i = 0; i < 6 && C.foam.length < 26; i++) { const [fx, fy] = pick(FOAM_AT); C.foam.push(makeClump(fx + rand(-0.15, 0.15), fy + rand(-0.12, 0.12), i * 0.05)); }
+      } else C.foam = FOAM_AT.map(([fx, fy], i) => makeClump(fx + rand(-0.04, 0.04), fy + rand(-0.03, 0.03), i * 0.05));
+      C.foamOn = true;
       snd.foam(); happy(); burst(hx, hy - Rr * 0.7, 'spark', 10, { color: '#bfe8ff', speed: 200 });
     } else if (k === 'shower') {
-      C.shower = Math.min(4, Math.max(C.shower, 0) + 2.6); sfx.splash(); whoosh(2.2, 0.05); happy();
+      C.shower = Math.min(4, Math.max(C.shower, 0) + 2.6); C.washT = 0.3; sfx.splash(); whoosh(2.2, 0.05); happy();
     } else if (k === 'rubberduck') {
       if (C.duck) { const [dx, dy] = duckPos(); C.duck = null; sfx.poof(); burst(dx, dy - duckS() * 0.6, 'smoke', 6, { color: '#fff', speed: 120, size: 14 }); return; }
       C.duck = { t: 0, jump: 0 }; sfx.squeak(); sfx.splash();
@@ -529,58 +642,73 @@ export function careAct(stage: string, k: string, x: number, y: number) {
       for (let i = 0; i < 7; i++) if (C.bubbles.length < 22) C.bubbles.push({ x: hx + rand(-1.1, 1.1) * Rr, y: hy + rand(0.3, 1.0) * Rr, r: Math.max(26, Rr * rand(0.11, 0.2)), vy: -rand(45, 80) * S, ph: rand(0, TAU), t: -i * 0.12 });
       sfx.blub(); sfx.magic();
     } else if (k === 'sponge') {
-      C.sponge = { t: 0, e: 0 }; snd.rub();
+      C.sponge = { t: 0, e: 0, dry: dry() }; if (C.sponge.dry) snd.squeakDry(); else snd.rub();
     } else if (k === 'towel') {
-      C.towel = { t: 0 }; whoosh(0.5, 0.1);
+      if (C.shower > 0) { C.shower = 0; snd.click(); } // полотенце выключает душ
+      C.towel = { t: 0, dry: dry() }; whoosh(0.5, 0.1);
     }
     return;
   }
   if (stage === 'sleep') {
-    if (k === 'moon') { if (C.sleep) wakeUp(true); else goSleep(); }
+    if (k === 'moon') { if (C.sleep) stir(); else goSleep(); } // луна по спящему не будит
     else if (k === 'teddy') {
-      if (C.teddy) { const [tx, ty] = teddyPos(); C.teddy = null; sfx.poof(); burst(tx, ty - teddyS() * 1.4, 'smoke', 6, { color: '#fff', speed: 120, size: 16 }); }
-      else { C.teddy = { t: 0, hug: 0 }; snd.hug(); G.hs.love = Math.max(G.hs.love, 1.2); }
+      if (here(C.teddy)) { const [tx, ty] = teddyPos(); C.teddy = null; sfx.poof(); burst(tx, ty - teddyS() * 1.4, 'smoke', 6, { color: '#fff', speed: 120, size: 16 }); }
+      else { C.teddy = { t: 0, hug: 0, wave: 9 }; snd.hug(); G.hs.love = Math.max(G.hs.love, 1.2); }
     } else if (k === 'nightlight') {
-      if (C.lamp) { C.lamp = null; snd.click(); }
+      if (here(C.lamp)) { leave(C.lamp); snd.click(); }
       else {
         const stars: Star[] = []; for (let i = 0; i < 11; i++) stars.push({ u: (i + rand(0.1, 0.9)) / 11, v: rand(0.05, 0.32), s: rand(0.7, 1.3), tw: 0, ph: rand(0, TAU) });
         C.lamp = { t: 0, hue: 0, stars }; snd.click(); sfx.tinkle();
       }
     } else if (k === 'blanket') {
-      if (C.blanket) { C.blanket = null; sfx.rustle(); }
+      if (here(C.blanket)) { leave(C.blanket); sfx.rustle(); }
       else { C.blanket = { t: 0, tuck: 0 }; sfx.rustle(); if (!C.sleep) happy(); }
     } else if (k === 'lullaby') {
-      if (C.box) { C.box = null; snd.click(); } else { C.box = { t: 0, spin: 0, boost: 0 }; snd.click(); }
+      if (here(C.box)) leave(C.box); else C.box = { t: 0, spin: 0, boost: 0 };
+      snd.click();
     } else if (k === 'sun') {
-      wakeUp(true);
-      if (C.wake > 0.5) sfx.tinkle();
+      if (C.morning < 9) { C.sunLaugh = 0.8; sfx.giggle(1.3); } // утро уже идёт — солнышко хихикает, но не задерживается
+      else morning();
     }
   }
 }
-/** Сменился раздел (from → to, id этапов): например, ушли со сна — сердце просыпается */
+/** Выйти из раздела ухода: всё доигрывает и плавно убирается (без солнышка, без следов в чужом разделе) */
+function exitStage(id: string) {
+  if (id === 'food') swallow();
+  else if (id === 'bath') bathExit();
+  else if (id === 'sleep') wakeQuiet();
+}
+/** Сменился раздел (from → to, id этапов): например, ушли со сна — сердце тихо просыпается */
 export function careStageChange(from: string, to: string) {
   if (from === to) return;
-  if (from === 'sleep') {
-    if (C.sleep) wakeUp(true);
-    C.teddy = null; C.lamp = null; C.blanket = null; C.box = null;
-  }
-  if (from === 'bath') {
-    popAllFoam(); C.duck = null; C.shower = 0; C.sponge = null; C.towel = null;
-  }
+  exitStage(from);
 }
 
 // ---------------- ОБНОВЛЕНИЕ ----------------
+let wasFinale = false, wasWand = false;
 export function updateCare(dt: number) {
   const hs = G.hs, { x: hx, y: hy } = G.heart, Rr = R();
-  if (G.finale && C.sleep) wakeUp(false);
-  // еда летит
+  // палочка и праздник сначала будят и убирают уход
+  const fin = !!G.finale, wd = !!G.wand;
+  if ((fin && !wasFinale) || (wd && !wasWand)) for (const id of ['food', 'bath', 'sleep']) exitStage(id);
+  wasFinale = fin; wasWand = wd;
+  // еда летит: ко рту или в очередь
   for (const f of C.fly) f.t += dt;
-  const FLY = 0.7;
-  for (const f of C.fly.filter(q => q.t >= FLY)) {
+  for (const f of C.fly.filter(q => q.t >= q.dur)) {
     C.fly.splice(C.fly.indexOf(f), 1);
-    const fav = f.k === C.fav;
-    if (!fav) C.eaten++;
-    C.eat = { k: f.k, t: 0, fav, grim: !fav && C.eaten % 3 === 2, bites: 0, done: false };
+    if (f.park < 0 && !C.eat) startEat(f.k);
+    else C.wait.push({ k: f.k, park: f.park < 0 ? 0 : f.park, t: 0 });
+  }
+  for (const w of C.wait) w.t += dt;
+  if (!C.eat && !C.fly.some(f => f.park < 0) && C.wait.length) { // следующее из очереди — ко рту
+    const w = C.wait.shift()!, [x, y] = parkPos(w.park);
+    C.fly.push({ k: w.k, x0: x, y0: y, t: 0, dur: 0.4, park: -1 }); whoosh(0.2, 0.05);
+  }
+  if (C.bounce) { // кнопка пружинит: очередь полна
+    const b = C.bounce; b.t += dt;
+    const it = UI.items.find(q => q.kind === 'care' && q.k === b.k);
+    if (it) it.press = 0.9 * Math.abs(Math.sin(b.t * 18)) * Math.exp(-b.t * 5);
+    if (b.t > 0.6) C.bounce = null;
   }
   // жуёт: 3 «ням» (в моменты 0.12, 0.55, 0.98), потом реакция
   const E = C.eat;
@@ -605,19 +733,33 @@ export function updateCare(dt: number) {
     if (E.t > (E.grim ? 2.7 : 1.9)) C.eat = null;
   }
   // пена
-  for (const c of C.foam) c.t += dt;
-  // душ
+  for (const c of C.foam) { c.t += dt; if (c.wash != null) c.wash += dt; }
+  // душ: мочит сердце и смывает пену сверху вниз
   if (C.shower > 0) {
-    C.shower -= dt; C.dropT -= dt; C.splashT -= dt;
-    const [sx, sy] = showerPos(), s = Math.max(16, Rr * 0.14);
+    C.shower -= dt; C.dropT -= dt; C.splashT -= dt; C.washT -= dt; C.wet = 60;
+    const [sx, sy] = showerPos(), s = showerS();
     while (C.dropT <= 0) {
       C.dropT += 0.02;
       const dx = rand(-0.7, 0.7);
       C.drops.push({ x: sx + dx * s * 1.1, y: sy + s * 0.1, vy: rand(350, 450) * S, stop: hy + (-0.75 + Math.abs(dx) * 0.2 + rand(0, 1.3)) * Rr });
     }
     if (C.splashT <= 0) { C.splashT = 0.55; sfx.splash(); }
+    if (C.washT <= 0) { // смывает по шапке сверху вниз: даже много пены уходит за одно включение душа
+      C.washT = 0.07;
+      const c = C.foam.filter(q => q.wash == null && q.t > 0).sort((a, b) => a.fy - b.fy)[0];
+      if (c) c.wash = 0;
+    }
     hs.mouth = Math.max(hs.mouth, 0.6);
   }
+  const washed = C.foam.filter(q => q.wash != null && q.wash > WASH);
+  for (const c of washed) {
+    C.foam.splice(C.foam.indexOf(c), 1);
+    const [x, y] = hp(c.fx, c.fy + 0.25);
+    burst(x, y, 'spark', 3, { color: '#ffffff', speed: 90, size: 6 });
+    if (Math.random() < 0.5) snd.drip();
+  }
+  if (washed.length) foamGone();
+  C.wet = Math.max(0, C.wet - dt);
   for (const d of C.drops) {
     d.y += d.vy * dt; d.x += (d.x - showerPos()[0]) * dt * 0.8;
     if (d.y > d.stop) { d.vy = -1; if (Math.random() < 0.4) addP({ kind: 'spark', x: d.x, y: d.y, vx: rand(-60, 60) * S, vy: rand(-90, -30) * S, life: 0.35, size: rand(3, 5) * S, color: '#9fdcff', rot: 0, vr: 0, g: 600 }); }
@@ -628,24 +770,32 @@ export function updateCare(dt: number) {
   // мыльные пузыри
   for (const b of C.bubbles) { b.t += dt; if (b.t > 0) { b.y += b.vy * dt; b.ph += dt * 1.6; } }
   C.bubbles = C.bubbles.filter(b => b.y > G.HR.y - b.r * 2);
-  // губка: трёт по кругу, искорки чистоты; если есть пена — пены прибавляется
+  // губка: трёт по кругу, искорки чистоты; если есть пена — пены прибавляется; на сухом — скрипит и щекочет
   if (C.sponge) {
     const Sp = C.sponge; Sp.t += dt; Sp.e -= dt;
     if (Sp.e <= 0) {
       Sp.e = 0.16; const [px, py] = spongePos();
-      burst(px, py, 'spark', 2, { color: pick(['#ffffff', '#bfe8ff', '#fff6a8']), speed: 160, size: 9 });
+      if (!Sp.dry) burst(px, py, 'spark', 2, { color: pick(['#ffffff', '#bfe8ff', '#fff6a8']), speed: 160, size: 9 });
       if (C.foamOn && C.foam.length < 18 && Math.random() < 0.35) C.foam.push(makeClump((px - hx) / Rr, (py - hy) / Rr));
     }
-    if ((Sp.t * 2.4 | 0) !== ((Sp.t - dt) * 2.4 | 0)) snd.rub();
-    if (Sp.t > 1.8) { C.sponge = null; C.shine = Math.max(C.shine, 1.5); happy(); sfx.tinkle(); }
+    if ((Sp.t * 2.4 | 0) !== ((Sp.t - dt) * 2.4 | 0)) { if (Sp.dry) snd.squeakDry(); else snd.rub(); }
+    if (Sp.t > 1.8) {
+      C.sponge = null;
+      if (Sp.dry) { sfx.giggle(1.25); happy(true); hs.wgT = 0; burst(hx, hy - Rr * 0.2, 'heart', 6, { up: -80, speed: 150 }); }
+      else { C.shine = Math.max(C.shine, 1.5); happy(); sfx.tinkle(); }
+    }
   }
-  // полотенце: вытирает пену, потом сердце блестит
+  // полотенце: вытирает пену и воду, потом сердце блестит; на сухом — щекотно и смешно
   if (C.towel) {
     const Tw = C.towel; Tw.t += dt;
     const [tx, ty] = towelPos();
     for (const c of [...C.foam]) { const [cx, cy] = hp(c.fx, c.fy); if (Math.hypot(cx - tx, cy - ty) < Rr * 0.45) { C.foam.splice(C.foam.indexOf(c), 1); burst(cx, cy, 'smoke', 3, { color: '#fff', speed: 60, size: 10 }); } }
     if ((Tw.t * 3 | 0) !== ((Tw.t - dt) * 3 | 0)) whoosh(0.25, 0.06);
-    if (Tw.t > 1.6) { C.towel = null; C.foam.length = 0; C.foamOn = false; C.shine = 2.6; happy(true); sfx.tinkle(); sfx.magic(); burst(hx, hy - Rr * 0.3, 'spark', 16, { color: '#fff6a8', speed: 280 }); }
+    if (Tw.t > 1.6) {
+      C.towel = null; C.foam.length = 0; C.foamOn = false; C.wet = 0;
+      if (Tw.dry) { sfx.giggle(1.3); happy(true); burst(hx, hy - Rr * 0.4, 'heart', 8, { up: -90, speed: 170, color: '#ff7aa8' }); }
+      else { C.shine = 2.6; happy(true); sfx.tinkle(); sfx.magic(); burst(hx, hy - Rr * 0.3, 'spark', 16, { color: '#fff6a8', speed: 280 }); }
+    }
   }
   C.shine = Math.max(0, C.shine - dt);
   // сон
@@ -658,23 +808,44 @@ export function updateCare(dt: number) {
       addP({ kind: z ? 'z' : 'spark', x: hx + 0.5 * Rr, y: hy - 0.55 * Rr, vx: rand(15, 35) * S, vy: -rand(30, 45) * S, life: 2.4, size: Math.max(16, Rr * (z ? 0.16 : 0.07)), color: z ? '#fff6c0' : '#ffe27a', rot: 0, vr: z ? 0 : 1.5, g: 0 });
     }
   }
-  // просыпается
+  // утро по шагам
+  if (C.morning < 9) {
+    const p = C.morning; C.morning += dt;
+    const at = (x: number) => p < x && C.morning >= x;
+    if (at(M.box) && here(C.box)) { leave(C.box); snd.click(); }
+    if (at(M.lamp) && here(C.lamp)) { leave(C.lamp); snd.click(); }
+    if (at(M.stretch)) {
+      if (here(C.blanket)) { leave(C.blanket); sfx.rustle(); }
+      if (C.wake === 9) { snd.morning(); happy(true); } // и не спал — просто «доброе утро»
+    }
+    if (at(M.teddyWave) && C.teddy && here(C.teddy)) { C.teddy.wave = 0; snd.hug(); }
+    if (at(M.teddy) && here(C.teddy)) leave(C.teddy);
+    if (C.morning > M.end) C.morning = 9;
+  }
+  // просыпается: потягушки (wake < 0 — ещё ждёт своего шага утра)
   if (C.wake < 9) {
     const prev = C.wake; C.wake += dt;
-    if (prev < 1.0 && C.wake >= 1.0) { snd.morning(); hs.jT = 0; hs.mouth = 1; burst(hx, hy - Rr * 0.5, 'spark', 14, { color: '#fff6a8', speed: 240 }); burst(hx, hy - Rr * 0.3, 'heart', 6, { up: -80, speed: 160 }); }
+    if (prev < 0 && C.wake >= 0) snd.yawn();
+    if (C.wakeLoud && prev < 1.0 && C.wake >= 1.0) { snd.morning(); hs.jT = 0; hs.mouth = 1; burst(hx, hy - Rr * 0.5, 'spark', 14, { color: '#fff6a8', speed: 240 }); burst(hx, hy - Rr * 0.3, 'heart', 6, { up: -80, speed: 160 }); }
     if (C.wake > 2.2) C.wake = 9;
   }
-  if (C.morning < 9) { C.morning += dt; if (C.morning > 5) C.morning = 9; }
   C.sunLaugh = Math.max(0, C.sunLaugh - dt);
-  if (C.teddy) { C.teddy.t += dt; C.teddy.hug += dt; }
+  // предметы сна; уходящие доигрывают и исчезают
+  if (C.teddy) { C.teddy.t += dt; C.teddy.hug += dt; C.teddy.wave += dt; }
   if (C.lamp) { C.lamp.t += dt; for (const s of C.lamp.stars) s.tw = Math.max(0, s.tw - dt * 1.2); }
   if (C.blanket) { C.blanket.t += dt; C.blanket.tuck = Math.max(0, C.blanket.tuck - dt * 2); }
   if (C.box) {
-    const B = C.box; B.t += dt; B.boost = Math.max(0, B.boost - dt); B.spin += dt * (2 + B.boost * 6);
-    if ((B.t * 1.2 | 0) !== ((B.t - dt) * 1.2 | 0)) { const [bx, by] = boxPos(); addP({ kind: 'note', x: bx + rand(-10, 10) * S, y: by - boxS() * 1.6, vx: rand(-20, 20) * S, vy: -40 * S, life: 1.8, size: Math.max(18, 26 * S), color: pick(['#ffd6ea', '#bfe8ff', '#fff6a8']), rot: 0, vr: 0, g: 0 }); }
+    const B = C.box; B.t += dt; B.boost = Math.max(0, B.boost - dt); B.spin += dt * (B.out == null ? 2 + B.boost * 6 : 0.5);
+    if (B.out == null && (B.t * 1.2 | 0) !== ((B.t - dt) * 1.2 | 0)) { const [bx, by] = boxPos(); addP({ kind: 'note', x: bx + rand(-10, 10) * S, y: by - boxS() * 1.6, vx: rand(-20, 20) * S, vy: -40 * S, life: 1.8, size: Math.max(18, 26 * S), color: pick(['#ffd6ea', '#bfe8ff', '#fff6a8']), rot: 0, vr: 0, g: 0 }); }
   }
-  updLullaby(G.started && !G.finale && (C.sleep || !!C.box), !!C.box);
+  for (const key of ['teddy', 'lamp', 'blanket', 'box'] as const) {
+    const o = C[key] as Leaving | null;
+    if (o && o.out != null) { o.out += dt; if (o.out > OUT) (C as any)[key] = null; }
+  }
+  // колыбельная — только вечером в разделе сна: днём (с солнышком) и в чужих разделах молчит
+  updLullaby(G.started && !G.finale && C.morning === 9 && (C.sleep || here(C.box)), here(C.box));
 }
+const WASH = 0.4;
 function spongePos(): [number, number] { const p = C.sponge ? C.sponge.t : 0, a = p * 9; return hp(Math.cos(a) * 0.38 + Math.sin(p * 2) * 0.15, -0.35 + Math.sin(a) * 0.22 + p * 0.2); }
 function towelPos(): [number, number] { const p = C.towel ? C.towel.t / 1.6 : 0; return hp(Math.sin(p * 14) * 0.55, -0.8 + p * 1.4); }
 
@@ -682,17 +853,20 @@ function towelPos(): [number, number] { const p = C.towel ? C.towel.t / 1.6 : 0;
 /** Позади сердца */
 export function drawCareBack() {
   if (G.finale) return;
-  const Rr = R();
-  if (C.shower > 0 || C.drops.length) { const [sx, sy] = showerPos(); showerHead(sx, sy, Math.max(16, Rr * 0.14), C.shower > 0); }
+  if (C.shower > 0 || C.drops.length) { const [sx, sy] = showerPos(); showerHead(sx, sy, showerS(), C.shower > 0); }
 }
 /** Перед сердцем */
 export function drawCareFront() {
   if (G.finale) return;
   const { x: hx, y: hy } = G.heart, Rr = R();
-  // одеяльце — в координатах сердца
-  if (C.blanket) { ctx.save(); ctx.translate(hx, hy + C.dy); blanket(Rr, ease.out(clamp01(C.blanket.t / 0.5)), C.blanket.tuck); ctx.restore(); }
-  // пена
-  for (const c of C.foam) { if (c.t <= 0) continue; const [x, y] = hp(c.fx, c.fy); clump(x, y, c, Rr, ease.outBack(clamp01(c.t / 0.3))); }
+  // одеяльце — в координатах сердца; уходя, сползает вниз и тает
+  if (C.blanket) { ctx.save(); ctx.translate(hx, hy + C.dy + (1 - stay(C.blanket)) * Rr * 0.4); blanket(Rr, ease.out(clamp01(C.blanket.t / 0.5)) * stay(C.blanket), C.blanket.tuck); ctx.restore(); }
+  // пена (смываемая душем — сползает и тает)
+  for (const c of C.foam) {
+    if (c.t <= 0) continue;
+    const w = c.wash == null ? 0 : clamp01(c.wash / WASH), [x, y] = hp(c.fx, c.fy + w * 0.25);
+    clump(x, y, c, Rr, ease.outBack(clamp01(c.t / 0.3)) * (1 - w * 0.9));
+  }
   // блеск чистоты
   if (C.shine > 0) {
     const a = clamp01(C.shine);
@@ -703,37 +877,42 @@ export function drawCareFront() {
     });
     ctx.restore();
   }
-  // еда у рта и гримаса
+  // еда у рта (ниже рта, откусы сверху) и гримаса
   const E = C.eat;
   if (E && E.bites < 3) {
-    const [mx, my] = mouthPos(), s = Rr * 0.17 * (1 - E.bites * 0.12);
-    ctx.save(); ctx.translate(mx + Rr * 0.03, my + Rr * 0.02); ctx.rotate(-0.2 + Math.sin(E.t * 14) * 0.05); food(E.k, s, E.bites); ctx.restore();
+    const [fx, fy] = holdPos(E.k, E.bites), s = foodS(E.k) * (1 - E.bites * 0.05);
+    ctx.save(); ctx.translate(fx, fy); ctx.rotate(Math.sin(E.t * 14) * 0.04); food(E.k, s, E.bites); ctx.restore();
   }
   if (E && E.grim && E.done && E.t < 2.1) { // язычок «бе-е»
     const [mx, my] = mouthPos(), w = Math.sin((E.t - 1.2) * 18) * 0.015 * Rr;
     ctx.fillStyle = '#ff6f8f'; ell(mx + w, my + 0.07 * Rr, 0.065 * Rr, 0.08 * Rr); ctx.strokeStyle = '#d0406a'; ctx.lineWidth = Math.max(1, 0.012 * Rr); ctx.beginPath(); ctx.moveTo(mx + w, my + 0.03 * Rr); ctx.lineTo(mx + w, my + 0.1 * Rr); ctx.stroke();
   }
-  // еда в полёте: дуга от кнопки ко рту
-  for (const f of C.fly) {
-    const k = clamp01(f.t / 0.7), [mx, my] = mouthPos(), e = ease.inOut(k);
-    const x = f.x0 + (mx - f.x0) * e, y = f.y0 + (my - f.y0) * e - Math.sin(k * Math.PI) * Rr * 0.6;
-    const s = (Math.max(22, 30 * S) * (1 - k) + Rr * 0.17 * k) * (k < 0.15 ? 0.6 + k / 0.15 * 0.4 : 1);
-    ctx.save(); ctx.translate(x, y); ctx.rotate(k * TAU * 0.8 - 0.2); food(f.k, s); ctx.restore();
-  }
+  // очередь: угощения ждут сбоку и покачиваются
+  for (const w of C.wait) { const [x, y] = parkPos(w.park); ctx.save(); ctx.translate(x, y); ctx.rotate(Math.sin(t * 2.5 + w.park) * 0.12); food(w.k, foodS(w.k) * PARK_K); ctx.restore(); }
+  // еда в полёте: дуга от кнопки ко рту (или в очередь)
+  for (const f of C.fly) { const [x, y, s, k] = flyPos(f); ctx.save(); ctx.translate(x, y); ctx.rotate(f.dur > 0.5 ? k * TAU : 0); food(f.k, s); ctx.restore(); }
   // губка и полотенце
-  if (C.sponge) { const [px, py] = spongePos(); sponge(px, py, Math.max(24, Rr * 0.17), Math.sin(C.sponge.t * 9) * 0.3); }
+  if (C.sponge) { const [px, py] = spongePos(); sponge(px, py, spongeS(), Math.sin(C.sponge.t * 9) * 0.3); }
   if (C.towel) { const [tx, ty] = towelPos(); towel(tx, ty, Math.max(30, Rr * 0.3), Math.sin(C.towel.t * 9) * 0.25); }
   // душ: капли
   for (const d of C.drops) drop(d.x, d.y, Math.max(3, Rr * 0.025));
-  if (C.morning < 9) { // солнышко выглядывает
-    const [sx, sy] = sunPos(), a = C.morning > 4.3 ? (5 - C.morning) / 0.7 : 1;
-    ctx.save(); ctx.globalAlpha *= clamp01(a); sun(sx, sy, sunR(), t * 0.4 + C.sunLaugh * 6, C.sunLaugh > 0 ? 1 : 0); ctx.restore();
+  if (C.morning < 9) { // солнышко выглядывает и уплывает
+    const [sx, sy] = sunPos(), a = 1 - clamp01((C.morning - (M.end - 0.35)) / 0.35);
+    ctx.save(); ctx.globalAlpha *= a; sun(sx, sy, sunR(), t * 0.4 + C.sunLaugh * 6, C.sunLaugh > 0 ? 1 : 0); ctx.restore();
   }
-  // уточка, мишка, шкатулка, ночник
-  if (C.lamp) { const [lx, ly] = lampPos(), k = ease.outBack(clamp01(C.lamp.t / 0.4)); lamp(lx, ly - (1 - k) * lampS() * 2, lampS(), C.lamp.hue, true, G.HR.y); }
+  // уточка, мишка, шкатулка, ночник (уходя: ночник уезжает вверх, мишка — вбок, шкатулка закрывается и прячется)
+  if (C.lamp) { const [lx, ly] = lampPos(), k = ease.outBack(clamp01(C.lamp.t / 0.4)), o = 1 - stay(C.lamp); lamp(lx, ly - (1 - k) * lampS() * 2 - ease.in(o) * (ly - G.HR.y + lampS() * 2), lampS(), C.lamp.hue, o < 0.3, G.HR.y); }
   if (C.duck) { const [dx, dy] = duckPos(), k = ease.outBack(clamp01(C.duck.t / 0.4)); rubberDuck(dx, dy, duckS() * Math.max(0.01, k), C.duck.jump < 0.3 ? Math.sin(C.duck.jump / 0.3 * Math.PI) : 0); }
-  if (C.teddy) { const [tx, ty] = teddyPos(), k = ease.outBack(clamp01(C.teddy.t / 0.4)), h = C.teddy.hug < 1.2 ? Math.sin(C.teddy.hug / 1.2 * Math.PI) : 0; teddy(tx - h * Rr * 0.08, ty, teddyS() * Math.max(0.01, k), C.sleep && C.sleepT > 0.7, h, C.teddy.hug < 1.2 ? 1 : 0); }
-  if (C.box) { const [bx, by] = boxPos(), k = ease.outBack(clamp01(C.box.t / 0.4)); musicBox(bx, by, boxS() * Math.max(0.01, k), C.box.spin, clamp01(C.box.t / 0.6)); }
+  if (C.teddy) {
+    const Td = C.teddy, [tx, ty] = teddyPos(), k = ease.outBack(clamp01(Td.t / 0.4)), h = Td.hug < 1.2 ? Math.sin(Td.hug / 1.2 * Math.PI) : 0, o = 1 - stay(Td);
+    ctx.save(); ctx.globalAlpha *= 1 - o;
+    teddy(tx - h * Rr * 0.08 + ease.in(o) * Rr * 0.9, ty - Math.abs(Math.sin(o * 9)) * Rr * 0.04, teddyS() * Math.max(0.01, k), C.sleep && C.sleepT > 0.7, h, Td.hug < 1.2 || Td.wave < 0.7 || o > 0 ? 1 : 0);
+    ctx.restore();
+  }
+  if (C.box) {
+    const B = C.box, [bx, by] = boxPos(), k = ease.outBack(clamp01(B.t / 0.4)), o = B.out == null ? 0 : B.out;
+    musicBox(bx, by, boxS() * Math.max(0.01, k * clamp01((OUT - o) / 0.25)), B.spin, clamp01(B.t / 0.6) * (1 - clamp01(o / 0.25)));
+  }
   // мыльные пузыри
   for (const b of C.bubbles) { if (b.t <= 0) continue; const k = ease.outBack(clamp01(b.t / 0.4)); bubble(b.x + Math.sin(b.ph) * b.r * 0.4, b.y, b.r * Math.max(0.01, k)); }
 }
@@ -746,9 +925,9 @@ export function drawCareOverlay() {
     g.addColorStop(0, `rgba(24,20,80,${0.22 * n})`); g.addColorStop(1, `rgba(16,12,58,${0.62 * n})`);
     ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
   }
-  if (C.lamp) { // ночник: тёплый свет и звёздочки по «потолку»
-    const L = C.lamp, [lx, ly] = lampPos(), s = lampS(), [c0] = LAMP_HUES[L.hue % LAMP_HUES.length], on = clamp01(L.t / 0.6);
-    ctx.save(); ctx.globalCompositeOperation = 'lighter';
+  if (C.lamp) { // ночник: тёплый свет и звёздочки по «потолку»; уходя — гаснут
+    const L = C.lamp, [lx, ly] = lampPos(), s = lampS(), [c0] = LAMP_HUES[L.hue % LAMP_HUES.length], on = clamp01(L.t / 0.6) * stay(L);
+    ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha *= on;
     const g = ctx.createRadialGradient(lx, ly, s * 0.2, lx, ly, s * 4.5); g.addColorStop(0, c0 + '66'); g.addColorStop(1, c0 + '00');
     ctx.fillStyle = g; circle(lx, ly, s * 4.5);
     ctx.restore();
@@ -765,12 +944,11 @@ const starS = (st: Star) => Math.max(9, R() * 0.06) * st.s;
 export function careLive(L: Live) {
   const E = C.eat;
   // смотрит на летящую еду и открывает рот
-  const f = C.fly[0];
+  const f = C.fly.find(q => q.park < 0) || C.fly[0];
   if (f) {
-    const k = clamp01(f.t / 0.7), [mx, my] = mouthPos(), e = ease.inOut(k), Rr = R();
-    const x = f.x0 + (mx - f.x0) * e, y = f.y0 + (my - f.y0) * e - Math.sin(k * Math.PI) * Rr * 0.6;
+    const [x, y, , k] = flyPos(f), Rr = R();
     L.lx = clamp((x - G.heart.x) / (Rr * 1.2), -1, 1); L.ly = clamp((y - G.heart.y) / (Rr * 1.2), -1, 1);
-    if (k > 0.35) L.mouth = Math.max(L.mouth, 1);
+    if (k > 0.35 && f.park < 0) L.mouth = Math.max(L.mouth, 1);
   }
   if (E) {
     if (E.t < 1.1) L.mouth = 0.5 - 0.45 * Math.cos((E.t - 0.12) / 0.43 * TAU);
@@ -778,8 +956,9 @@ export function careLive(L: Live) {
     else if (E.grim) L.mouth = 0.6 + 0.4 * Math.abs(Math.sin(E.t * 14));
     if (E.t < 1.1) L.ly = Math.max(L.ly, 0.5);
   }
-  if (C.shower > 0 || C.towel) L.blink = 1; // жмурится от удовольствия
+  if (C.shower > 0 || (C.towel && !C.towel.dry)) L.blink = 1; // жмурится от удовольствия
   if (C.sponge) L.mouth = Math.max(L.mouth, 0.6 + 0.3 * Math.sin(t * 10));
+  if (C.towel && C.towel.dry) L.mouth = Math.max(L.mouth, 0.7 + 0.3 * Math.sin(t * 12)); // щекотно
   if (C.sleep) {
     if (C.sleepT < 0.8) { L.mouth = Math.max(L.mouth, Math.sin(clamp01(C.sleepT / 0.8) * Math.PI)); L.blink = Math.max(L.blink, C.sleepT / 0.8); }
     else if (C.stir < 1.4) { // сонно моргнул и бормочет
@@ -790,7 +969,7 @@ export function careLive(L: Live) {
   if (C.wake < 9) {
     const p = C.wake;
     if (p < 0.6) L.blink = 1; else if (p < 0.9) L.blink = 0.5;
-    if (p < 0.95) L.mouth = Math.max(L.mouth, Math.sin(clamp01(p / 0.95) * Math.PI)); // зевает
+    if (p >= 0 && p < 0.95) L.mouth = Math.max(L.mouth, Math.sin(clamp01(p / 0.95) * Math.PI)); // зевает
   }
 }
 /** Добавка к положению/форме сердца (жуёт, потягивается) */
@@ -801,9 +980,9 @@ export function careXform(Rr: number): Xf {
     if (E.t < 1.1) { const c = Math.cos((E.t - 0.12) / 0.43 * TAU); sy *= 1 - 0.025 * c; sx *= 1 + 0.02 * c; }
     else if (E.grim && E.t < 2.1) { rot += Math.sin(E.t * 16) * 0.05; sx *= 1.06; sy *= 0.94; }
   }
-  if (C.sleep) { const b = Math.sin(t * 1.7); sy *= 1 + 0.03 * b; sx *= 1 - 0.012 * b; rot += Math.sin(t * 0.85) * 0.015; }
-  if (C.wake < 9 && C.wake < 0.95) { const k = Math.sin(clamp01(C.wake / 0.95) * Math.PI); sy *= 1 + 0.12 * k; sx *= 1 - 0.07 * k; dy -= 0.04 * Rr * k; rot += Math.sin(C.wake * 7) * 0.04 * k; }
-  if (C.sponge) rot += Math.sin(C.sponge.t * 13) * 0.025;
+  if (C.sleep || C.wake < 0) { const b = Math.sin(t * 1.7); sy *= 1 + 0.03 * b; sx *= 1 - 0.012 * b; rot += Math.sin(t * 0.85) * 0.015; }
+  if (C.wake >= 0 && C.wake < 0.95) { const k = Math.sin(clamp01(C.wake / 0.95) * Math.PI); sy *= 1 + 0.12 * k; sx *= 1 - 0.07 * k; dy -= 0.04 * Rr * k; rot += Math.sin(C.wake * 7) * 0.04 * k; }
+  if (C.sponge) rot += Math.sin(C.sponge.t * 13) * (C.sponge.dry ? 0.05 : 0.025);
   if (C.towel) { rot += Math.sin(C.towel.t * 12) * 0.04; sx *= 1.02; sy *= 0.98; }
   if (C.teddy && C.teddy.hug < 1.2) { const k = Math.sin(C.teddy.hug / 1.2 * Math.PI); rot += 0.12 * k; sx *= 1 + 0.04 * k; }
   if (C.blanket && C.blanket.tuck > 0) { sx *= 1 + 0.03 * C.blanket.tuck; sy *= 1 - 0.03 * C.blanket.tuck; }
@@ -817,19 +996,19 @@ export function hitCare(x: number, y: number): any {
   if (G.finale) return null;
   const Rr = R();
   for (let i = C.bubbles.length - 1; i >= 0; i--) { const b = C.bubbles[i]; if (b.t > 0 && near(x, y, b.x + Math.sin(b.ph) * b.r * 0.4, b.y, b.r * 1.1)) return { k: 'care', what: 'bubble', o: b }; }
-  if (C.sponge) { const [px, py] = spongePos(); if (near(x, y, px, py, Rr * 0.2)) return { k: 'care', what: 'sponge' }; }
+  if (C.sponge) { const [px, py] = spongePos(); if (near(x, y, px, py, spongeS() * 1.1)) return { k: 'care', what: 'sponge' }; }
   if (C.towel) { const [tx, ty] = towelPos(); if (near(x, y, tx, ty, Rr * 0.3)) return { k: 'care', what: 'towel' }; }
   if (C.duck) { const [dx, dy] = duckPos(), s = duckS(); if (near(x, y, dx, dy - 0.6 * s, s * 0.8)) return { k: 'care', what: 'duck' }; }
-  if (C.teddy) { const [tx, ty] = teddyPos(), s = teddyS(); if (Math.abs(x - tx) < Math.max(32, s * 0.85) && y < ty + 6 && y > ty - Math.max(64, s * 2.4)) return { k: 'care', what: 'teddy' }; }
-  if (C.box) { const [bx, by] = boxPos(), s = boxS(); if (near(x, y, bx, by - 0.8 * s, s * 1.0)) return { k: 'care', what: 'box' }; }
-  if (C.lamp) { const [lx, ly] = lampPos(), s = lampS(); if (near(x, y, lx, ly, s * 1.1)) return { k: 'care', what: 'lamp' }; }
+  if (here(C.teddy)) { const [tx, ty] = teddyPos(), s = teddyS(); if (Math.abs(x - tx) < Math.max(32, s * 0.85) && y < ty + 6 && y > ty - Math.max(64, s * 2.4)) return { k: 'care', what: 'teddy' }; }
+  if (here(C.box)) { const [bx, by] = boxPos(), s = boxS(); if (near(x, y, bx, by - 0.8 * s, s * 1.0)) return { k: 'care', what: 'box' }; }
+  if (here(C.lamp)) { const [lx, ly] = lampPos(), s = lampS(); if (near(x, y, lx, ly, s * 1.1)) return { k: 'care', what: 'lamp' }; }
   let best: Clump | null = null, bd = 1e9;
-  for (const c of C.foam) { if (c.t <= 0) continue; const [cx, cy] = hp(c.fx, c.fy), d = Math.hypot(x - cx, y - cy); if (d < Math.max(30, Rr * 0.17) && d < bd) { bd = d; best = c; } }
+  for (const c of C.foam) { if (c.t <= 0 || c.wash != null) continue; const [cx, cy] = hp(c.fx, c.fy), d = Math.hypot(x - cx, y - cy); if (d < Math.max(30, Rr * 0.17) && d < bd) { bd = d; best = c; } }
   if (best) return { k: 'care', what: 'foam', o: best };
-  if (C.blanket) { const top = G.heart.y + C.dy + 0.4 * Rr; if (y > top && y < G.heart.y + 1.12 * Rr && Math.abs(x - G.heart.x) < 1.12 * Rr) return { k: 'care', what: 'blanket' }; }
-  if (C.shower > 0) { const [sx, sy] = showerPos(); if (near(x, y, sx, sy - Rr * 0.05, Rr * 0.16)) return { k: 'care', what: 'shower' }; }
+  if (here(C.blanket)) { const top = G.heart.y + C.dy + 0.4 * Rr; if (y > top && y < G.heart.y + 1.12 * Rr && Math.abs(x - G.heart.x) < 1.12 * Rr) return { k: 'care', what: 'blanket' }; }
+  if (C.shower > 0) { const [sx, sy] = showerPos(); if (near(x, y, sx, sy - showerS() * 0.3, showerS() * 1.1)) return { k: 'care', what: 'shower' }; }
   if (C.morning < 9) { const [sx, sy] = sunPos(); if (near(x, y, sx, sy, sunR() * 1.3)) return { k: 'care', what: 'sun' }; }
-  if (C.lamp) for (const st of C.lamp.stars) { const [sx, sy] = starPos(st); if (near(x, y, sx, sy, starS(st) * 1.4)) return { k: 'care', what: 'star', o: st }; }
+  if (C.lamp && here(C.lamp)) for (const st of C.lamp.stars) { const [sx, sy] = starPos(st); if (near(x, y, sx, sy, starS(st) * 1.4)) return { k: 'care', what: 'star', o: st }; }
   return null;
 }
 export function tapCare(h: any, x: number, y: number) {
@@ -840,7 +1019,7 @@ export function tapCare(h: any, x: number, y: number) {
       sfx.pop(rand(0.7, 1.3)); burst(x, y, 'spark', 8, { color: pick(['#ffffff', '#bfe8ff', '#ffc4e1']), speed: 200 }); break;
     }
     case 'foam': popClump(h.o); break;
-    case 'sponge': snd.rub(); C.sponge!.t = Math.max(0, C.sponge!.t - 0.6); burst(x, y, 'smoke', 4, { color: '#fff', speed: 100, size: 12 }); break;
+    case 'sponge': if (C.sponge!.dry) snd.squeakDry(); else snd.rub(); C.sponge!.t = Math.max(0, C.sponge!.t - 0.6); burst(x, y, 'smoke', 4, { color: '#fff', speed: 100, size: 12 }); break;
     case 'towel': whoosh(0.3, 0.08); burst(x, y, 'spark', 5, { color: '#ffc4e1', speed: 150 }); break;
     case 'duck': C.duck!.jump = 0; sfx.squeak(); burst(x, y - 10 * S, 'heart', 4, { up: -80, speed: 120, color: '#ffd93b' }); break;
     case 'teddy': C.teddy!.hug = 0; snd.hug(); G.hs.love = Math.max(G.hs.love, 1); burst(x, y, 'heart', 6, { up: -80, speed: 140, color: '#ff7aa8' }); break;
@@ -849,16 +1028,12 @@ export function tapCare(h: any, x: number, y: number) {
     case 'star': h.o.tw = 1; snd.twinkle(); burst(x, y, 'spark', 5, { color: '#fff6a8', speed: 120 }); break;
     case 'blanket': C.blanket!.tuck = 1; sfx.rustle(); if (!C.sleep) { G.hs.mouth = 1; sfx.giggle(0.9); } else C.stir = 0.9; break;
     case 'shower': C.shower = Math.min(4, C.shower + 1.2); sfx.splash(); burst(x, y + Rr * 0.1, 'spark', 6, { color: '#9fdcff', speed: 160 }); break;
-    case 'sun': C.sunLaugh = 0.8; C.morning = Math.min(C.morning, 1.5); sfx.giggle(1.3); burst(x, y, 'spark', 8, { color: '#ffe27a', speed: 200 }); break;
+    case 'sun': C.sunLaugh = 0.8; sfx.giggle(1.3); burst(x, y, 'spark', 8, { color: '#ffe27a', speed: 200 }); break; // хихикает, но утро не затягивает
   }
 }
 /** Тап по самому сердцу во время ухода. Вернуть true, если обработано (например, спит — сонно моргает) */
 export function careHeartTap(): boolean {
   if (!C.sleep) return false;
-  if (C.stir > 1.0) {
-    C.stir = 0; snd.mumble(); G.hs.swingV += 1;
-    const { x, y, R: Rr } = G.heart;
-    addP({ kind: 'z', x: x + 0.45 * Rr, y: y - 0.5 * Rr, vx: 25 * S, vy: -40 * S, life: 1.8, size: Math.max(16, Rr * 0.13), color: '#fff6c0', rot: 0, vr: 0, g: 0 });
-  }
+  stir();
   return true;
 }

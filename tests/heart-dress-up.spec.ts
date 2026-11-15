@@ -476,7 +476,7 @@ for (const [w, h] of [[1280, 800], [390, 844]]) test(`уход: еда, ванн
       A.revealItem(j); const it = g.UI.items[j]; A.tapAt(it.x, it.y);
       if (C.fly.length) out.flew++;
       g.step(0.75); if (C.eat) out.eats++;
-      g.step(2.2);
+      g.step(3.0); // смешная еда дня дольше (гримаса), иначе следующее ждёт в очереди
     }
     out.favFound = C.favFound;
     // ещё раз — снимок во время жевания
