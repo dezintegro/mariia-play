@@ -475,12 +475,12 @@ for (const [w, h] of [[1280, 800], [390, 844]]) test(`уход: еда, ванн
     for (let j = 0; j < n; j++) {
       A.revealItem(j); const it = g.UI.items[j]; A.tapAt(it.x, it.y);
       if (C.food.fly.length) out.flew++;
-      g.step(0.75); if (C.food.eat) out.eats++;
-      g.step(3.0); // смешная еда дня дольше (гримаса), иначе следующее ждёт в очереди
+      g.step(1.3); if (C.food.eat) out.eats++; // летит на тарелку, потом ко рту
+      g.step(4.5); // смешная еда дня дольше (гримаса), сытое ест медленно; иначе следующее ждёт в очереди
     }
     out.favFound = C.food.favFound;
     // ещё раз — снимок во время жевания
-    A.revealItem(1); const it = g.UI.items[1]; A.tapAt(it.x, it.y); g.step(1.0);
+    A.revealItem(1); const it = g.UI.items[1]; A.tapAt(it.x, it.y); g.step(1.6);
     out.chewing = !!C.food.eat && C.food.eat.bites >= 1 && C.food.eat.bites < 3;
     return out;
   });

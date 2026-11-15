@@ -78,10 +78,10 @@ for (const [w, h] of [[390, 844], [1280, 800]]) test.describe(`ванна ${w}x$
       window.go('bath'); g.step(0.5); out.cleanAgain = window.B().spots.length;
       // следы еды: крошки и кремовые усы → пятнышки, следы обнулены
       window.go('food'); g.step(4);
-      window.__traces.crumbs.push({ fx: -0.3, fy: 0.25 }, { fx: 0.35, fy: 0.22 }); window.__traces.cream = 1;
+      window.__traces.crumbs = 0.8; window.__traces.cream = 1;
       window.go('bath'); g.step(0.5);
       out.fromFood = window.B().spots.map((s: any) => s.kind).sort();
-      out.tracesTaken = window.__traces.crumbs.length === 0 && !window.__traces.cream;
+      out.tracesTaken = !window.__traces.crumbs && !window.__traces.cream;
       return out;
     });
     expect(r.n).toBeGreaterThanOrEqual(3);

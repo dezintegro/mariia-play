@@ -129,10 +129,10 @@ for (const [w, h] of [[390, 844], [1280, 800]]) test.describe(`уход ${w}x${h
       out.sleepEat = { eat: !!C.food.eat, fly: C.food.fly.length, wait: C.food.wait.length };
       // смешная еда дня — всегда гримаса, остальные — нет
       window.go('food'); g.step(1);
-      window.tap(C.food.funny); for (let i = 0; i < 20 && !C.food.eat; i++) g.step(0.05); out.funnyGrim = C.food.eat && C.food.eat.grim;
+      window.tap(C.food.funny); for (let i = 0; i < 80 && C.food.eat?.k !== C.food.funny; i++) g.step(0.05); out.funnyGrim = C.food.eat && C.food.eat.grim;
       g.step(3);
       const other = ['strawberry', 'cupcake', 'icecream', 'cookie', 'watermelon', 'candy', 'apple', 'carrot', 'donut'].find(k => k !== C.food.funny && k !== C.food.fav);
-      window.tap(other); for (let i = 0; i < 20 && !C.food.eat; i++) g.step(0.05); out.otherGrim = C.food.eat && C.food.eat.grim;
+      window.tap(other); for (let i = 0; i < 160 && C.food.eat?.k !== other; i++) g.step(0.05); out.otherGrim = C.food.eat && C.food.eat.grim;
       out.funnyNotFav = C.food.funny !== C.food.fav;
       return out;
     });

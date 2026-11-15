@@ -54,8 +54,16 @@ export interface CareSection {
 }
 
 // ---------------- ПОМОЩНИКИ ----------------
-/** Общая добавка к положению сердца (жуёт, потягивается) — чтобы рисовать пену и еду там, где сердце сейчас */
-export const shared = { dy: 0 };
+/** Общая добавка к положению сердца (жуёт, потягивается) — чтобы рисовать пену и еду там, где сердце сейчас;
+ *  mat — система координат сердца в последнем кадре (центр сердца, с наклоном, прыжком и сжатием) */
+export const shared = { dy: 0, mat: null as DOMMatrix | null };
+/** Нарисовать «на сердце»: (0,0) — центр сердца, сердце качается — рисунок вместе с ним. До первого кадра — ничего */
+export function onHeart(fn: () => void) { if (!shared.mat) return; ctx.save(); ctx.setTransform(shared.mat); fn(); ctx.restore(); }
+/**
+ * Следы на сердце 0..1 (0 — нет). Переживают смену раздела: еда оставляет, другие разделы читают и могут смыть,
+ * обнулив значение (разделы друг друга не импортируют). crumbs — крошки у рта, cream — усы из крема, milk — молочные усы.
+ * rested и dreams — от сна (dreams.food — рисовалка любимой еды дня в (0,0) радиусом r: она снится).
+ */
 export const R = () => G.heart.R;
 /** Точка сердца в долях R → экран */
 export const hp = (fx: number, fy: number): [number, number] => [G.heart.x + fx * R(), G.heart.y + fy * R() + shared.dy];
@@ -97,11 +105,11 @@ export function iconBg(r: number, c0: string, c1: string) { const g = ctx.create
 /**
  * Следы ухода на самом сердце, общие для разделов (живут дольше раздела).
  * rested — выспалось (сек), dreams — что снится: ключ → рисовалка в (0,0) радиусом r, сон показывает по кругу в порядке DREAM_ORDER (sleep.ts): food, duck, teddy, stars;
- * crumbs, cream — следы еды (крошки — точки в долях R от центра сердца, кремовые усы 0..1): ванна забирает их в пятнышки;
+ * crumbs, cream, milk — следы еды 0..1 (крошки, кремовые и молочные усы; рисует еда): ванна забирает их в пятнышки;
  * spots — пятнышки, которые отмывает ванна (рисует ванна); glow — сколько ещё секунд сердце блестит чистотой.
  */
 export const traces = {
   rested: 0, dreams: {} as Record<string, (r: number) => void>,
-  crumbs: [] as { fx: number; fy: number }[], cream: 0,
+  crumbs: 0, cream: 0, milk: 0,
   spots: [] as { fx: number; fy: number; kind: string; dirt: number; rot: number; col: string; wig: number }[], glow: 0,
 };

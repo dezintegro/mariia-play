@@ -4,6 +4,7 @@
 //
 // Новый раздел (доктор, игры…): модуль <id>.ts с `export const <id>: CareSection`, строка в SECTIONS ниже,
 // варианты в careopts.ts и этап { id, care: true, opts: CARE_OPTS.<id> } в STAGES (state.ts). Чужие модули не трогать.
+import { ctx } from '../../../core/canvas';
 import { G } from '../state';
 import { Live } from '../heart';
 import { Xf } from '../reactions';
@@ -57,7 +58,7 @@ export function drawCareFront() { if (!G.finale) for (const s of SECTIONS) s.dra
 export function drawCareOverlay() { if (!G.finale) for (const s of SECTIONS) s.drawOverlay?.(); }
 
 /** Подправить живое состояние сердца перед рисованием: рот жуёт, глаза закрыты во сне */
-export function careLive(L: Live) { for (const s of SECTIONS) s.live?.(L); }
+export function careLive(L: Live) { shared.mat = ctx.getTransform(); for (const s of SECTIONS) s.live?.(L); } // здесь ctx уже в системе сердца — запомним её для onHeart()
 const NONE: Xf = { dy: 0, rot: 0, sx: 1, sy: 1 };
 /** Добавка к положению/форме сердца (жуёт, потягивается) */
 export function careXform(Rr: number): Xf {

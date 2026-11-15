@@ -285,17 +285,15 @@ const mkSpot = (fx: number, fy: number, kind: string): Spot => ({ fx, fy: Math.m
 /** Пришли в ванну: следы еды становятся пятнышками; если давно не мылись — пыль, краска, лапки; чистое сердце — без пятен */
 function makeSpots() {
   if (B.spots.length) return;
-  const tr = traces as any, cr = tr.crumbs, nCr = Array.isArray(cr) ? cr.length : +cr || 0, cream = Array.isArray(tr.cream) ? tr.cream.length : +tr.cream || 0;
-  if (nCr > 0 || cream > 0) {
-    if (cream > 0) B.spots.push(mkSpot(0, 0.16, 'cream'));
-    const pts: { fx?: number; fy?: number }[] = Array.isArray(cr) ? cr : [];
+  const nCr = traces.crumbs > 0.01 ? Math.ceil(traces.crumbs * 3) : 0, cream = traces.cream + traces.milk;
+  if (nCr > 0 || cream > 0.01) {
+    if (cream > 0.01) B.spots.push(mkSpot(0, 0.16, 'cream'));
     for (let i = 0; i < Math.min(3, nCr); i++) {
-      const p = pts[i] || {}, side = i % 2 ? 1 : -1;
-      B.spots.push(mkSpot(p.fx ?? side * (0.32 + 0.12 * i), p.fy ?? 0.22 + rand(-0.05, 0.03), 'crumb'));
+      const side = i % 2 ? 1 : -1;
+      B.spots.push(mkSpot(side * (0.32 + 0.12 * i), 0.22 + rand(-0.05, 0.03), 'crumb'));
     }
     // следы забрали — теперь это наши пятнышки (еда их больше не рисует)
-    if (Array.isArray(cr)) cr.length = 0; else tr.crumbs = typeof cr === 'number' ? 0 : [];
-    if (Array.isArray(tr.cream)) tr.cream.length = 0; else tr.cream = typeof tr.cream === 'boolean' ? false : 0;
+    traces.crumbs = traces.cream = traces.milk = 0;
     return;
   }
   if (B.since < DIRTY) return;
