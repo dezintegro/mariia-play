@@ -78,7 +78,7 @@ for (const [w, h] of [[390, 844], [1280, 800]]) test.describe(`ванна ${w}x$
       window.go('bath'); g.step(0.5); out.cleanAgain = window.B().spots.length;
       // следы еды: крошки и кремовые усы → пятнышки, следы обнулены
       window.go('food'); g.step(4);
-      window.__traces.crumbs = 0.8; window.__traces.cream = 1;
+      window.__traces.crumbs = 0.6; window.__traces.cream = 1;
       window.go('bath'); g.step(0.5);
       out.fromFood = window.B().spots.map((s: any) => s.kind).sort();
       out.tracesTaken = !window.__traces.crumbs && !window.__traces.cream;
