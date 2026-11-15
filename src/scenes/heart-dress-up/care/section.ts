@@ -87,18 +87,21 @@ export function tickLeaving(obj: Record<string, any>, keys: string[], dt: number
   for (const key of keys) { const o = obj[key] as Leaving | null; if (o && o.out != null) { o.out += dt; if (o.out > OUT) obj[key] = null; } }
 }
 
-/** Следы ухода: переживают смену раздела. Раздел пишет свой след, другие только читают. */
-export const traces = {
-  /** «выспалось» (сон): сколько секунд ещё бодрое, глаза блестят */
-  rested: 0,
-  /** Картинки для снов — что было в этот заход: ключ → рисовалка в (0,0) радиусом r.
-   *  Сон показывает их по кругу в порядке DREAM_ORDER (sleep.ts): food — любимая еда, duck — уточка, teddy, stars. */
-  dreams: {} as Record<string, (r: number) => void>,
-};
-
 /** Номер дня (по местному времени) — для «еды дня» и будущих секретов дня */
 export const dayNo = () => Math.floor((Date.now() - new Date().getTimezoneOffset() * 60000) / 86400000);
 
 export const INK = '#45182e';
 /** Фон значка: вертикальный градиент */
 export function iconBg(r: number, c0: string, c1: string) { const g = ctx.createLinearGradient(0, -r, 0, r); g.addColorStop(0, c0); g.addColorStop(1, c1); ctx.fillStyle = g; circle(0, 0, r); }
+
+/**
+ * Следы ухода на самом сердце, общие для разделов (живут дольше раздела).
+ * rested — выспалось (сек), dreams — что снится: ключ → рисовалка в (0,0) радиусом r, сон показывает по кругу в порядке DREAM_ORDER (sleep.ts): food, duck, teddy, stars;
+ * crumbs, cream — следы еды (крошки — точки в долях R от центра сердца, кремовые усы 0..1): ванна забирает их в пятнышки;
+ * spots — пятнышки, которые отмывает ванна (рисует ванна); glow — сколько ещё секунд сердце блестит чистотой.
+ */
+export const traces = {
+  rested: 0, dreams: {} as Record<string, (r: number) => void>,
+  crumbs: [] as { fx: number; fy: number }[], cream: 0,
+  spots: [] as { fx: number; fy: number; kind: string; dirt: number; rot: number; col: string; wig: number }[], glow: 0,
+};
