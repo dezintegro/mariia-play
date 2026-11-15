@@ -111,11 +111,11 @@ const RX: Record<string, Spec> = {
   },
   'color:dots': { // горошки «пык-пык-пык»
     snd: () => { for (let i = 0; i < 6; i++) tone(400 + i * 90, 0.06, { slide: 1000 + i * 120, vol: 0.13, delay: i * 0.11 }); },
-    xf: tm => ({ sy: 1 + 0.04 * Math.sin(tm * TAU * 5) * hump(tm, 1.4), sx: 1 - 0.03 * Math.sin(tm * TAU * 5) * hump(tm, 1.4) }),
+    xf: tm => ({ sy: 1 + 0.04 * Math.sin(tm * TAU * 2.2) * hump(tm, 1.4), sx: 1 - 0.03 * Math.sin(tm * TAU * 2.2) * hump(tm, 1.4) }),
   },
   'color:stripes': { // полоски бегут, «вжжик»
     snd: () => { tone(300, 0.35, { type: 'sawtooth', slide: 1800, vol: 0.035 }); tone(400, 0.35, { type: 'sawtooth', slide: 2000, vol: 0.035, delay: 0.45 }); whoosh(0.6, 0.08); },
-    xf: tm => ({ sx: 1 + 0.05 * wob(tm, 3, 2) }),
+    xf: tm => ({ sx: 1 + 0.05 * wob(tm, 2, 2) }),
   },
   'color:sunset': { // закат: солнышко садится и встаёт, сердце плавно качается
     snd: () => { seq([1047, 880, 784, 659, 523], 0.15, { vol: 0.07, type: 'sine', dur: 0.5 }); seq([659, 784, 1047], 0.12, { vol: 0.05, delay: 0.9 }); },
@@ -136,8 +136,8 @@ const RX: Record<string, Spec> = {
   },
   'eyes:happy': { // хохочет, глазки-дужки прыгают
     snd: () => { sfx.giggle(1.3); later(0.5, () => sfx.giggle(1.5)); },
-    xf: tm => ({ sx: 1 + 0.04 * Math.sin(tm * TAU * 7) * hump(tm, 1.3) }),
-    mouth: tm => laugh(tm, 0, 1.2, 6),
+    xf: tm => ({ sx: 1 + 0.03 * Math.sin(tm * TAU * 2.5) * hump(tm, 1.3) }),
+    mouth: tm => laugh(tm, 0, 1.2, 4),
   },
   'eyes:sleepy': { // сладко зевает и потягивается
     snd: () => { tone(500, 0.9, { type: 'triangle', slide: 220, vol: 0.12, attack: 0.15 }); tone(250, 0.7, { slide: 180, vol: 0.05, delay: 0.2 }); tone(330, 0.4, { type: 'triangle', slide: 300, vol: 0.05, delay: 1.1 }); },
@@ -177,7 +177,7 @@ const RX: Record<string, Spec> = {
   'lashes:short': {
     snd: () => { [0.1, 0.3, 0.5].forEach(d => tone(2000, 0.04, { type: 'triangle', vol: 0.08, delay: d })); },
     blink: tm => blinks(tm, [0.1, 0.3, 0.5], 0.14),
-    xf: tm => ({ sy: 1 + 0.03 * Math.sin(tm * TAU * 5) * hump(tm, 0.7) }),
+    xf: tm => ({ sy: 1 + 0.025 * Math.sin(tm * TAU * 2.5) * hump(tm, 0.7) }),
   },
   'lashes:long': { // медленно хлопает ресницами — «флирт»
     snd: () => { tone(800, 0.25, { type: 'triangle', slide: 1600, vol: 0.1 }); tone(1400, 0.45, { type: 'triangle', slide: 700, vol: 0.1, delay: 0.3 }); },
@@ -194,7 +194,7 @@ const RX: Record<string, Spec> = {
   },
   'lashes:flutter': { // хлопает часто-часто, как крылышками, и чуть взлетает
     snd: () => { for (let i = 0; i < 12; i++) tone(rand(1600, 2400), 0.04, { vol: 0.04, delay: i * 0.06 }); tone(500, 0.8, { type: 'triangle', slide: 900, vol: 0.05 }); },
-    blink: tm => (tm < 1.0 ? Math.abs(Math.sin(tm * TAU * 4)) : 0),
+    blink: tm => (tm < 1.2 ? Math.abs(Math.sin(tm * TAU * 2.5)) : 0),
     xf: tm => ({ dy: -0.25 * hump(tm, 1.6), rot: 0.05 * Math.sin(tm * TAU * 2) * hump(tm, 1.6) }),
   },
   'lashes:color': { // ресницы перебирают цвета, ксилофон
@@ -241,7 +241,7 @@ const RX: Record<string, Spec> = {
   },
   'nose:tri': { // носик зверька: шмыг-шмыг-шмыг, как у зайчика
     snd: () => { [0, 0.16, 0.32, 0.48].forEach(d => sniff(d, 0.07)); tone(1500, 0.08, { type: 'triangle', slide: 1900, vol: 0.06, delay: 0.75 }); },
-    xf: tm => ({ dy: -0.012 * Math.abs(Math.sin(tm * TAU * 6)) * hump(tm, 0.9) }),
+    xf: tm => ({ dy: -0.012 * Math.abs(Math.sin(tm * TAU * 2.5)) * hump(tm, 0.9) }),
   },
   'nose:line': { // носик-дужка: улыбается шире и хихикает
     snd: () => { tone(500, 0.3, { type: 'triangle', slide: 900, vol: 0.08 }); later(0.3, () => sfx.giggle(1.25)); },
@@ -260,8 +260,8 @@ const RX: Record<string, Spec> = {
   'nose:clown': { // «бип-бип», нос сжимается, сердце хохочет
     snd: () => { honk(520, 0); honk(520, 0.35); later(0.6, () => sfx.giggle(1.1)); },
     tick: (tm, pr) => { if (at(tm, pr, 0.6)) confetti(0, 0.06, 12); },
-    xf: tm => ({ sx: 1 + 0.05 * Math.sin(tm * TAU * 6) * hump(tm - 0.6, 1) }),
-    mouth: tm => laugh(tm, 0.6, 1.6, 5),
+    xf: tm => ({ sx: 1 + 0.04 * Math.sin(tm * TAU * 2.5) * hump(tm - 0.6, 1) }),
+    mouth: tm => laugh(tm, 0.6, 1.6, 4),
   },
   'nose:cat': { // «мяу», усики шевелятся
     snd: () => { sfx.meow(); },
@@ -277,12 +277,12 @@ const RX: Record<string, Spec> = {
   'nose:strawberry': { // клубничка прыгает, «ням-ням»
     snd: () => { for (const d of [0, 0.35]) { tone(400, 0.1, { type: 'triangle', slide: 600, vol: 0.1, delay: d }); tone(500, 0.12, { type: 'triangle', slide: 350, vol: 0.1, delay: d + 0.15 }); } },
     tick: (tm, pr) => { if (at(tm, pr, 0.2)) hearts(0, 0.04, 3, '#ff3b5c'); },
-    xf: tm => ({ sy: 1 + 0.05 * wob(tm, 3) }),
+    xf: tm => ({ sy: 1 + 0.05 * wob(tm, 2) }),
     mouth: tm => laugh(tm, 0, 0.8, 3),
   },
   'nose:dog': { // «тяв-тяв», нос нюхает, сердце виляет как хвостиком
     snd: () => { yap(0); yap(0.3); sniff(0.7); sniff(0.85); },
-    xf: tm => ({ rot: 0.12 * Math.sin(tm * TAU * 4) * hump(tm, 1.5) }),
+    xf: tm => ({ rot: 0.08 * Math.sin(tm * TAU * 2) * hump(tm, 1.5) }),
     mouth: tm => 0.8 * (hump(tm, 0.15) + hump(tm - 0.3, 0.15)),
   },
   'nose:mustache': { // усы-завитушки шевелятся, «о-ля-ля»
@@ -295,7 +295,7 @@ const RX: Record<string, Spec> = {
     snd: () => { tone(900, 0.4, { type: 'triangle', slide: 700, vol: 0.08 }); later(0.35, () => sfx.giggle(1.4)); },
     go: () => { hs().love = Math.max(hs().love, 0.45); },
     xf: tm => ({ rot: -0.1 * hump(tm, 1.5), sx: 1 - 0.05 * hump(tm, 1.5) }),
-    mouth: tm => laugh(tm, 0.35, 1.0, 5) * 0.6,
+    mouth: tm => laugh(tm, 0.35, 1.0, 4) * 0.6,
   },
   'cheeks:shine': { // щёчки-блёстки: краснеет, блики вспыхивают, хрустальный звон
     snd: () => { for (let i = 0; i < 7; i++) tone(rand(2200, 3400), 0.15, { vol: 0.04, delay: i * 0.07 }); later(0.6, () => sfx.giggle(1.4)); },
@@ -311,7 +311,7 @@ const RX: Record<string, Spec> = {
   'cheeks:doll': { // надувает щёчки — «пуф!»
     snd: () => { tone(150, 0.4, { slide: 300, vol: 0.1, attack: 0.1 }); tone(800, 0.08, { slide: 200, vol: 0.14, delay: 0.5 }); later(0.5, () => whoosh(0.18, 0.08)); },
     tick: (tm, pr) => { if (at(tm, pr, 0.5)) puff(0, 0.25, 5, '#ffffff', 12); },
-    xf: tm => ({ sx: 1 + 0.12 * hump(tm, 0.5) + 0.05 * wob(tm - 0.5, 3, 4) }),
+    xf: tm => ({ sx: 1 + 0.12 * hump(tm, 0.5) + 0.05 * wob(tm - 0.5, 2, 4) }),
   },
   'cheeks:freckles': { // веснушки пляшут, пиццикато
     snd: () => seq([784, 1047, 880, 1175, 1319], 0.1, { vol: 0.1, dur: 0.08 }),
@@ -335,8 +335,8 @@ const RX: Record<string, Spec> = {
   'cheeks:candy': { // посыпка подскакивает, «хрум-хрум»
     snd: () => { [0, 0.18, 0.36].forEach(d => later(d, () => whoosh(0.12, 0.12))); tone(1568, 0.4, { vol: 0.06, delay: 0.6 }); },
     tick: (tm, pr) => { if (at(tm, pr, 0.2)) both(s => { const [x, y] = P(s * 0.56, 0.1); burst(x, y, 'confetti', 5, { speed: 160, g: 400, size: 6 }); }); },
-    xf: tm => ({ sy: 1 + 0.04 * wob(tm, 4, 2) }),
-    mouth: tm => laugh(tm, 0, 0.6, 5),
+    xf: tm => ({ sy: 1 + 0.04 * wob(tm, 2.5, 2) }),
+    mouth: tm => laugh(tm, 0, 0.6, 4),
   },
   'cheeks:paw': { // лапки «топ-топ-топ» и писк
     snd: () => { [0, 0.15, 0.3].forEach(d => tone(160, 0.08, { vol: 0.2, delay: d })); tone(1400, 0.1, { type: 'triangle', slide: 1800, vol: 0.09, delay: 0.5 }); },
@@ -423,7 +423,7 @@ const RX: Record<string, Spec> = {
   },
   'earrings:bow': { // бантики хлопают крылышками — шуршат
     snd: () => { sfx.rustle(); later(0.35, sfx.rustle); tone(1175, 0.3, { type: 'triangle', vol: 0.06, delay: 0.6 }); },
-    xf: tm => ({ sx: 1 + 0.04 * wob(tm, 3, 2) }),
+    xf: tm => ({ sx: 1 + 0.04 * wob(tm, 2, 2) }),
   },
   'earrings:hoop': { // колечки крутятся как обруч
     snd: () => { tone(300, 0.4, { type: 'triangle', slide: 600, vol: 0.07 }); tone(600, 0.4, { type: 'triangle', slide: 300, vol: 0.07, delay: 0.4 }); whoosh(0.8, 0.05); },
@@ -455,8 +455,8 @@ const RX: Record<string, Spec> = {
   },
   'earrings:feather': { // пёрышки щекочут — сердце хихикает и ёжится
     snd: () => { whoosh(0.3, 0.08); sfx.giggle(1.15); later(0.5, () => sfx.giggle(1.3)); },
-    xf: tm => ({ sx: 1 + 0.05 * Math.sin(tm * TAU * 8) * hump(tm, 1.3), rot: 0.05 * Math.sin(tm * TAU * 4) * hump(tm, 1.3) }),
-    mouth: tm => laugh(tm, 0, 1.3, 6),
+    xf: tm => ({ sx: 1 + 0.025 * Math.sin(tm * TAU * 2.5) * hump(tm, 1.3), rot: 0.05 * Math.sin(tm * TAU * 1.5) * hump(tm, 1.3) }),
+    mouth: tm => laugh(tm, 0, 1.3, 4),
   },
   'earrings:star': { // звёздочки крутятся и мигают, «звёздочка-мелодия»
     snd: () => seq([1047, 1047, 1568, 1568, 1760, 1760, 1568], 0.14, { vol: 0.07, dur: 0.12 }),
@@ -522,7 +522,7 @@ const RX: Record<string, Spec> = {
   },
   'necklace:candy': { // леденец закрутился, конфетки пляшут, «ням-ням»
     snd: () => { tone(400, 0.1, { type: 'triangle', slide: 600, vol: 0.1 }); tone(500, 0.12, { type: 'triangle', slide: 350, vol: 0.1, delay: 0.18 }); later(0.4, () => whoosh(0.12, 0.1)); tone(1760, 0.4, { vol: 0.05, delay: 0.6 }); },
-    xf: tm => ({ sy: 1 + 0.04 * wob(tm, 3, 2) }),
+    xf: tm => ({ sy: 1 + 0.04 * wob(tm, 2, 2) }),
     mouth: tm => laugh(tm, 0, 0.5, 4),
   },
 };

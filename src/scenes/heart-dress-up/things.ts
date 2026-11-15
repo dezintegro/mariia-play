@@ -299,7 +299,7 @@ export function tree(x: number, y: number, s: number, shake: number, apples: num
   ctx.save(); ctx.translate(x, y); ctx.lineJoin = 'round'; ctx.lineCap = 'round';
   ctx.fillStyle = '#b07440'; ctx.strokeStyle = '#7a4a22'; ctx.lineWidth = 0.05 * s;
   ctx.beginPath(); ctx.moveTo(-0.2 * s, 0); ctx.quadraticCurveTo(-0.1 * s, -0.6 * s, -0.13 * s, -1.25 * s); ctx.lineTo(0.13 * s, -1.25 * s); ctx.quadraticCurveTo(0.1 * s, -0.6 * s, 0.2 * s, 0); ctx.closePath(); ctx.fill(); ctx.stroke();
-  ctx.translate(0, -1.2 * s); ctx.rotate(Math.sin(t * 30) * 0.05 * shake); ctx.translate(0, 1.2 * s);
+  ctx.translate(0, -1.2 * s); ctx.rotate(Math.sin(t * 15) * 0.06 * shake); ctx.translate(0, 1.2 * s);
   const P: [number, number, number][] = [[0, -1.75, 0.72], [-0.55, -1.4, 0.5], [0.55, -1.42, 0.5], [-0.32, -2.15, 0.5], [0.35, -2.1, 0.5]];
   ctx.fillStyle = '#3f9a33'; for (const [px, py, r] of P) circle(px * s, py * s, r * s + 0.05 * s);
   ctx.fillStyle = '#6fcf5a'; for (const [px, py, r] of P) circle(px * s, py * s, r * s);

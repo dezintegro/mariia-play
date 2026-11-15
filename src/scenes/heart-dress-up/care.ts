@@ -799,12 +799,12 @@ export function careXform(Rr: number): Xf {
   const E = C.eat;
   if (E) {
     if (E.t < 1.1) { const c = Math.cos((E.t - 0.12) / 0.43 * TAU); sy *= 1 - 0.025 * c; sx *= 1 + 0.02 * c; }
-    else if (E.grim && E.t < 2.1) { rot += Math.sin(E.t * 40) * 0.035; sx *= 1.06; sy *= 0.94; }
+    else if (E.grim && E.t < 2.1) { rot += Math.sin(E.t * 16) * 0.05; sx *= 1.06; sy *= 0.94; }
   }
   if (C.sleep) { const b = Math.sin(t * 1.7); sy *= 1 + 0.03 * b; sx *= 1 - 0.012 * b; rot += Math.sin(t * 0.85) * 0.015; }
   if (C.wake < 9 && C.wake < 0.95) { const k = Math.sin(clamp01(C.wake / 0.95) * Math.PI); sy *= 1 + 0.12 * k; sx *= 1 - 0.07 * k; dy -= 0.04 * Rr * k; rot += Math.sin(C.wake * 7) * 0.04 * k; }
-  if (C.sponge) rot += Math.sin(C.sponge.t * 22) * 0.025;
-  if (C.towel) { rot += Math.sin(C.towel.t * 18) * 0.04; sx *= 1.02; sy *= 0.98; }
+  if (C.sponge) rot += Math.sin(C.sponge.t * 13) * 0.025;
+  if (C.towel) { rot += Math.sin(C.towel.t * 12) * 0.04; sx *= 1.02; sy *= 0.98; }
   if (C.teddy && C.teddy.hug < 1.2) { const k = Math.sin(C.teddy.hug / 1.2 * Math.PI); rot += 0.12 * k; sx *= 1 + 0.04 * k; }
   if (C.blanket && C.blanket.tuck > 0) { sx *= 1 + 0.03 * C.blanket.tuck; sy *= 1 - 0.03 * C.blanket.tuck; }
   C.dy = dy;
