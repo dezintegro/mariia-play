@@ -339,6 +339,8 @@ export function hitAt(x: number, y: number): any {
   const cr = hitCare(x, y); if (cr) return cr;
   const f = hitWorld(x, y, true); if (f) return f;
   if (inHeart(x, y)) return { k: 'heart' };
+  // корона, ушки, хвостики торчат за контур сердца — тоже ловят тап
+  if (!G.finale) { const { x: hx, y: hy, R } = G.heart; if (partAt(G.cfg, (x - hx) / R, (y - hy) / R)) return { k: 'heart' }; }
   return hitWorld(x, y, false);
 }
 /** Мгновенное действие по точке (тап по миру, кнопкам). Варианты и этапы выбираются на отпускании — см. ввод ниже. */

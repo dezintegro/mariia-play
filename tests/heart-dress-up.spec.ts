@@ -220,6 +220,8 @@ test('портрет: отметки разделов, кнопки не пер�
   expect(r).toMatchObject({ babiesClear: true, hitParty: 'party', hitWand: 'wand' });
   expect(r.minCell).toBeGreaterThanOrEqual(62);
   await shot(page, 'heart-portrait-badges');
+  noErrors(errors);
+});
 
 test('свои реакции: у каждой детали — свой звук и анимация; тап по надетой детали', async ({ page }) => {
   const errors = await openScene(page, PAGE);
