@@ -28,20 +28,20 @@ test('этапы: выбор деталей, «без этого», окруже
     out.noNoneOnEyes = !g.UI.items.some((i: any) => i.kind === 'none');
     tapItem('sparkle'); out.eyes = g.G.cfg.eyes;
     // прыжок по ленте прямо к причёске, выбрать и потом снять «без этого»
-    tapStage(5); out.stageHair = g.G.stage;
+    tapStage(6); out.stageHair = g.G.stage;
     tapItem('crown'); out.hair1 = g.G.cfg.hair; tapItem(null); out.hair2 = g.G.cfg.hair; tapItem('pigtails');
     // остальные опциональные этапы
     const pickAt = (s: number, k: string) => { A.goStage(s); g.step(0.5); tapItem(k); };
-    pickAt(2, 'long'); pickAt(3, 'heart'); pickAt(4, 'blush'); pickAt(6, 'pearl'); pickAt(7, 'locket');
+    pickAt(2, 'long'); pickAt(3, 'heart'); pickAt(4, 'cat'); pickAt(5, 'blush'); pickAt(7, 'pearl'); pickAt(8, 'locket');
     out.cfg = { ...g.G.cfg, env: undefined, bgd: undefined };
     // окружение: несколько сразу
-    A.goStage(8); g.step(0.5);
+    A.goStage(9); g.step(0.5);
     for (const k of ['babies', 'bubbles', 'butterflies', 'balloons', 'sparkles', 'flowers']) tapItem(k);
     tapItem('sparkles'); // повторный тап — выключить
     out.env = Object.keys(g.G.cfg.env).filter(k => g.G.cfg.env[k]).sort();
     g.step(4); out.bubbles = g.env.bubbles.length;
     // фон: цвет + детали
-    tapStage(9); out.stageBg = g.G.stage;
+    tapStage(10); out.stageBg = g.G.stage;
     tapItem('sky'); for (const k of ['clouds', 'rainbow', 'sun', 'hills']) tapItem(k);
     out.bg = g.G.cfg.bg; out.bgd = Object.keys(g.G.cfg.bgd).filter(k => g.G.cfg.bgd[k]).sort();
     g.step(1.5);
@@ -49,9 +49,9 @@ test('этапы: выбор деталей, «без этого», окруже
   });
   expect(r).toMatchObject({
     def: { color: 'red', eyes: 'round' }, color: 'purple', stage1: 1, noNoneOnEyes: true, eyes: 'sparkle',
-    stageHair: 5, hair1: 'crown', hair2: null,
-    cfg: { color: 'purple', eyes: 'sparkle', lashes: 'long', nose: 'heart', cheeks: 'blush', hair: 'pigtails', earrings: 'pearl', necklace: 'locket', bg: 'pink' },
-    env: ['babies', 'balloons', 'bubbles', 'butterflies', 'flowers'], stageBg: 9, bg: 'sky', bgd: ['clouds', 'hills', 'rainbow', 'sun'],
+    stageHair: 6, hair1: 'crown', hair2: null,
+    cfg: { color: 'purple', eyes: 'sparkle', lashes: 'long', nose: 'heart', mouth: 'cat', cheeks: 'blush', hair: 'pigtails', earrings: 'pearl', necklace: 'locket', bg: 'pink' },
+    env: ['babies', 'balloons', 'bubbles', 'butterflies', 'flowers'], stageBg: 10, bg: 'sky', bgd: ['clouds', 'hills', 'rainbow', 'sun'],
   });
   expect(r.bubbles).toBeGreaterThan(0);
   await shot(page, 'heart-decorated');
@@ -109,7 +109,7 @@ test('узкий экран (портрет телефона): 2 ряда вар
   const r = await page.evaluate(() => {
     const g = window.__game, A = g.api, U = g.UI, out: any = {};
     g.G.cfg.hair = 'long'; g.G.cfg.earrings = 'cherry'; g.G.cfg.necklace = 'pearls';
-    A.goStage(9); g.step(1);
+    A.goStage(10); g.step(1);
     const is = U.itemsS;
     out.rows = new Set(U.items.map((i: any) => Math.round(i.y))).size;
     out.scrollable = is.cw > is.w && !!is.bar;
@@ -125,12 +125,12 @@ test('узкий экран (портрет телефона): 2 ряда вар
     A.tapAt(is.bar.x + is.bar.w - 2, is.bar.y + is.bar.h / 2); g.step(0.5); out.barEnd = Math.abs(is.off - (is.cw - is.w)) < 2;
     // последний этап на ленте доступен после прокрутки ленты
     A.swipe(U.stripS.x + U.stripS.w * 0.8, U.stripS.y + U.stripS.h / 2, -600); g.step(1);
-    const c = U.cells[9]; out.lastCellVisible = c.x + c.r <= U.stripS.x + U.stripS.w + 1;
+    const c = U.cells[10]; out.lastCellVisible = c.x + c.r <= U.stripS.x + U.stripS.w + 1;
     A.tapAt(c.x, c.y); out.stage = g.G.stage;
-    A.goStage(5); g.step(1);
+    A.goStage(6); g.step(1);
     return out;
   });
-  expect(r).toEqual({ rows: 2, scrollable: true, minR: r.minR, heartAbovePanel: true, stripScroll: true, offAfterSwipe: true, bgSame: true, offClamped: true, barEnd: true, lastCellVisible: true, stage: 9 });
+  expect(r).toEqual({ rows: 2, scrollable: true, minR: r.minR, heartAbovePanel: true, stripScroll: true, offAfterSwipe: true, bgSame: true, offClamped: true, barEnd: true, lastCellVisible: true, stage: 10 });
   expect(r.minR).toBeGreaterThanOrEqual(28);
   await shot(page, 'heart-portrait');
   noErrors(errors);
@@ -144,7 +144,7 @@ test('прокрутка вариантов — только когда они �
     const errors = await openScene(page, PAGE);
     const r = await page.evaluate(() => {
       const g = window.__game, U = g.UI, res: any[] = [];
-      for (let s = 0; s < 10; s++) {
+      for (let s = 0; s < 11; s++) {
         g.api.goStage(s); g.step(0.1);
         const is = U.itemsS, vis = U.items.every((it: any) => it.x - it.r >= is.x - 1 && it.x + it.r <= is.x + is.w + 1);
         res.push({ s, n: U.items.length, bar: !!is.bar, vis, minR: Math.min(...U.items.map((i: any) => i.r)) });
@@ -162,7 +162,7 @@ test('волшебная палочка, фото-альбом и безопас
   const errors = await openScene(page, PAGE);
   const r = await page.evaluate(() => {
     const g = window.__game, A = g.api, U = g.UI, G = g.G, out: any = {};
-    const ALB = 13;
+    const ALB = 14;
     // наряд руками → палочка сначала бережёт его в альбом, потом колдует
     A.goStage(0); g.step(0.5); const pur = U.items.find((i: any) => i.k === 'purple'); A.tapAt(pur.x, pur.y);
     out.dirty = G.dirty;
@@ -180,7 +180,7 @@ test('волшебная палочка, фото-альбом и безопас
     g.step(1); const snap = JSON.stringify(G.cfg);
     out.photos = U.items.filter((i: any) => i.kind === 'photo').length;
     // палочка могла уже надеть ушки (набор «зайка») — тогда другая причёска
-    A.goStage(5); A.choose({ kind: 'single', k: G.cfg.hair === 'bunny' ? 'crown' : 'bunny' }); A.goStage(ALB); g.step(0.5);
+    A.goStage(6); A.choose({ kind: 'single', k: G.cfg.hair === 'bunny' ? 'crown' : 'bunny' }); A.goStage(ALB); g.step(0.5);
     const ph = U.items[1]; A.tapAt(ph.x, ph.y); g.step(0.3);
     out.restored = JSON.stringify(G.cfg) === snap;
     out.sel = U.items.filter((i: any) => i.kind === 'photo').length;
@@ -196,7 +196,7 @@ test('волшебная палочка, фото-альбом и безопас
   // альбом переживает перезагрузку
   await page.reload(); await page.waitForFunction(() => window.__game);
   expect(await page.evaluate(() => window.__game.G.album.length)).toBe(4); // фиолетовое, случайное с фото, с ушками (сбережено при загрузке фото), с кошачьими глазами
-  await page.evaluate(() => { const g = window.__game; g.start(); g.api.goStage(13); g.step(1); });
+  await page.evaluate(() => { const g = window.__game; g.start(); g.api.goStage(14); g.step(1); });
   await page.waitForTimeout(700);
   await shot(page, 'heart-album');
   await page.evaluate(() => { const g = window.__game; g.api.goStage(2); g.api.wand(); g.step(0.5); });
@@ -210,7 +210,7 @@ test('портрет: отметки разделов, кнопки не пер�
   const r = await page.evaluate(() => {
     const g = window.__game, U = g.UI, G = g.G, out: any = {};
     Object.assign(G.cfg, { color: 'blue', hair: 'bow', nose: 'clown', env: { babies: true, duck: true, flowers: true, kitten: true }, bgd: { moon: true, garland: true } });
-    g.api.goStage(8); g.step(3);
+    g.api.goStage(9); g.step(3);
     out.minCell = Math.min(...U.cells.map((c: any) => c.r * 2));
     // никто из идущих по земле не стоит под палочкой и хлопушкой
     const near = (x: number, y: number) => [U.wand, U.party].some((b: any) => Math.abs(x - b.x) < b.r * 1.2);
@@ -226,8 +226,8 @@ test('портрет: отметки разделов, кнопки не пер�
 
 test('свои реакции: у каждой детали — свой звук и анимация; тап по надетой детали', async ({ page }) => {
   const errors = await openScene(page, PAGE);
-  const IDS = ['color', 'eyes', 'lashes', 'nose', 'cheeks', 'hair', 'earrings', 'necklace'];
-  // 1. выбор каждого варианта 8 этапов наряда запускает реакцию именно на него, и через ~2.5 с она заканчивается
+  const IDS = ['color', 'eyes', 'lashes', 'nose', 'mouth', 'cheeks', 'hair', 'earrings', 'necklace'];
+  // 1. выбор каждого варианта 9 этапов наряда запускает реакцию именно на него, и через ~2.5 с она заканчивается
   const r = await page.evaluate((IDS) => {
     const g = window.__game, A = g.api, hs = g.G.hs, bad: string[] = [];
     let n = 0;
@@ -235,7 +235,7 @@ test('свои реакции: у каждой детали — свой зву�
       A.goStage(s); g.step(0.3);
       for (const it of g.UI.items) {
         if (it.kind !== 'single') continue;
-        g.G.cfg[id] = id === 'color' || id === 'eyes' ? '_' : null; // уже надетый вариант повторно не выбирается
+        g.G.cfg[id] = id === 'color' || id === 'eyes' || id === 'mouth' ? '_' : null; // уже надетый вариант повторно не выбирается
         A.choose(it);
         const a = hs.act;
         if (!a || a.id !== id || a.k !== it.k) bad.push(`нет реакции ${id}:${it.k}`);
@@ -249,36 +249,37 @@ test('свои реакции: у каждой детали — свой зву�
     return { n, bad };
   }, IDS);
   expect(r.bad).toEqual([]);
-  expect(r.n).toBe(87);
+  expect(r.n).toBe(97);
   noErrors(errors);
 
   // 2. тап по надетой детали — реакция именно этой детали; тап по телу — старые 3 реакции
   const t = await page.evaluate(() => {
     const g = window.__game, A = g.api, hs = g.G.hs, out: any = {};
-    Object.assign(g.G.cfg, { color: 'pink', eyes: 'round', lashes: 'long', nose: 'clown', cheeks: 'blush', hair: 'crown', earrings: 'bell', necklace: 'beads', env: {}, bgd: {} });
+    Object.assign(g.G.cfg, { color: 'pink', eyes: 'round', lashes: 'long', nose: 'clown', mouth: 'gap', cheeks: 'blush', hair: 'crown', earrings: 'bell', necklace: 'beads', env: {}, bgd: {} });
     A.goStage(0); g.step(2.5);
     const h = g.G.heart;
     const tap = (px: number, py: number) => { hs.act = null; A.tapAt(h.x + px * h.R, h.y + py * h.R); const a = hs.act; g.step(2.5); return a ? a.id + ':' + a.k : null; };
-    out.nose = tap(0, 0.06); out.eyes = tap(-0.34, -0.1); out.lashes = tap(0.36, -0.36); out.cheeks = tap(0.56, 0.12);
+    out.nose = tap(0, 0.06); out.mouth = tap(0.05, 0.28); out.eyes = tap(-0.34, -0.1); out.lashes = tap(0.36, -0.36); out.cheeks = tap(0.56, 0.12);
     out.earrings = tap(-0.92, 0.3); out.necklace = tap(0.3, 0.52); out.hair = tap(0, -0.85);
     const r0 = hs.react; out.body = tap(0, -0.45); out.bodyOld = hs.react === r0 + 1;
     return out;
   });
-  expect(t).toEqual({ nose: 'nose:clown', eyes: 'eyes:round', lashes: 'lashes:long', cheeks: 'cheeks:blush', earrings: 'earrings:bell', necklace: 'necklace:beads', hair: 'hair:crown', body: null, bodyOld: true });
+  expect(t).toEqual({ nose: 'nose:clown', mouth: 'mouth:gap', eyes: 'eyes:round', lashes: 'lashes:long', cheeks: 'cheeks:blush', earrings: 'earrings:bell', necklace: 'necklace:beads', hair: 'hair:crown', body: null, bodyOld: true });
 
   // 3. скриншоты в середине реакций — смотреть глазами
   const mid: [Record<string, string>, string, string, number][] = [
     [{}, 'hair', 'crown', 0.6], [{}, 'nose', 'clown', 0.15], [{}, 'eyes', 'sunglasses', 0.6], [{}, 'necklace', 'scarf', 0.6],
     [{}, 'necklace', 'beads', 0.35], [{}, 'color', 'rainbow', 0.7], [{}, 'hair', 'bunny', 0.2], [{}, 'earrings', 'bell', 0.3],
     [{ lashes: 'long' }, 'eyes', 'glasses', 0.75], [{}, 'cheeks', 'blush', 0.8], [{ nose: 'pig' }, 'hair', 'pigtails', 0.5], [{ lashes: 'color' }, 'eyes', 'sparkle', 0.4],
+    [{ nose: 'dot' }, 'mouth', 'lips', 0.5], [{ nose: 'mustache', necklace: 'bowtie' }, 'mouth', 'fang', 0.2], [{ nose: 'strawberry' }, 'mouth', 'o', 0.5],
   ];
   for (const [cfg, id, k, at] of mid) {
     await page.evaluate(([cfg, id, k, at, IDS]: any) => {
       const g = window.__game; g.pause(true);
-      Object.assign(g.G.cfg, { color: 'red', eyes: 'round', lashes: null, nose: null, cheeks: null, hair: null, earrings: null, necklace: null, env: {}, bgd: {} }, cfg);
+      Object.assign(g.G.cfg, { color: 'red', eyes: 'round', lashes: null, nose: null, mouth: 'smile', cheeks: null, hair: null, earrings: null, necklace: null, env: {}, bgd: {} }, cfg);
       g.api.goStage(IDS.indexOf(id)); g.step(2);
       g.G.hs.act = null; g.G.hs.love = 0;
-      g.G.cfg[id] = id === 'color' || id === 'eyes' ? '_' : null;
+      g.G.cfg[id] = id === 'color' || id === 'eyes' || id === 'mouth' ? '_' : null;
       g.api.choose({ kind: 'single', k });
       g.step(at);
     }, [cfg, id, k, at, IDS]);
@@ -291,23 +292,23 @@ test('свои реакции: у каждой детали — свой зву�
 test('палитра в тон: на каждом цвете сердца все детали и их реакции рисуются без ошибок', async ({ page }) => {
   const errors = await openScene(page, PAGE);
   const r = await page.evaluate(() => {
-    const g = window.__game, G = g.G, IDS = ['eyes', 'lashes', 'nose', 'cheeks', 'hair', 'earrings', 'necklace'];
+    const g = window.__game, G = g.G, IDS = ['eyes', 'lashes', 'nose', 'mouth', 'cheeks', 'hair', 'earrings', 'necklace'];
     let n = 0;
     // варианты берём из панели каждого этапа
     const all: [string, string][] = [];
     IDS.forEach((id: string) => { g.api.goStage(['color', ...IDS].indexOf(id)); g.step(0.05); for (const it of g.UI.items) if (it.kind === 'single') all.push([id, it.k]); });
     g.api.goStage(0); g.step(0.05);
     for (const color of g.colors) {
-      Object.assign(G.cfg, { color, eyes: 'round', lashes: 'long', nose: 'dot', cheeks: 'blush', hair: 'bow', earrings: 'pearl', necklace: 'pearls' });
+      Object.assign(G.cfg, { color, eyes: 'round', lashes: 'long', nose: 'dot', mouth: 'smile', cheeks: 'blush', hair: 'bow', earrings: 'pearl', necklace: 'pearls' });
       for (const [id, k] of all) {
         G.cfg[id] = k; G.hs.act = { id, k, t: 0.6 }; g.step(1 / 60); n++; // кадр в середине реакции
       }
-      G.hs.act = null; G.hs.blink = 0.5; G.hs.love = 1; g.step(1 / 60); G.hs.love = 0; // моргание и «влюблённость» на последнем наряде
+      G.hs.act = null; G.hs.blink = 0.5; G.hs.love = 1; G.hs.mouth = 1; g.step(1 / 60); G.hs.love = 0; // открытый рот, моргание и «влюблённость» на последнем наряде
     }
     return { n, colors: g.colors.length, variants: all.length };
   });
   expect(r.colors).toBeGreaterThanOrEqual(12);
-  expect(r.variants).toBe(77);
+  expect(r.variants).toBe(87);
   expect(r.n).toBe(r.colors * r.variants);
   noErrors(errors);
 });
@@ -316,7 +317,7 @@ test('палочка собирает образы из наборов: мног
   const errors = await openScene(page, PAGE);
   const r = await page.evaluate(() => {
     const g = window.__game, G = g.G, A = g.api, bad: string[] = [];
-    const STG = ['color', 'eyes', 'lashes', 'nose', 'cheeks', 'hair', 'earrings', 'necklace'];
+    const STG = ['color', 'eyes', 'lashes', 'nose', 'mouth', 'cheeks', 'hair', 'earrings', 'necklace'];
     const opts: Record<string, string[]> = {};
     STG.forEach((id, s) => { A.goStage(s); g.step(0.05); opts[id] = g.UI.items.filter((i: any) => i.kind === 'single').map((i: any) => i.k); });
     // наборы — только из существующих вариантов
@@ -342,6 +343,33 @@ test('палочка собирает образы из наборов: мног
   expect(r.fromSet).toBeLessThan(370);
   expect(r.distinct).toBeGreaterThan(20);
   await shot(page, 'heart-wand-set');
+  noErrors(errors);
+});
+
+test('рот: выбирается, звёздочка не на улыбке, открывается; старое сохранение без рта работает', async ({ page }) => {
+  // старое сохранение: без поля mouth и с номером этапа «старой» ленты (без stageId)
+  await page.addInitScript(() => {
+    if (sessionStorage.getItem('seeded')) return; sessionStorage.setItem('seeded', '1');
+    localStorage.setItem('mariia-play:heart-dress-up', JSON.stringify({ cfg: { color: 'blue', eyes: 'cat', nose: 'pig', env: {}, bgd: {} }, stage: 3, album: [{ id: 1, cfg: { color: 'pink', eyes: 'round', env: {}, bgd: {} } }] }));
+  });
+  const errors = await openScene(page, PAGE);
+  const r = await page.evaluate(() => {
+    const g = window.__game, A = g.api, U = g.UI, G = g.G, out: any = {};
+    out.loaded = { color: G.cfg.color, mouth: G.cfg.mouth, album: G.album[0].cfg.mouth };
+    const mi = g.UI.cells.findIndex((c: any) => c.i === 4); out.mi = mi;
+    A.tapAt(U.cells[4].x, U.cells[4].y); g.step(0.5);
+    out.noNone = !U.items.some((i: any) => i.kind === 'none'); out.n = U.items.length;
+    out.selSmile = U.items.findIndex((i: any) => i.k === 'smile') === 0;
+    const it = U.items.find((i: any) => i.k === 'tongue'); A.revealItem(U.items.indexOf(it)); A.tapAt(it.x, it.y);
+    out.mouth = G.cfg.mouth; out.act = G.hs.act && G.hs.act.id + ':' + G.hs.act.k;
+    g.step(2.5);
+    // открытый рот во всех вариантах — без ошибок
+    for (const k of g.UI.items.map((i: any) => i.k)) for (const m of [0.3, 1]) { G.cfg.mouth = k; G.hs.mouth = m; g.step(1 / 60); }
+    G.cfg.mouth = 'tongue'; g.step(1);
+    return out;
+  });
+  expect(r).toEqual({ loaded: { color: 'blue', mouth: 'smile', album: 'smile' }, mi: 4, noNone: true, n: 10, selSmile: true, mouth: 'tongue', act: 'mouth:tongue' });
+  await shot(page, 'heart-mouth');
   noErrors(errors);
 });
 

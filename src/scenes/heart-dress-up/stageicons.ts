@@ -2,7 +2,7 @@
 import { TAU, ctx } from '../../core/canvas';
 import { circle, ell } from '../../core/draw';
 import { STAGES } from './state';
-import { MINI_COLORS, bubble, cloud, hillsPath, miniHeart, smallHeart, sun } from './things';
+import { MINI_COLORS, bubble, cloud, heartShape, hillsPath, miniHeart, smallHeart, sun } from './things';
 
 const INK = '#45182e';
 function bgFill(r: number, c0 = '#fff4f9', c1 = '#ffe0ee') {
@@ -35,11 +35,29 @@ export function stageIcon(i: number, r: number) {
     const g = ctx.createRadialGradient(-r * 0.15, -r * 0.15, r * 0.05, 0, 0, r * 0.45); g.addColorStop(0, '#ffb0c4'); g.addColorStop(1, '#e8436e');
     ctx.fillStyle = g; circle(0, 0, r * 0.42); ctx.fillStyle = 'rgba(255,255,255,0.85)'; ell(-r * 0.15, -r * 0.16, r * 0.11, r * 0.07, -0.6);
     ctx.fillStyle = 'rgba(120,20,50,0.55)'; ell(-r * 0.13, r * 0.14, r * 0.06, r * 0.045); ell(r * 0.13, r * 0.14, r * 0.06, r * 0.045);
+  } else if (id === 'mouth') {
+    // большой смеющийся рот: зубки сверху, язычок снизу (без лица — не путается со щёчками)
+    bgFill(r);
+    const w = r * 0.6, y = -r * 0.2, h = r * 0.4;
+    const cup = () => { ctx.beginPath(); ctx.moveTo(-w, y); ctx.quadraticCurveTo(0, y + r * 0.08, w, y); ctx.quadraticCurveTo(0, y + h * 2.2, -w, y); ctx.closePath(); };
+    cup(); ctx.fillStyle = '#7a1f3d'; ctx.fill();
+    ctx.save(); cup(); ctx.clip();
+    ctx.fillStyle = '#fff'; ctx.fillRect(-w, y - r * 0.05, 2 * w, r * 0.2);
+    ctx.fillStyle = '#ff7b9c'; ell(0, y + h * 1.1, r * 0.32, r * 0.2);
+    ctx.restore();
+    cup(); ctx.strokeStyle = INK; ctx.lineWidth = r * 0.07; ctx.lineJoin = 'round'; ctx.stroke();
   } else if (id === 'cheeks') {
-    bgFill(r, '#ffe9df', '#ffd2c2');
-    ctx.fillStyle = 'rgba(255,80,130,0.6)'; ell(-r * 0.42, r * 0.12, r * 0.3, r * 0.2); ell(r * 0.42, r * 0.12, r * 0.3, r * 0.2);
-    ctx.fillStyle = 'rgba(255,255,255,0.75)'; circle(-r * 0.5, r * 0.04, r * 0.07); circle(r * 0.34, r * 0.04, r * 0.07);
-    ctx.strokeStyle = INK; ctx.lineWidth = r * 0.08; ctx.lineCap = 'round'; ctx.beginPath(); ctx.arc(0, -r * 0.05, r * 0.16, 0.2 * Math.PI, 0.8 * Math.PI); ctx.stroke();
+    // бледное личико-сердечко, на нём ярко горят только румяные щёчки
+    bgFill(r);
+    ctx.save(); ctx.translate(0, r * 0.04); heartShape(r * 0.66); ctx.fillStyle = '#ffe6ee'; ctx.fill(); ctx.strokeStyle = '#f2c4d3'; ctx.lineWidth = r * 0.05; ctx.stroke(); ctx.restore();
+    ctx.fillStyle = '#d9b3c3'; ell(-r * 0.22, -r * 0.12, r * 0.06, r * 0.075); ell(r * 0.22, -r * 0.12, r * 0.06, r * 0.075);
+    ctx.strokeStyle = '#d9b3c3'; ctx.lineWidth = r * 0.05; ctx.lineCap = 'round'; ctx.beginPath(); ctx.arc(0, r * 0.06, r * 0.1, 0.2 * Math.PI, 0.8 * Math.PI); ctx.stroke();
+    for (const s of [-1, 1]) {
+      const g = ctx.createRadialGradient(s * r * 0.36, r * 0.14, r * 0.02, s * r * 0.36, r * 0.14, r * 0.17);
+      g.addColorStop(0, '#ff2f78'); g.addColorStop(0.7, '#ff5c97'); g.addColorStop(1, 'rgba(255,92,151,0)');
+      ctx.fillStyle = g; ell(s * r * 0.36, r * 0.14, r * 0.17, r * 0.12);
+      ctx.fillStyle = 'rgba(255,255,255,0.85)'; circle(s * r * 0.36 - r * 0.05, r * 0.1, r * 0.035);
+    }
   } else if (id === 'hair') {
     bgFill(r);
     // парик: шапка волос с чёлкой и прядями по бокам

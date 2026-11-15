@@ -10,6 +10,8 @@ export const STAGES = [
   { id: 'eyes', opts: ['round', 'sparkle', 'happy', 'sleepy', 'cat', 'rainbow', 'glasses', 'sunglasses', 'wink', 'button'] },
   { id: 'lashes', optional: true, opts: ['short', 'long', 'one', 'flutter', 'wing', 'lower', 'brows', 'glitter', 'color'] },
   { id: 'nose', optional: true, opts: ['dot', 'tone', 'soft', 'tri', 'line', 'heart', 'cat', 'dog', 'pig', 'clown', 'strawberry', 'mustache'] },
+  // рот есть всегда (как глаза): по умолчанию улыбка
+  { id: 'mouth', opts: ['smile', 'grin', 'o', 'tongue', 'fang', 'cat', 'lips', 'heart', 'bunny', 'gap'] },
   { id: 'cheeks', optional: true, opts: ['blush', 'shine', 'hearts', 'doll', 'freckles', 'swirl', 'daisy', 'paw', 'rainbow', 'candy'] },
   { id: 'hair', optional: true, opts: ['bow', 'headband', 'clip', 'flowers', 'crown', 'long', 'pigtails', 'bun', 'cat', 'bunny', 'unicorn', 'afro'] },
   { id: 'earrings', optional: true, opts: ['pearl', 'studheart', 'studgem', 'hoop', 'drop', 'bow', 'star', 'butterfly', 'cherry', 'bell', 'feather', 'icecream'] },
@@ -39,14 +41,14 @@ export const BG_DETAILS = ['clouds', 'rainbow', 'sun', 'hills', 'moon', 'garland
 
 /** Готовые образы для волшебной палочки: все детали наряда + окружение + фон подобраны друг к другу */
 export const SETS: Record<string, any>[] = [
-  { name: 'princess', color: 'pink', eyes: 'sparkle', lashes: 'long', nose: 'dot', cheeks: 'blush', hair: 'crown', earrings: 'pearl', necklace: 'pearls', env: ['sparkles'], bg: 'lilac', bgd: ['castle'] },
-  { name: 'kitty', color: 'purple', eyes: 'cat', lashes: 'short', nose: 'cat', cheeks: 'paw', hair: 'cat', earrings: 'bell', necklace: 'ribbon', env: ['kitten'], bg: 'mint', bgd: ['hills'] },
-  { name: 'sea', color: 'blue', eyes: 'round', lashes: 'lower', nose: 'dot', cheeks: 'blush', hair: 'long', earrings: 'drop', necklace: 'shells', env: ['fish', 'bubbles'], bg: 'sky', bgd: ['sea'] },
-  { name: 'sweets', color: 'dots', eyes: 'happy', lashes: 'color', nose: 'strawberry', cheeks: 'candy', hair: 'bun', earrings: 'icecream', necklace: 'candy', env: ['balloons'], bg: 'peach', bgd: ['garland'] },
-  { name: 'fairy', color: 'green', eyes: 'round', lashes: 'flutter', nose: 'heart', cheeks: 'daisy', hair: 'flowers', earrings: 'butterfly', necklace: 'flowers', env: ['butterflies', 'flowers'], bg: 'lemon', bgd: ['sun', 'tree'] },
-  { name: 'unicorn', color: 'sunset', eyes: 'rainbow', lashes: 'glitter', nose: 'heart', cheeks: 'rainbow', hair: 'unicorn', earrings: 'star', necklace: 'locket', env: ['sparkles'], bg: 'night', bgd: ['moon', 'rainbow'] },
-  { name: 'bunny', color: 'yellow', eyes: 'button', lashes: 'short', nose: 'tri', cheeks: 'doll', hair: 'bunny', earrings: 'pearl', necklace: 'ribbon', env: ['flowers', 'duck'], bg: 'mint', bgd: ['hills'] },
-  { name: 'classic', color: 'red', eyes: 'round', lashes: 'long', nose: 'dot', cheeks: 'blush', hair: 'bow', earrings: 'studheart', necklace: 'pearls', env: ['babies'], bg: 'pink', bgd: ['clouds'] },
+  { name: 'princess', color: 'pink', eyes: 'sparkle', lashes: 'long', nose: 'dot', mouth: 'lips', cheeks: 'blush', hair: 'crown', earrings: 'pearl', necklace: 'pearls', env: ['sparkles'], bg: 'lilac', bgd: ['castle'] },
+  { name: 'kitty', color: 'purple', eyes: 'cat', lashes: 'short', nose: 'cat', mouth: 'cat', cheeks: 'paw', hair: 'cat', earrings: 'bell', necklace: 'ribbon', env: ['kitten'], bg: 'mint', bgd: ['hills'] },
+  { name: 'sea', color: 'blue', eyes: 'round', lashes: 'lower', nose: 'dot', mouth: 'o', cheeks: 'blush', hair: 'long', earrings: 'drop', necklace: 'shells', env: ['fish', 'bubbles'], bg: 'sky', bgd: ['sea'] },
+  { name: 'sweets', color: 'dots', eyes: 'happy', lashes: 'color', nose: 'strawberry', mouth: 'tongue', cheeks: 'candy', hair: 'bun', earrings: 'icecream', necklace: 'candy', env: ['balloons'], bg: 'peach', bgd: ['garland'] },
+  { name: 'fairy', color: 'green', eyes: 'round', lashes: 'flutter', nose: 'heart', mouth: 'smile', cheeks: 'daisy', hair: 'flowers', earrings: 'butterfly', necklace: 'flowers', env: ['butterflies', 'flowers'], bg: 'lemon', bgd: ['sun', 'tree'] },
+  { name: 'unicorn', color: 'sunset', eyes: 'rainbow', lashes: 'glitter', nose: 'heart', mouth: 'heart', cheeks: 'rainbow', hair: 'unicorn', earrings: 'star', necklace: 'locket', env: ['sparkles'], bg: 'night', bgd: ['moon', 'rainbow'] },
+  { name: 'bunny', color: 'yellow', eyes: 'button', lashes: 'short', nose: 'tri', mouth: 'bunny', cheeks: 'doll', hair: 'bunny', earrings: 'pearl', necklace: 'ribbon', env: ['flowers', 'duck'], bg: 'mint', bgd: ['hills'] },
+  { name: 'classic', color: 'red', eyes: 'round', lashes: 'long', nose: 'dot', mouth: 'grin', cheeks: 'blush', hair: 'bow', earrings: 'studheart', necklace: 'pearls', env: ['babies'], bg: 'pink', bgd: ['clouds'] },
 ];
 /** Наряд из набора: env/bgd — в виде { ключ: true } */
 export function setCfg(set: Record<string, any>): Record<string, any> {
@@ -70,7 +72,7 @@ export function stageItems(s: number): Item[] {
 }
 
 export const defaultCfg = () => ({
-  color: 'red', eyes: 'round', lashes: null, nose: null, cheeks: null, hair: null, earrings: null, necklace: null,
+  color: 'red', eyes: 'round', lashes: null, nose: null, mouth: 'smile', cheeks: null, hair: null, earrings: null, necklace: null,
   env: {} as Record<string, boolean>, bg: 'pink', bgd: {} as Record<string, boolean>,
 } as Record<string, any>);
 
@@ -108,6 +110,7 @@ export function stageHas(s: number) {
   if (id === 'bg') return c.bg !== 'pink' || Object.values(c.bgd).some(Boolean);
   if (id === 'color') return c.color !== 'red';
   if (id === 'eyes') return c.eyes !== 'round';
+  if (id === 'mouth') return (c.mouth || 'smile') !== 'smile';
   return c[id] != null;
 }
 /** Сколько разделов наряда украшено (для пульсации хлопушки) */
@@ -116,12 +119,14 @@ export const decorated = () => STAGES.reduce((n, _, i) => n + (stageHas(i) ? 1 :
 const KEY = 'mariia-play:heart-dress-up';
 export const ALBUM_MAX = 12;
 export function save() {
-  try { localStorage.setItem(KEY, JSON.stringify({ cfg: G.cfg, stage: G.stage, album: G.album, dirty: G.dirty })); } catch (e) { /* без сохранения — не страшно */ }
+  try { localStorage.setItem(KEY, JSON.stringify({ cfg: G.cfg, stage: G.stage, stageId: STAGES[G.stage].id, album: G.album, dirty: G.dirty })); } catch (e) { /* без сохранения — не страшно */ }
 }
 export function load() {
   try {
     const d = JSON.parse(localStorage.getItem(KEY) || 'null');
-    if (d && d.cfg) { G.cfg = Object.assign(defaultCfg(), d.cfg); G.stage = Math.max(0, Math.min(STAGES.length - 1, d.stage | 0)); }
+    if (d && d.cfg) { G.cfg = Object.assign(defaultCfg(), d.cfg); G.stage = Math.max(0, Math.min(STAGES.length - 1, d.stage | 0));
+      // этап по имени: старые сохранения хранят только номер, а после нового раздела номера сдвинулись
+      const si = STAGES.findIndex(s => s.id === d.stageId); if (si >= 0) G.stage = si; }
     if (d && Array.isArray(d.album)) G.album = d.album.filter((p: any) => p && p.cfg).map((p: any) => ({ id: +p.id || 0, cfg: Object.assign(defaultCfg(), p.cfg) })).slice(0, ALBUM_MAX);
     if (d) G.dirty = !!d.dirty;
   } catch (e) { /* ок */ }
@@ -130,5 +135,5 @@ export function load() {
 export const sameCfg = (a: Record<string, any>, b: Record<string, any>) => cfgKey(a) === cfgKey(b);
 function cfgKey(c: Record<string, any>) {
   const on = (o: Record<string, boolean>) => Object.keys(o || {}).filter(k => o[k]).sort().join(',');
-  return ['color', 'eyes', 'lashes', 'nose', 'cheeks', 'hair', 'earrings', 'necklace', 'bg'].map(k => c[k] ?? '-').join('|') + '|' + on(c.env) + '|' + on(c.bgd);
+  return ['color', 'eyes', 'lashes', 'nose', 'cheeks', 'hair', 'earrings', 'necklace', 'bg'].map(k => c[k] ?? '-').join('|') + '|' + (c.mouth || 'smile') + '|' + on(c.env) + '|' + on(c.bgd);
 }

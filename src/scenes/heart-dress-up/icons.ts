@@ -9,7 +9,7 @@ import { MINI_COLORS, balloon, bubble, butterfly, castle, cloud, duck, fish, gar
 import { FISH_COLS } from './world';
 // ---------------- ЗНАЧКИ ----------------
 const ZOOM: Record<string, [number, number, number]> = {
-  color: [0, -0.05, 0.52], eyes: [0, -0.12, 1.3], lashes: [0, -0.22, 1.15], nose: [0, 0.08, 1.9], cheeks: [0, 0.02, 1.3],
+  color: [0, -0.05, 0.52], eyes: [0, -0.12, 1.3], lashes: [0, -0.22, 1.15], nose: [0, 0.08, 1.9], mouth: [0, 0.28, 3.1], cheeks: [0, 0.02, 1.3],
   hair: [0, -0.5, 0.68], earrings: [-0.8, 0.17, 1.85], necklace: [0, 0.6, 1.3],
 };
 function heartIcon(id: string, cfg: Record<string, any>, r: number) {

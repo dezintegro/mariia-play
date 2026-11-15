@@ -29,26 +29,26 @@ const INK = '#45182e';
 // Для каждого цвета сердца — роли: акцент (банты, ленты, бусы), камень (кулоны, гвоздики), металл, румянец.
 // Металл — золото, на жёлтом сердце — серебро (иначе пропадает). [светлый, основной, тёмный]
 type RGBA = [number, number, number, number];
-export type Pal = { acc: [string, string]; gem: [string, string]; metal: [string, string, string]; blush: RGBA };
+export type Pal = { acc: [string, string]; gem: [string, string]; metal: [string, string, string]; blush: RGBA; lip: [string, string] };
 const GOLD: [string, string, string] = ['#fff3a0', '#ffd23f', '#b07d00'];
 const SILVER: [string, string, string] = ['#ffffff', '#ece6f2', '#8f7f9e'];
 // на радуге щёчки ложатся на зелёно-голубое — нужен плотный розовый
-const PATTERN: Pal = { acc: ['#ffffff', '#c27aa3'], gem: ['#ffffff', '#c27aa3'], metal: GOLD, blush: [255, 120, 170, 0.8] };
+const PATTERN: Pal = { acc: ['#ffffff', '#c27aa3'], gem: ['#ffffff', '#c27aa3'], metal: GOLD, blush: [255, 120, 170, 0.8], lip: ['#e0186a', '#8f0c42'] };
 // на зелёном полупрозрачный розовый буреет — румянец почти непрозрачный
-const TO_PINK: Pal = { acc: ['#ffc2de', '#d94f97'], gem: ['#ff8cc6', '#c2387f'], metal: GOLD, blush: [255, 160, 190, 0.92] };
+const TO_PINK: Pal = { acc: ['#ffc2de', '#d94f97'], gem: ['#ff8cc6', '#c2387f'], metal: GOLD, blush: [255, 160, 190, 0.92], lip: ['#ff4f93', '#b3195e'] };
 export const PALS: Record<string, Pal> = {
-  red: { acc: ['#ffd9e2', '#e87a98'], gem: ['#ffffff', '#c47a9b'], metal: GOLD, blush: [255, 196, 208, 0.62] },
-  pink: { acc: ['#c9a2ff', '#7a3fd0'], gem: ['#b57cff', '#7a3fd0'], metal: GOLD, blush: [255, 60, 135, 0.5] },
-  purple: { acc: ['#ffb0da', '#d94f97'], gem: ['#ff8cc6', '#c2387f'], metal: GOLD, blush: [255, 130, 200, 0.6] },
+  red: { acc: ['#ffd9e2', '#e87a98'], gem: ['#ffffff', '#c47a9b'], metal: GOLD, blush: [255, 196, 208, 0.62], lip: ['#a8123f', '#5e0822'] },
+  pink: { acc: ['#c9a2ff', '#7a3fd0'], gem: ['#b57cff', '#7a3fd0'], metal: GOLD, blush: [255, 60, 135, 0.5], lip: ['#e0186a', '#8f0c42'] },
+  purple: { acc: ['#ffb0da', '#d94f97'], gem: ['#ff8cc6', '#c2387f'], metal: GOLD, blush: [255, 130, 200, 0.6], lip: ['#ff4f9a', '#a8186a'] },
   blue: { ...TO_PINK, blush: [255, 179, 214, 0.85] },
   green: TO_PINK,
-  yellow: { acc: ['#ff9cc4', '#d94f97'], gem: ['#ff6fa8', '#cf3479'], metal: SILVER, blush: [255, 120, 120, 0.5] },
+  yellow: { acc: ['#ff9cc4', '#d94f97'], gem: ['#ff6fa8', '#cf3479'], metal: SILVER, blush: [255, 120, 120, 0.5], lip: ['#ff4f7a', '#b81f4a'] },
   rainbow: PATTERN, sunset: PATTERN,
   // на горошке и полосках много белого — белые детали в нём теряются, берём розовое/сиреневое
-  dots: { acc: ['#d9b8ff', '#7a3fd0'], gem: ['#b57cff', '#7a3fd0'], metal: GOLD, blush: [255, 60, 135, 0.5] },
+  dots: { acc: ['#d9b8ff', '#7a3fd0'], gem: ['#b57cff', '#7a3fd0'], metal: GOLD, blush: [255, 60, 135, 0.5], lip: ['#d4145a', '#7e0a3a'] },
   stripes: { ...TO_PINK, blush: [255, 160, 200, 0.85] },
   teal: { ...TO_PINK, blush: [255, 160, 200, 0.85] },
-  orange: { acc: ['#ffd9e2', '#e87a98'], gem: ['#ffffff', '#c47a9b'], metal: GOLD, blush: [255, 90, 110, 0.5] },
+  orange: { acc: ['#ffd9e2', '#e87a98'], gem: ['#ffffff', '#c47a9b'], metal: GOLD, blush: [255, 90, 110, 0.5], lip: ['#d4145a', '#7e0a3a'] },
 };
 export const palOf = (c: string) => PALS[c] || PALS.red;
 const rgba = (c: RGBA, a = c[3]) => `rgba(${c[0]},${c[1]},${c[2]},${a})`;
@@ -56,7 +56,7 @@ const rgba = (c: RGBA, a = c[3]) => `rgba(${c[0]},${c[1]},${c[2]},${a})`;
 const warm = (c: string) => c === 'red' || c === 'pink' || c === 'dots' || c === 'orange' || c === 'sunset';
 /** Подложка-обводка вокруг текущего пути (ставится перед основной заливкой; наружу видна половина толщины минус своя обводка детали).
  *  thick — толстая белая, thin — тонкий белый кантик, none — без подложки, dark — тёмно-винный контур */
-export const HALO = { mode: 'thick' as 'thick' | 'thin' | 'none' | 'dark' };
+export const HALO = { mode: 'dark' as 'thick' | 'thin' | 'none' | 'dark' };
 const HALO_STYLE: Record<string, [string, number]> = { thick: ['rgba(255,255,255,0.9)', 1], thin: ['rgba(255,255,255,0.95)', 0.62], dark: ['rgba(110,0,40,0.8)', 0.6] };
 function halo(w: number) {
   const st = HALO_STYLE[HALO.mode];
@@ -131,6 +131,16 @@ const MOVE: Record<string, (x: number) => Mv> = {
   'hair:afro': x => ({ sx: 1 + 0.07 * Math.sin(x * TAU * 2.2) * on(x), sy: 1 - 0.07 * Math.sin(x * TAU * 2.2) * on(x) }),
   'hair:bunny': x => ({ dy: -0.06 * Math.abs(Math.sin(x * TAU * 1.1)) * fade(x) }),
   'necklace:locket': x => ({ rot: 0.45 * wob(x, 1.6, 1.6) }),
+  // рот: колебания не чаще ~2.5 раз в секунду
+  'mouth:smile': x => ({ sx: 1 + 0.15 * hump(x, 0.8) }),
+  'mouth:grin': x => ({ sx: 1 + 0.2 * hump(x, 0.9), sy: 1 + 0.1 * hump(x, 0.9) }),
+  'mouth:o': x => ({ sx: 1 + 0.3 * hump(x, 0.6) + 0.08 * wob(x - 0.6, 2, 3), sy: 1 + 0.45 * hump(x, 0.6) - 0.08 * wob(x - 0.6, 2, 3) }),
+  'mouth:fang': x => ({ dy: -0.012 * hump(x, 0.35), sx: 1 + 0.08 * hump(x - 0.4, 0.6) }),
+  'mouth:cat': x => ({ sx: 1 + 0.12 * Math.sin(x * TAU * 2) * on(x), sy: 1 - 0.1 * Math.sin(x * TAU * 2) * on(x) }),
+  'mouth:lips': x => { const k = hump(x - 0.1, 0.7); return { sx: 1 - 0.35 * k, sy: 1 + 0.15 * k }; },
+  'mouth:heart': x => { const b = (y: number) => hump(y, 0.14) + 0.7 * hump(y - 0.22, 0.14); const s = 1 + 0.35 * (b(x) + b(x - 0.7)); return { sx: s, sy: s }; },
+  'mouth:bunny': x => ({ dy: 0.012 * Math.abs(Math.sin(x * TAU * 1.25)) * on(x), sy: 1 - 0.06 * Math.abs(Math.sin(x * TAU * 1.25)) * on(x) }),
+  'mouth:gap': x => ({ sx: 1 - 0.25 * hump(x, 1.3), rot: 0.12 * Math.sin(x * TAU * 1.2) * on(x) }),
 };
 /** Нарисовать деталь, сдвинутую/повёрнутую её реакцией вокруг якоря (ax, ay) */
 function mv(L: Live, id: string, k: string, R: number, ax: number, ay: number, fn: () => void) {
@@ -158,7 +168,8 @@ export function drawHeart(cfg: Record<string, any>, R: number, L: Live = STILL) 
   if (cfg.lashes) popped(L, 'lashes', 0, -0.25 * R, () => { ctx.save(); if (HAIR[cfg.hair]) bangsClip(R, cfg.hair === 'afro'); lashes(cfg.lashes, eyes, R, L, cfg.color); ctx.restore(); });
   popped(L, 'eyes', 0, -0.12 * R, () => eyewear(cfg.eyes, R, L));
   if (cfg.nose) popped(L, 'nose', 0, 0.06 * R, () => mv(L, 'nose', cfg.nose, R, 0, 0.06 * R, () => nose(cfg.nose, R, L, cfg.color)));
-  mouth(R, L);
+  const mk = cfg.mouth || 'smile'; // старые сохранения без рта — улыбка
+  popped(L, 'mouth', 0, 0.25 * R, () => mv(L, 'mouth', mk, R, 0, 0.25 * R, () => mouth(mk, R, L, cfg.color)));
   if (cfg.hair) popped(L, 'hair', 0, -0.7 * R, () => mv(L, 'hair', cfg.hair, R, 0, hairPiv, () => hairFront(cfg.hair, R, L, cfg.color)));
   if (cfg.earrings) popped(L, 'earrings', 0, 0.05 * R, () => earrings(cfg.earrings, R, L, cfg.color));
   if (cfg.necklace) popped(L, 'necklace', 0, 0.55 * R, () => necklace(cfg.necklace, R, L, cfg.color));
@@ -466,19 +477,117 @@ function lashes(type: string, eyes: string, R: number, L: Live, color: string) {
   }
 }
 
-// ---------------- РОТ, НОС, ЩЁЧКИ ----------------
-function mouth(R: number, L: Live) {
-  const y = 0.22 * R;
-  if (L.mouth > 0.05) {
-    const h = (0.08 + 0.1 * clamp01(L.mouth)) * R;
-    ctx.save(); ctx.beginPath(); ctx.moveTo(-0.12 * R, y); ctx.quadraticCurveTo(0, y + h * 2, 0.12 * R, y); ctx.closePath();
-    ctx.fillStyle = '#7a1f3d'; ctx.fill(); ctx.clip(); ctx.fillStyle = '#ff7b9c'; ell(0, y + h * 1.2, 0.07 * R, 0.05 * R); ctx.restore();
-  } else {
-    ctx.strokeStyle = INK; ctx.lineWidth = 0.04 * R; ctx.lineCap = 'round';
-    ctx.beginPath(); ctx.arc(0, y - 0.07 * R, 0.11 * R, 0.22 * Math.PI, 0.78 * Math.PI); ctx.stroke();
+// ---------------- РОТ ----------------
+// Рот есть всегда (по умолчанию улыбка). L.mouth (0..1) — насколько открыт: смех, жевание, зевок, песня в празднике.
+// Всё держится в полосе y ≈ 0.19..0.42 R и |x| < 0.2 R: выше — носик и усы, по бокам — щёчки, ниже — ожерелье.
+const MY = 0.22;                    // линия губ
+const M_IN = '#7a1f3d', TONGUE = '#ff7b9c', TONGUE_D = '#d0406a';
+/** «Ковшик» открытого рта: верх — линия (чуть прогнута вниз на top), низ — дуга глубиной h; w — полуширина */
+function cupPath(w: number, y: number, h: number, top = 0) {
+  ctx.beginPath(); ctx.moveTo(-w, y); ctx.quadraticCurveTo(0, y + top * 2, w, y); ctx.quadraticCurveTo(0, y + h * 2, -w, y); ctx.closePath();
+}
+/** Залить текущий путь «внутренностью рта» и положить язычок снизу (ty — где центр язычка) */
+function mouthIn(tw: number, ty: number, th: number, extra?: () => void) {
+  ctx.save(); ctx.fillStyle = M_IN; ctx.fill(); ctx.clip();
+  ctx.fillStyle = TONGUE; ell(0, ty, tw, th);
+  extra?.();
+  ctx.restore();
+}
+/** Улыбка-дужка: центр дуги (0, cy), радиус r, от a0 до a1 (доли π) */
+function smileArc(cy: number, r: number, a0: number, a1: number, w: number) {
+  ctx.strokeStyle = INK; ctx.lineWidth = w; ctx.lineCap = 'round'; ctx.beginPath(); ctx.arc(0, cy, r, a0 * Math.PI, a1 * Math.PI); ctx.stroke();
+}
+/** Белый зубик-прямоугольничек с круглым низом (x — левый край) */
+function tooth(x: number, y: number, w: number, h: number, R: number) {
+  ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + w, y); ctx.lineTo(x + w, y + h - w * 0.4); ctx.quadraticCurveTo(x + w, y + h, x + w / 2, y + h); ctx.quadraticCurveTo(x, y + h, x, y + h - w * 0.4); ctx.closePath();
+  ctx.fillStyle = '#fff'; ctx.fill(); ctx.strokeStyle = INK; ctx.lineWidth = 0.011 * R; ctx.lineJoin = 'round'; ctx.stroke();
+}
+
+function mouth(kind: string, R: number, L: Live, color: string) {
+  const y = MY * R, m = clamp01(L.mouth), open = m > 0.05, ax = actT(L, 'mouth', kind);
+  ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  if (kind === 'grin') { // улыбка до ушей с ямочками; открытая — с зубками сверху
+    const w = 0.16 * R;
+    if (open) {
+      const h = (0.07 + 0.1 * m) * R;
+      cupPath(w, y, h, 0.015 * R);
+      mouthIn(0.08 * R, y + h * 1.25, 0.05 * R, () => { ctx.fillStyle = '#fff'; ctx.fillRect(-w, y - 0.02 * R, 2 * w, 0.055 * R); });
+      cupPath(w, y, h, 0.015 * R); ctx.strokeStyle = INK; ctx.lineWidth = 0.02 * R; ctx.stroke();
+    } else smileArc(y - 0.12 * R, 0.17 * R, 0.25, 0.75, 0.04 * R);
+    // ямочки на концах; реакция: улыбка растягивается (MOVE) и на зубках блестит звёздочка
+    ctx.strokeStyle = INK; ctx.lineWidth = 0.025 * R;
+    const ex = open ? w : 0.12 * R;
+    for (const s of [-1, 1]) { ctx.beginPath(); ctx.moveTo(s * (ex - 0.008 * R), y - 0.03 * R); ctx.lineTo(s * (ex + 0.018 * R), y + 0.012 * R); ctx.stroke(); }
+    const k = hump(ax - 0.35, 0.8);
+    if (k > 0) { ctx.save(); ctx.translate(0.07 * R, y + 0.01 * R); ctx.rotate(ax * 2); ctx.fillStyle = '#fff'; starPath(4, 0.07 * R * k, 0.015 * R * k); ctx.fill(); ctx.restore(); }
+  } else if (kind === 'o') { // ротик «о»
+    const ry = (0.062 + 0.045 * m) * R, cy = y + 0.042 * R + 0.045 * m * R, rx = (0.055 + 0.03 * m) * R; // открывается вниз: верх не лезет на носик
+    ctx.beginPath(); ctx.ellipse(0, cy, rx, ry, 0, 0, TAU);
+    mouthIn(rx * 0.75, cy + ry * 0.75, ry * 0.45);
+    ctx.beginPath(); ctx.ellipse(0, cy, rx, ry, 0, 0, TAU); ctx.strokeStyle = INK; ctx.lineWidth = 0.024 * R; ctx.stroke();
+    ctx.fillStyle = 'rgba(255,255,255,0.55)'; ell(-rx * 0.4, cy - ry * 0.5, rx * 0.22, ry * 0.12, -0.5);
+  } else if (kind === 'tongue') { // показывает язычок; реакция — язычок дразнится вправо-влево
+    const tx = 0.03 * R + 0.035 * R * Math.sin(ax * TAU * 2) * fade(ax);
+    if (open) {
+      const h = (0.08 + 0.08 * m) * R;
+      cupPath(0.12 * R, y, h); mouthIn(0.07 * R, y + h * 1.2, 0.05 * R);
+    } else smileArc(y - 0.07 * R, 0.11 * R, 0.22, 0.78, 0.04 * R);
+    const ty = open ? y + (0.08 + 0.08 * m) * R * 0.8 : y + 0.045 * R; // открытый: язычок на нижней губе, не ниже 0.4 R
+    ctx.beginPath(); ctx.ellipse(tx, ty, 0.045 * R, 0.055 * R, 0, 0, Math.PI); ctx.lineTo(tx - 0.045 * R, ty - 0.03 * R); ctx.lineTo(tx + 0.045 * R, ty - 0.03 * R); ctx.closePath();
+    ctx.fillStyle = TONGUE; ctx.fill(); ctx.strokeStyle = TONGUE_D; ctx.lineWidth = 0.012 * R; ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(tx, ty - 0.01 * R); ctx.lineTo(tx, ty + 0.03 * R); ctx.stroke();
+    if (!open) smileArc(y - 0.07 * R, 0.11 * R, 0.22, 0.78, 0.04 * R); // дужка поверх корня язычка
+  } else if (kind === 'fang') { // улыбка с одним зубиком-клычком; реакция: зубик сверкает
+    let tx: number, ty: number;
+    if (open) {
+      const h = (0.08 + 0.1 * m) * R; cupPath(0.12 * R, y, h); mouthIn(0.07 * R, y + h * 1.2, 0.05 * R); tx = 0.045 * R; ty = y;
+    } else { tx = 0.11 * R * Math.cos(0.36 * Math.PI); ty = y - 0.07 * R + 0.11 * R * Math.sin(0.36 * Math.PI) - 0.004 * R; }
+    ctx.beginPath(); ctx.moveTo(tx - 0.028 * R, ty - 0.004 * R); ctx.lineTo(tx + 0.028 * R, ty + 0.002 * R); ctx.quadraticCurveTo(tx + 0.012 * R, ty + 0.04 * R, tx + 0.003 * R, ty + 0.058 * R); ctx.quadraticCurveTo(tx - 0.012 * R, ty + 0.04 * R, tx - 0.028 * R, ty - 0.004 * R); ctx.closePath();
+    ctx.fillStyle = '#fff'; ctx.fill(); ctx.strokeStyle = INK; ctx.lineWidth = 0.012 * R; ctx.stroke();
+    if (!open) smileArc(y - 0.07 * R, 0.11 * R, 0.22, 0.78, 0.04 * R);
+    const k = hump(ax - 0.5, 0.7);
+    if (k > 0) { ctx.save(); ctx.translate(tx + 0.02 * R, ty + 0.025 * R); ctx.rotate(ax * 2); ctx.fillStyle = '#fff'; starPath(4, 0.06 * R * k, 0.013 * R * k); ctx.fill(); ctx.restore(); }
+  } else if (kind === 'cat') { // кошачий ротик «ω»; открытый — ротик под ним
+    const cy = y - 0.015 * R, r = 0.045 * R;
+    if (open) { ctx.beginPath(); ctx.ellipse(0, cy + r + 0.005 * R, 0.045 * R, (0.02 + 0.06 * m) * R, 0, 0, TAU); mouthIn(0.035 * R, cy + r + (0.03 + 0.05 * m) * R, 0.03 * R); }
+    ctx.strokeStyle = INK; ctx.lineWidth = 0.035 * R;
+    ctx.beginPath(); ctx.arc(-r, cy, r, 0, Math.PI); ctx.stroke(); ctx.beginPath(); ctx.arc(r, cy, r, 0, Math.PI); ctx.stroke();
+  } else if (kind === 'lips') { // губки с помадой в тон сердцу; открытые — нижняя губка опускается
+    ctx.save(); ctx.translate(0, 0.012 * R); // чуть ниже — не задевает крупные носики
+    const [lc, ld] = palOf(color).lip, d = open ? (0.02 + 0.06 * m) * R : 0, c = 0.12 * R, cy = 0.225 * R, ml = 0.255 * R;
+    const upper = () => { ctx.beginPath(); ctx.moveTo(-c, cy); ctx.quadraticCurveTo(-0.07 * R, 0.18 * R, -0.025 * R, 0.19 * R); ctx.quadraticCurveTo(0, 0.2 * R, 0.025 * R, 0.19 * R); ctx.quadraticCurveTo(0.07 * R, 0.18 * R, c, cy); ctx.quadraticCurveTo(0, ml, -c, cy); ctx.closePath(); };
+    const lower = () => { ctx.beginPath(); ctx.moveTo(-c, cy); ctx.quadraticCurveTo(0, ml + d * 2, c, cy); ctx.quadraticCurveTo(0.075 * R, 0.31 * R + d, 0, 0.31 * R + d); ctx.quadraticCurveTo(-0.075 * R, 0.31 * R + d, -c, cy); ctx.closePath(); };
+    if (open) { ctx.beginPath(); ctx.moveTo(-c, cy); ctx.quadraticCurveTo(0, ml, c, cy); ctx.quadraticCurveTo(0, ml + d * 2, -c, cy); ctx.closePath(); mouthIn(0.06 * R, ml + d * 0.9, 0.04 * R); }
+    for (const f of [upper, lower]) { f(); if (warm(color)) halo(0.03 * R); }
+    for (const f of [upper, lower]) { f(); ctx.fillStyle = lc; ctx.fill(); ctx.strokeStyle = ld; ctx.lineWidth = 0.012 * R; ctx.stroke(); }
+    ctx.fillStyle = 'rgba(255,255,255,0.6)'; ell(-0.035 * R, 0.285 * R + d, 0.025 * R, 0.01 * R, -0.15); ell(0.045 * R, 0.2 * R, 0.014 * R, 0.006 * R, 0.2);
+    ctx.restore();
+  } else if (kind === 'heart') { // ротик-сердечко
+    const s = (0.07 + 0.025 * m) * R, cy = y + 0.04 * R + 0.015 * m * R;
+    ctx.save(); ctx.translate(0, cy); heartShape(s); mouthIn(s * 0.6, s * 0.6, s * 0.4); heartShape(s); ctx.strokeStyle = INK; ctx.lineWidth = 0.02 * R; ctx.stroke(); ctx.restore();
+  } else if (kind === 'bunny') { // два передних зубика, как у зайчика
+    if (open) { const h = (0.08 + 0.1 * m) * R; cupPath(0.11 * R, y, h); mouthIn(0.065 * R, y + h * 1.2, 0.05 * R); }
+    const ty = open ? y - 0.004 * R : y + 0.008 * R;
+    tooth(-0.045 * R, ty, 0.044 * R, 0.068 * R, R); tooth(0.001 * R, ty, 0.044 * R, 0.068 * R, R);
+    if (!open) smileArc(y - 0.08 * R, 0.1 * R, 0.2, 0.8, 0.035 * R);
+    else { cupPath(0.11 * R, y, (0.08 + 0.1 * m) * R); ctx.strokeStyle = INK; ctx.lineWidth = 0.018 * R; ctx.stroke(); }
+  } else if (kind === 'gap') { // весёлая улыбка с зубками, одного зубика нет — щербинка
+    const w = 0.14 * R, h = (0.075 + 0.09 * m) * R, top = y - 0.015 * R;
+    cupPath(w, top, h, 0.012 * R);
+    mouthIn(0.07 * R, top + h * 1.3, 0.045 * R, () => {
+      const tw = 0.048 * R;
+      for (const i of [-1.5, -0.5, 1.5]) tooth(i * tw * 1.04 - tw / 2, top - 0.02 * R, tw, 0.07 * R, R);
+    });
+    cupPath(w, top, h, 0.012 * R); ctx.strokeStyle = INK; ctx.lineWidth = 0.022 * R; ctx.stroke();
+  } else { // smile — нынешняя улыбка
+    if (open) {
+      const h = (0.08 + 0.1 * m) * R;
+      cupPath(0.12 * R, y, h); mouthIn(0.07 * R, y + h * 1.2, 0.05 * R);
+    } else smileArc(y - 0.07 * R, 0.11 * R, 0.22, 0.78, 0.04 * R);
   }
 }
 
+// ---------------- НОС, ЩЁЧКИ ----------------
 function nose(kind: string, R: number, L: Live, color: string) {
   const y = 0.06 * R, ax = actT(L, 'nose', kind), P = palOf(color);
   ctx.lineJoin = 'round'; ctx.lineCap = 'round';
@@ -1030,7 +1139,7 @@ function necklace(kind: string, R: number, L: Live, color: string) {
     });
   } else if (kind === 'bowtie') { // галстук-бабочка в горошек, цвет акцента
     const spin = ax < 0 ? 0 : TAU * 2 * ease.inOut(clamp01(ax / 0.9)); // реакция: бабочка крутится пропеллером
-    ctx.save(); ctx.translate(0, 0.47 * R); ctx.rotate(Math.sin(t * 2) * 0.05 + spin);
+    ctx.save(); ctx.translate(0, 0.52 * R); ctx.rotate(Math.sin(t * 2) * 0.05 + spin); // ниже открытого рта
     const wing = (sd: number) => { ctx.beginPath(); ctx.moveTo(0, 0); ctx.quadraticCurveTo(sd * 0.08 * R, -0.11 * R, sd * 0.21 * R, -0.1 * R); ctx.quadraticCurveTo(sd * 0.25 * R, 0, sd * 0.21 * R, 0.1 * R); ctx.quadraticCurveTo(sd * 0.08 * R, 0.11 * R, 0, 0); ctx.closePath(); };
     const wc = ac === '#ffffff' ? '#ff6f9f' : ad, dc = ac === '#ffffff' ? '#fff' : ac;
     for (const sd of [-1, 1]) {

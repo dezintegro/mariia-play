@@ -78,7 +78,7 @@ export function tapHeart(px?: number, py?: number) {
 
 // ---------------- ВЫБОР ----------------
 /** Где на сердце появится деталь — туда летят искорки */
-const PART_AT: Record<string, [number, number]> = { color: [0, -0.1], eyes: [0, -0.12], lashes: [0, -0.3], nose: [0, 0.06], cheeks: [0, 0.1], hair: [0, -0.85], earrings: [0, -0.1], necklace: [0, 0.55] };
+const PART_AT: Record<string, [number, number]> = { color: [0, -0.1], eyes: [0, -0.12], lashes: [0, -0.3], nose: [0, 0.06], mouth: [0, 0.25], cheeks: [0, 0.1], hair: [0, -0.85], earrings: [0, -0.1], necklace: [0, 0.55] };
 
 export function choose(it: Item & { x?: number; y?: number; press?: number }) {
   const st = STAGES[G.stage], id = st.id, c = G.cfg, { x: hx, y: hy, R } = G.heart;
@@ -173,7 +173,7 @@ export function loadPhoto(id: number) {
   if (sameCfg(p.cfg, G.cfg)) return wiggleOnly();
   keepInAlbum();
   G.cfg = Object.assign(defaultCfg(), JSON.parse(JSON.stringify(p.cfg))); G.dirty = false;
-  for (const k of ['hair', 'eyes', 'nose', 'cheeks', 'lashes', 'earrings', 'necklace']) hs.pop[k] = 0;
+  for (const k of ['hair', 'eyes', 'nose', 'mouth', 'cheeks', 'lashes', 'earrings', 'necklace']) hs.pop[k] = 0;
   burst(G.heart.x, G.heart.y, 'smoke', 10, { color: '#ffffff', speed: 180, size: 24 });
   burst(G.heart.x, G.heart.y - G.heart.R * 0.3, 'heart', 12, { speed: 260, up: -80 });
   sfx.poof(); sfx.tinkle(); happy(true); save();
@@ -197,7 +197,7 @@ function drawPhotoFly() {
 // ---------------- ВОЛШЕБНАЯ ПАЛОЧКА ----------------
 const WAND_P: Record<string, number> = { lashes: 0.7, nose: 0.7, cheeks: 0.7, hair: 0.85, earrings: 0.65, necklace: 0.65 };
 /** Разделы, где палочка может заменить деталь набора на «базовую» (первые варианты раздела) */
-const SWAP_IDS = ['eyes', 'lashes', 'nose', 'cheeks', 'hair', 'earrings', 'necklace'];
+const SWAP_IDS = ['eyes', 'lashes', 'nose', 'mouth', 'cheeks', 'hair', 'earrings', 'necklace'];
 /** Наряд для палочки: ~70% — готовый образ из SETS с 1–2 заменами на базовые варианты, ~30% — полный случай */
 export function wandCfg(rnd = Math.random): Record<string, any> {
   const pk = <T,>(a: T[]) => a[Math.floor(rnd() * a.length)];
