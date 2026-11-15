@@ -285,3 +285,95 @@ test('свои реакции: у каждой детали — свой зву�
   }
   noErrors(errors);
 });
+
+// Уход: еда, ванна, сон. Состояние ухода — window.__care (care.ts).
+for (const [w, h] of [[1280, 800], [390, 844]]) test(`уход: еда, ванна, сон (${w}x${h})`, async ({ page }) => {
+  await page.setViewportSize({ width: w, height: h });
+  const errors = await openScene(page, PAGE);
+  const sz = `${w}x${h}`;
+  // ЕДА: каждое угощение летит ко рту, сердце жуёт
+  const food = await page.evaluate(() => {
+    const g = window.__game, A = g.api, C = window.__care, out: any = { eats: 0, flew: 0 };
+    const si = [...Array(20).keys()].find((i: number) => { A.goStage(i); g.step(0.05); return g.UI.items[0]?.k === 'strawberry'; });
+    out.stage = si; g.step(0.5);
+    const n = g.UI.items.length; out.n = n;
+    for (let j = 0; j < n; j++) {
+      A.revealItem(j); const it = g.UI.items[j]; A.tapAt(it.x, it.y);
+      if (C.fly.length) out.flew++;
+      g.step(0.75); if (C.eat) out.eats++;
+      g.step(2.2);
+    }
+    out.favFound = C.favFound;
+    // ещё раз — снимок во время жевания
+    A.revealItem(1); const it = g.UI.items[1]; A.tapAt(it.x, it.y); g.step(1.0);
+    out.chewing = !!C.eat && C.eat.bites >= 1 && C.eat.bites < 3;
+    return out;
+  });
+  expect(food.n).toBeGreaterThanOrEqual(6);
+  expect(food.flew).toBe(food.n);
+  expect(food.eats).toBe(food.n);
+  expect(food.favFound).toBe(true);
+  expect(food.chewing).toBe(true);
+  await shot(page, `heart-care-food-${sz}`);
+
+  // ВАННА: пена (лопается тапом), уточка, душ, пузыри, губка, полотенце
+  const tapK = `(k) => { const g = window.__game, j = g.UI.items.findIndex(q => q.k === k); g.api.revealItem(j); const it = g.UI.items[j]; g.api.tapAt(it.x, it.y); }`;
+  const bath = await page.evaluate((tapK) => {
+    const g = window.__game, A = g.api, C = window.__care, out: any = {}, tap = eval(tapK);
+    g.step(3); A.goStage(g.G.stage + 1); g.step(0.5);
+    out.isBath = g.UI.items[0]?.k === 'foam';
+    tap('foam'); g.step(1); out.foamOn = C.foamOn; out.foam0 = C.foam.length;
+    out.foamSel = g.UI.items.find((q: any) => q.k === 'foam') && C.foamOn;
+    const c = C.foam[0], H = g.G.heart, px = H.x + c.fx * H.R, py = H.y + c.fy * H.R;
+    out.hitFoam = A.hitAt(px, py)?.what; A.tapAt(px, py); out.foam1 = C.foam.length;
+    tap('rubberduck'); g.step(0.6); out.duck = !!C.duck;
+    tap('shower'); g.step(0.8); out.shower = C.shower > 0 && C.drops.length > 0;
+    tap('soapbubbles'); g.step(1.2); out.bubbles = C.bubbles.length;
+    const b = C.bubbles.find((q: any) => q.t > 0.3), bx = b.x + Math.sin(b.ph) * b.r * 0.4, n = C.bubbles.length;
+    out.hitBubble = A.hitAt(bx, b.y)?.what; A.tapAt(bx, b.y); out.bubblePopped = C.bubbles.length === n - 1;
+    tap('sponge'); g.step(0.6); out.sponge = !!C.sponge;
+    return out;
+  }, tapK);
+  expect(bath).toMatchObject({ isBath: true, foamOn: true, hitFoam: 'foam', duck: true, shower: true, sponge: true, hitBubble: 'bubble', bubblePopped: true });
+  expect(bath.foam1).toBe(bath.foam0 - 1);
+  await shot(page, `heart-care-bath-${sz}`);
+  const bath2 = await page.evaluate((tapK) => {
+    const g = window.__game, C = window.__care, out: any = {}, tap = eval(tapK);
+    g.step(2); tap('towel'); g.step(2); out.foamAfterTowel = C.foam.length; out.foamOn = C.foamOn; out.shine = C.shine > 0;
+    tap('rubberduck'); out.duckOff = !C.duck;
+    return out;
+  }, tapK);
+  expect(bath2).toEqual({ foamAfterTowel: 0, foamOn: false, shine: true, duckOff: true });
+
+  // СОН: луна укладывает, тап по сердцу — сонно моргает, солнышко будит, уход с раздела будит
+  const sleep = await page.evaluate((tapK) => {
+    const g = window.__game, A = g.api, C = window.__care, out: any = {}, tap = eval(tapK);
+    A.goStage(g.G.stage + 1); g.step(0.5);
+    out.isSleep = g.UI.items[0]?.k === 'moon';
+    tap('moon'); g.step(2); out.sleep = C.sleep; out.night = C.night > 0.5;
+    for (const k of ['teddy', 'nightlight', 'blanket', 'lullaby']) tap(k);
+    g.step(1.5);
+    out.on = { teddy: !!C.teddy, lamp: !!C.lamp, blanket: !!C.blanket, box: !!C.box };
+    const H = g.G.heart; out.hitHeart = A.hitAt(H.x, H.y + H.R * 0.15)?.k;
+    A.tapAt(H.x, H.y + H.R * 0.15); g.step(0.5); out.stillAsleep = C.sleep; out.stir = C.stir < 1;
+    // звёздочки ночника отвечают на тап
+    // звёзды случайные — какие-то могут прятаться за фонариком или кнопкой; хотя бы большинство должны ловить тап
+    const L = C.lamp, A2 = g.G.HR;
+    const hits = L.stars.filter((st: any) => { const u = ((st.u + L.t * 0.008) % 1 + 1) % 1; return A.hitAt(A2.x + 0.04 * A2.w + u * A2.w * 0.92, A2.y + st.v * A2.h)?.what === 'star'; }).length;
+    out.hitStar = hits >= L.stars.length / 2;
+    return out;
+  }, tapK);
+  expect(sleep).toMatchObject({ isSleep: true, sleep: true, night: true, on: { teddy: true, lamp: true, blanket: true, box: true }, hitHeart: 'heart', stillAsleep: true, stir: true, hitStar: true });
+  await page.evaluate(() => window.__game.step(1.5));
+  await shot(page, `heart-care-sleep-${sz}`);
+  const wake = await page.evaluate((tapK) => {
+    const g = window.__game, A = g.api, C = window.__care, out: any = {}, tap = eval(tapK);
+    tap('sun'); g.step(0.3); out.awakeBySun = !C.sleep; g.step(3);
+    tap('moon'); g.step(1); out.asleepAgain = C.sleep;
+    A.goStage(0); g.step(0.5); out.wokeOnLeave = !C.sleep; out.cleared = !C.teddy && !C.lamp && !C.box;
+    g.step(3); out.dayAgain = C.night < 0.1;
+    return out;
+  }, tapK);
+  expect(wake).toEqual({ awakeBySun: true, asleepAgain: true, wokeOnLeave: true, cleared: true, dayAgain: true });
+  noErrors(errors);
+});
