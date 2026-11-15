@@ -4,7 +4,7 @@ import { circle } from '../../core/draw';
 import { STILL, drawHeart } from './heart';
 import { careIcon, careStageIcon } from './care';
 import { stageIcon } from './stageicons';
-import { BG_COLORS, G, Item, STAGES, stageHas } from './state';
+import { BG_COLORS, G, Item, STAGES } from './state';
 import { MINI_COLORS, balloon, bubble, butterfly, castle, cloud, duck, fish, garland, hillsPath, kitten, miniHeart, moon, rainbowArc, sea, smallHeart, sparkleStar, stemFlower, sun, tree } from './things';
 import { FISH_COLS } from './world';
 // ---------------- ЗНАЧКИ ----------------
@@ -71,16 +71,13 @@ export function itemIcon(id: string, it: Item, r: number) {
   heartIcon(id, { ...G.cfg, [id]: it.k }, r);
 }
 
-/** Значок раздела на ленте: украшенный — показывает выбранное, иначе — общий значок раздела */
+/** Значок раздела на ленте: сама деталь крупно (у каждого раздела свой силуэт — не путаются);
+ *  «украшено» показывает зелёная звёздочка (ui.ts), а не превью выбранного: превью разделов выходят одинаковыми */
 export function stageIconFor(i: number, r: number) {
-  const st = STAGES[i], id = st.id, c = G.cfg;
-  if (st.care) return careStageIcon(id, r);
-  if (id === 'album') return albumIcon(r);
-  if (!stageHas(i)) return stageIcon(i, r);
-  if (id === 'color') return colorIcon(c.color, r);
-  if (id === 'env') return envIcon(Object.keys(c.env).find(k => c.env[k]) as string, r);
-  if (id === 'bg') { const d = Object.keys(c.bgd).find(k => c.bgd[k]); return bgIcon(c.bg === 'pink' && d ? { kind: 'bgd', k: d } : { kind: 'bgcolor', k: c.bg }, r); }
-  return itemIcon(id, { kind: 'single', k: c[id] }, r);
+  const st = STAGES[i];
+  if (st.care) return careStageIcon(st.id, r);
+  if (st.id === 'album') return albumIcon(r);
+  return stageIcon(i, r);
 }
 
 // ---------------- АЛЬБОМ ----------------
