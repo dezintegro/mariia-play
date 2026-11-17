@@ -118,11 +118,12 @@ export class House {
     ctx.fillStyle = 'rgba(0,0,0,0.15)'; ctx.fill();
     ctx.fillStyle = '#ffd66b'; circle(22 * k, 28 * k, 3 * k);
     ctx.restore();
-    // лишние жильцы — сердечки над крышей
-    const extra = Math.min(occ.length - 2, 8);
+    // жильцы — сердечко за каждого, с первого
+    const extra = Math.min(occ.length, 10);
+    const hs = Math.max(6, 8 * k); // на телефоне — не мельче 6px
     for (let i = 0; i < extra; i++) {
-      ctx.save(); ctx.translate((i - (extra - 1) / 2) * 14 * k, -118 * k + Math.sin(t * 3 + i) * 2 * k);
-      ctx.fillStyle = '#ff7aa8'; heartPath(6 * k); ctx.restore();
+      ctx.save(); ctx.translate((i - (extra - 1) / 2) * hs * 2.3, -112 * k - hs + Math.sin(t * 3 + i) * 2 * k);
+      ctx.fillStyle = '#ff7aa8'; heartPath(hs); ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke(); ctx.fill(); ctx.restore();
     }
     // желания жильцов видны и снаружи
     occ.filter(b => b.wish).slice(0, 3).forEach((b, i) => drawWish(b, 92 * k, -50 * k - i * 46 * k, 0.6));

@@ -85,6 +85,10 @@ function update(dt) {
 
 function draw() {
   if (G.scene === 'space') {
+    // вход на площадку: камера «ныряет» к воротам на макушке планеты (и обратно при выходе)
+    const T = G.trans, ez = (p) => { p = clamp(p, 0, 1); return p * p * (3 - 2 * p); };
+    const zoom = T && T.phase === 'out' && T.house === park ? ez(T.p) : T && T.phase === 'in' && T.house0 === park ? 1 - ez(T.p) : 0;
+    if (zoom > 0) { const zx = planet.x, zy = planet.y - planet.r * 1.15, z = 1 + zoom * 3.5; ctx.save(); ctx.translate(zx, zy); ctx.scale(z, z); ctx.translate(-zx, -zy); }
     ctx.drawImage(bgC, 0, 0, W, H);
     if (G.night > 0.01) { ctx.fillStyle = `rgba(5,3,25,${G.night * 0.45})`; ctx.fillRect(0, 0, W, H); }
     drawStars(); drawShooting(); drawRinged(); drawAlien();
@@ -97,6 +101,7 @@ function draw() {
     for (const b of babies) if (!b.home && b.wish) drawWish(b, ...(wishPos(b) as [number, number]));
     // желания тех, кто гуляет на планете, видны над ней
     park.occupants().filter(b => b.wish).slice(0, 2).forEach((b, i) => drawWish(b, planet.x + planet.r * 0.8 + 30 * S, planet.y - planet.r * 1.15 - i * 48 * S, 0.6));
+    if (zoom > 0) ctx.restore();
     drawButton(btn.night, G.nightTarget ? '#ffb84d' : '#5b4bb7', iconMoonSun, false);
     drawButton(btn.house, houses.length < MAX_HOUSES ? '#2ec4b6' : '#5f7d8c', iconHouse, houses.length < MAX_HOUSES && !picker.open && !picker.fly);
     if (picker.open) {

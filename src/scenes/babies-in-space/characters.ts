@@ -11,7 +11,7 @@ import { tickBed } from './anim/crib';
 import { tickEat } from './anim/eat';
 import { satisfy } from './wishes';
 import { dripWet, tickPotty, tickTowel, tickTub } from './bath';
-import { drawMud, tickSpot } from './park';
+import { drawMud, parkAuto, tickGoSpot, tickSpot } from './park';
 
 // ---------------- МАЛЫШИ ----------------
 export const SKINS = ['#ffdcbf', '#f6c7a0', '#e5ad7f', '#c98d62', '#ffe6d1'];
@@ -81,6 +81,7 @@ export class Baby {
       return;
     }
     if (this.play) { updatePlay(this, dt, L); return; }
+    if (this.goSpot && tickGoSpot(this, dt, L, h)) return;
     if (this.eat || this.eatPending) return;
     this.iwT -= dt;
     if (this.iwT <= 0) {
@@ -89,6 +90,8 @@ export class Baby {
       if (h.kind === 'nursery' && !this.wish && this.visible() && !this.sleeping() && Math.random() < 0.3) {
         const free = TOYS4.filter(k => !toyBusy(h, k)); if (free.length) this.play = { k: pick(free), phase: 'go', t: 9 };
       }
+      // на площадке — сам идёт покачаться, скатиться, полепить, попрыгать
+      if (h.kind === 'park' && !this.wish && this.visible() && Math.random() < 0.4) parkAuto(this, h, L);
     }
     if (this.sleeping()) return;
     const dx = this.iwx - this.ix, dy = this.iwy - this.iy, d = Math.hypot(dx, dy);
@@ -391,8 +394,8 @@ export function drawRoomBabyAt(b, ox, oy, shadow) {
   const still = sleep || b.dragged || b.chair || b.tub || b.potty || b.towel || (b.spot && b.spot.ph !== 'walk') || b.eat || isRider(b);
   const crawl = !still ? Math.abs(Math.sin(t * 5 + b.phase)) * 3 * S : 0;
   if (b.love > 0) halo(ox, hy + r * 0.6, r * 2.6, b.love);
-  const X = animXf(b);
-  ctx.save(); ctx.translate(ox, oy + X.dy); ctx.scale(bnc * X.sx, bnc * X.sy);
+  const X = animXf(b), ps = (b.pose && b.pose.scale) || 1; // scale — малыш ближе/дальше (качели)
+  ctx.save(); ctx.translate(ox, oy + X.dy); ctx.scale(bnc * X.sx * ps, bnc * X.sy * ps);
   ctx.translate(0, -r * 1.2); ctx.rotate(X.rot); ctx.translate(0, r * 1.2);
   ctx.translate(0, -r * 2.4 - crawl); ctx.rotate(b.dragged ? Math.sin(t * 6) * 0.15 : 0);
   const P = b.pose; // поза от «спектакля» игры (см. ниже POSE)

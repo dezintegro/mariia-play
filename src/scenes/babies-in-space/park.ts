@@ -19,14 +19,14 @@ export const PLACES = ['swing', 'slide', 'sand', 'puddle', 'tramp'];
 export const park: any = {
   kind: 'park', roof: '#3fb39d', wall: '#bff3e2', door: 0, bounce: 0,
   get x() { return planet.x; }, get y() { return planet.y; },
-  cy() { return planet.y - planet.r * 0.95; },
+  cy() { return planet.y - planet.r * 1.15; },
   occupants() { return babies.filter(b => b.home === park); },
   room: null as any,
 };
 park.room = {
   swings: [{ a: 0, ph: 0, amp: 0 }, { a: 0, ph: 1.5, amp: 0 }], slide: { wob: 0 }, cakes: [] as any[], bucket: 0,
   puddle: { rip: 0, frog: 0 }, tramp: { sag: 0, wob: 0 }, flowers: [0, 0, 0, 0, 0], burrow: 0, mini: [0, 0, 0],
-  bubbles: [] as any[], light: true, starT: 0, doorOpen: 0, lampSwing: 0,
+  bubbles: [] as any[], autoCount: 0, light: true, starT: 0, doorOpen: 0, lampSwing: 0,
 };
 
 /** куда упал малыш в космосе: на планету (или на горку на её макушке) */
@@ -35,7 +35,7 @@ export function parkAt(x, y) {
   return dist(x, y, P.x, P.y) < P.r * 1.08 || dist(x, y, P.x, P.y - P.r * 1.05) < Math.max(P.r * 0.55, 42) ? park : null;
 }
 /** тап по горке на макушке планеты — зайти на площадку (тап по лицу — прежние реакции) */
-export const parkDoorHit = (x, y) => dist(x, y, planet.x, planet.y - planet.r * 1.08) < Math.max(planet.r * 0.5, 40);
+export const parkDoorHit = (x, y) => dist(x, y, planet.x, planet.y - planet.r * 1.2) < Math.max(planet.r * 0.6, 42);
 
 export function PL() {
   const k = S, port = H > W * 1.1, fy = port ? H * 0.36 : H * 0.42, gh = H - fy;
@@ -60,60 +60,81 @@ export function PL() {
 }
 
 // геометрия мест
-const SW_LEN = 150, SW_DX = 62, SW_TOP = 228;
+const SW_LEN = 150, SW_DX = 58, SW_TOP = 228;
 const pivot = (L, i) => [L.swing.x + (i ? 1 : -1) * SW_DX * S, L.swing.y - SW_TOP * S];
+/** качели качаются вперёд-назад (к нам и от нас): сиденье поднимается на краях, ближе — крупнее */
+export const swingProj = (sw) => ({ y: SW_LEN * S * Math.cos(sw.a), sc: 1 + 0.22 * Math.sin(sw.a) });
 function chute(L, u) { // горка: квадратичная кривая сверху вниз
   const s = L.slide, k = S, x0 = s.x - 70 * k, y0 = s.y - 200 * k, x1 = s.x + 5 * k, y1 = s.y - 10 * k, x2 = s.x + 135 * k, y2 = s.y - 22 * k;
   const a = (1 - u) * (1 - u), b = 2 * u * (1 - u), c = u * u;
   return [a * x0 + b * x1 + c * x2, a * y0 + b * y1 + c * y2];
 }
-const sandSlot = (L, i) => [L.sand.x + (i ? 1 : -1) * 58 * S, L.sand.y - 26 * S];
+const ladderAt = (L, u): [number, number] => { const s = L.slide, [tx, ty] = chute(L, 0), lx = s.x - 112 * S; return [lx + (tx - 10 * S - lx) * u, s.y + (ty + 6 * S - s.y) * u]; };
+const sandSlot = (L, i) => [L.sand.x + (i ? 1 : -1) * 58 * S, L.sand.y - 4 * S];
 export const spotOf = (h, k, i = 0) => h.occupants().find(b => b.spot && b.spot.k === k && (b.spot.i || 0) === i && !b.dragged);
-const free = (b) => { b.spot = null; b.pose = null; b.iwT = 1.5; b.bounce = 1; };
+const free = (b) => { b.spot = null; b.pose = null; b.iwT = rand(1.5, 3); b.bounce = 1; };
+/** куда малыш подползает, чтобы сам занять место (фоновая игра) */
+function approach(L, tg): [number, number] {
+  const k = S;
+  switch (tg.spot) {
+    case 'swing': return [pivot(L, tg.i)[0], L.swing.y + 6 * k];
+    case 'slide': return ladderAt(L, 0);
+    case 'sand': return [sandSlot(L, tg.i)[0], L.sand.y + 18 * k];
+    case 'puddle': return [L.puddle.x - 115 * k, L.puddle.y + 4 * k];
+    default: return [L.tramp.x - 110 * k, L.tramp.y + 4 * k];
+  }
+}
+const leave = (b, L) => { const [x, y] = approach(L, b.spot); free(b); b.ix = x; b.iy = clamp(y, L.by0, L.by1); if (b.visible()) sfx.boop(); };
 
 // ---------------- ЖИЗНЬ НА МЕСТАХ ----------------
 export function tickSpot(b, dt, L) {
   const P = b.spot, r = RB(), R = park.room, vis = b.visible(), k = S;
   P.t += dt;
+  // качели, песочница, батут: поиграл — слезает сам (батут — только приземлившись)
+  if (P.life != null && (P.k === 'swing' || P.k === 'sand' || (P.k === 'tramp' && (P.q ?? 0) < 0.05))) { P.life -= dt; if (P.life <= 0) { leave(b, L); return; } }
   switch (P.k) {
-    case 'swing': { // качается; ножки вперёд-назад
-      const sw = R.swings[P.i], [px, py] = pivot(L, P.i), L0 = SW_LEN * k;
-      b.ix = px + Math.sin(sw.a) * L0; b.iy = py + Math.cos(sw.a) * L0 + r * 0.25; b.face = 1;
-      const v = Math.cos(sw.ph);
-      b.pose = { mood: sw.amp > 0.45 ? 'laugh' : undefined, lean: -sw.a, armL: 0.9, armR: 0.9, legL: v * 0.5 * sw.amp, legR: v * 0.5 * sw.amp };
+    case 'swing': {
+      const sw = R.swings[P.i], [px, py] = pivot(L, P.i), f = swingProj(sw);
+      b.ix = px; b.iy = py + f.y + r * 0.25 * f.sc; b.face = 1;
+      const fw = Math.sin(sw.a) / 0.6; // вперёд — ножки вытянуты, назад — поджаты
+      b.pose = { mood: sw.amp > 0.45 ? 'laugh' : undefined, armL: 1.45, armR: 1.45, legL: 0.35 + fw * 0.35, legR: 0.35 + fw * 0.35, scale: f.sc };
       if (sw.amp > 0.5 && Math.abs(Math.sin(sw.ph)) > 0.97 && (P.top ?? 0) < t - 0.5) { P.top = t; b.laugh = 0.8; if (vis && Math.random() < 0.5) sfx.giggle(1.2); }
       return;
     }
     case 'slide': return tickSlide(b, dt, L);
-    case 'sand': { // лепит куличики
+    case 'sand': { // сидит в песке, стучит лопаткой и лепит куличики
       const [sx, sy] = sandSlot(L, P.i); b.ix = sx; b.iy = sy; b.face = P.i ? -1 : 1;
-      const pat = Math.abs(Math.sin(P.t * 7));
-      b.pose = { armR: 0.2 + pat * 0.9, armL: 0.3, dy: -pat * 2 * k, legL: 0.9, legR: 0.9 };
+      const ph = P.t * 5, pat = Math.abs(Math.sin(ph)), wr = 0.15 + pat * 1.15;
+      b.pose = { armR: wr, armL: 0.35, legL: 1.1, legR: 1.1, dy: -pat * 1.5 * k, front: (rr) => shovel(rr, wr) };
+      const n = Math.floor(ph / Math.PI);
+      if (n !== P.pn) { P.pn = n; if (vis) { const hx = sx + 0.55 * r + Math.sin(0.55 + 0.15) * 0.9 * r; addP({ kind: 'smoke', x: hx, y: sy - 0.6 * r, vx: rand(-20, 20) * k, vy: -rand(10, 30) * k, life: 0.6, size: rand(4, 7) * k, color: '#f3d79a', rot: 0, vr: 0, g: 0 }); } }
       P.c = (P.c ?? 1.6) - dt;
       if (P.c <= 0) {
         P.c = rand(2.4, 3.4);
         const mine = R.cakes.filter(c => c.i === P.i);
         if (mine.length < 3) {
-          // свои места для куличиков у каждого: сзади слева/справа и спереди
-          const slot = [0, 1, 2].find(j => !mine.some(c => c.j === j)), [dx, dy] = [[-100, -50], [-18, -50], [-62, -6]][slot];
+          // свои места для куличиков у каждого: сзади сбоку, сзади к середине и спереди
+          const slot = [0, 1, 2].find(j => !mine.some(c => c.j === j)), [dx, dy] = [[-98, -50], [-96, -10], [-22, -12]][slot];
           const cx = L.sand.x + (P.i ? -dx : dx) * k;
           R.cakes.push({ i: P.i, j: slot, x: cx, y: L.sand.y + dy * k, pop: 1, c: pick(['#ff9ec7', '#8fd3ff', '#ffd66b', '#a8e6a1']) });
-          if (vis) { sfx.pat(); burst(cx, sy, 'spark', 6, { size: 5, speed: 80, color: '#f3d79a' }); b.laugh = 0.6; }
+          if (vis) { sfx.pat(); burst(cx, L.sand.y + dy * k - 10 * k, 'spark', 7, { size: 5, speed: 80, color: '#f3d79a' }); b.laugh = 0.6; }
         }
       }
       return;
     }
     case 'puddle': { // прыгает по луже: плюх-плюх, пачкается
-      const p = L.puddle, J = 0.65; b.ix = p.x + (P.i ? 1 : -1) * 30 * k; b.iy = p.y; b.face = 1;
+      const p = L.puddle, J = 0.7; b.ix = p.x - 10 * k; b.iy = p.y + 4 * k; b.face = 1;
       const n = Math.floor(P.t / J), q = (P.t % J) / J;
       if (n < 4) {
-        b.pose = { dy: -Math.sin(q * Math.PI) * 42 * k, mood: 'laugh', armL: 1.6, armR: 1.6 };
+        // присел → прыжок → плюх (сплющился)
+        const up = q < 0.15 ? 0 : Math.sin((q - 0.15) / 0.85 * Math.PI), squash = q < 0.15 ? Math.sin(q / 0.15 * Math.PI) : 0;
+        b.pose = { dy: -up * 46 * k + squash * 4 * k, mood: 'laugh', armL: 0.6 + up * 1.4, armR: 0.6 + up * 1.4, legL: up * 0.5, legR: up * 0.5 };
         if (n > (P.n ?? -1)) {
           P.n = n;
-          if (n > 0) { b.mud = Math.min(1, (b.mud || 0) + 0.3); R.puddle.rip = 1; if (vis) { sfx.splash(); splash(b.ix, p.y, 12, '#9ed8ff'); splash(b.ix, p.y, 5, '#b98a5a'); } }
+          if (n > 0) { b.mud = Math.min(1, (b.mud || 0) + 0.3); R.puddle.rip = 1; b.bounce = 0.6; if (vis) { sfx.splash(); splash(b.ix, p.y, 12, '#9ed8ff'); splash(b.ix, p.y, 5, '#b98a5a'); } }
         }
       } else b.pose = { mood: 'laugh', armL: 1.9 + Math.sin(t * 14) * 0.3, armR: 1.9 + Math.sin(t * 14 + 1) * 0.3 };
-      if (P.t > 4 * J + 1.4) { free(b); b.ix = p.x - 110 * k; b.iy = clamp(p.y - 20 * k, L.by0, L.by1); if (vis) sfx.boop(); }
+      if (P.t > 4 * J + 1.2) leave(b, L);
       return;
     }
     case 'tramp': { // батут: медленно и высоко, как на Луне
@@ -121,47 +142,78 @@ export function tickSpot(b, dt, L) {
       b.ix = T.x; b.face = 1;
       P.q = (P.q ?? 0) + dt / D;
       if (P.q >= 1) { P.q -= 1; P.big = false; R.tramp.sag = 1; if (vis) tone(160, 0.25, { type: 'sine', slide: 320, vol: 0.14 }); }
-      const h = Math.sin(P.q * Math.PI) * H0;
-      b.iy = T.y - 30 * k;
-      b.pose = { dy: -h, mood: h > 30 * k ? 'laugh' : undefined, armL: 1.2 + h / H0, armR: 1.2 + h / H0, lean: P.flip ? P.q * TAU : 0 };
+      const h = Math.sin(P.q * Math.PI) * H0, low = 1 - Math.min(1, h / (25 * k));
+      b.iy = T.y - 30 * k + R.tramp.sag * 7 * k;
+      b.pose = { dy: -h, mood: h > 30 * k ? 'laugh' : undefined, armL: 0.5 + 1.5 * (h / H0), armR: 0.5 + 1.5 * (h / H0), legL: low * 0.5, legR: low * 0.5, lean: P.flip ? P.q * TAU : 0 };
       if (P.flip && P.q > 0.95) P.flip = false;
       return;
     }
   }
 }
 
+// лопатка в правой ручке (координаты головы; кисть — как в drawBody)
+function shovel(r, wr) {
+  const a = 0.55 + wr, hx = 0.55 * r + Math.sin(a) * 0.72 * r, hy = 1.05 * r + Math.cos(a) * 0.72 * r;
+  ctx.save(); ctx.translate(hx, hy); ctx.rotate(-a + 0.5);
+  ctx.strokeStyle = '#ffd166'; ctx.lineWidth = r * 0.12; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(0, -r * 0.1); ctx.lineTo(0, r * 0.55); ctx.stroke();
+  ctx.fillStyle = '#ff6b6b'; ctx.beginPath(); ctx.moveTo(-r * 0.2, r * 0.5); ctx.lineTo(r * 0.2, r * 0.5); ctx.lineTo(r * 0.14, r * 0.85); ctx.quadraticCurveTo(0, r * 0.95, -r * 0.14, r * 0.85); ctx.closePath(); ctx.fill();
+  ctx.restore();
+}
+
 function tickSlide(b, dt, L) {
   const P = b.spot, r = RB(), k = S, vis = b.visible(), s = L.slide;
   P.ph = P.ph || 'top';
   const go = (ph) => { P.ph = ph; P.t = 0; };
-  if (P.ph === 'top') {
-    [b.ix, b.iy] = chute(L, 0); b.iy += r * 0.2; b.face = 1;
-    b.pose = { dy: -Math.abs(Math.sin(P.t * 9)) * 3 * k, armL: 1.6, armR: 1.6, mood: 'laugh' };
-    if (P.t > 0.55) { go('down'); if (vis) sfx.wheee(); }
+  const sit = (u) => { const [x, y] = chute(L, u); b.ix = x; b.iy = y + r * 0.62; };
+  if (P.ph === 'top') { // сидит наверху, ёрзает — «поехали!»
+    sit(0); b.face = 1;
+    b.pose = { dy: -Math.abs(Math.sin(P.t * 9)) * 3 * k, armL: 1.6, armR: 1.6, mood: 'laugh', legL: 1.1, legR: 1.1, lean: -0.1 };
+    if (P.t > 0.6) { go('down'); if (vis) sfx.wheee(); }
   } else if (P.ph === 'down') {
-    const u = Math.min(1, Math.pow(P.t / 0.95, 1.5));
-    [b.ix, b.iy] = chute(L, u); b.iy += r * 0.2;
-    b.pose = { mood: 'laugh', armL: 2.1, armR: 2.1, lean: 0.25 - u * 0.25, legL: 0.6, legR: 0.6 };
+    const u = Math.min(1, Math.pow(P.t / 0.95, 1.6)); sit(u);
+    b.pose = { mood: 'laugh', armL: 2.2, armR: 2.2, lean: -0.3 + u * 0.2, legL: 1.1, legR: 1.1 };
     if (vis && Math.random() < 0.5) addP({ kind: 'spark', x: b.ix - 20 * k, y: b.iy - r, vx: -rand(30, 80) * k, vy: -rand(10, 50) * k, life: 0.5, size: rand(4, 7) * k, color: pick(['#ffe27a', '#fff', '#ffb3d1']), rot: 0, vr: 3, g: 0 });
-    if (P.t > 0.95) { go('land'); b.bounce = 1; b.laugh = 1.5; P.n = (P.n || 0) + 1; if (vis) { sfx.giggle(1.1); burst(b.ix, b.iy - r, 'heart', 6, { size: 8, speed: 110, up: -60, color: '#ff7aa8' }); } }
-  } else if (P.ph === 'land') {
-    b.pose = { mood: 'laugh', armL: 1.9 + Math.sin(t * 14) * 0.3, armR: 1.9 + Math.sin(t * 14 + 1) * 0.3 };
-    if (P.t > 0.8) {
-      if (P.n < 3) go('walk'); // ещё раз! (до трёх раз)
-      else { free(b); b.ix = clamp(b.ix + 40 * k, L.bx0, L.bx1); b.iy = clamp(s.y + 10 * k, L.by0, L.by1); }
+    if (P.t > 0.95) { go('land'); P.n = (P.n || 0) + 1; }
+  } else if (P.ph === 'land') { // соскальзывает с края на траву — подпрыгнул, радуется
+    const [ex, ey] = chute(L, 1), q = Math.min(1, P.t / 0.35);
+    b.ix = ex + 38 * k * q; b.iy = ey + r * 0.62 + (s.y + 8 * k - ey - r * 0.62) * q - Math.sin(q * Math.PI) * 20 * k;
+    if (q < 1) b.pose = { mood: 'laugh', armL: 2.2, armR: 2.2, legL: 1.1 * (1 - q), legR: 1.1 * (1 - q) };
+    else {
+      if (!P.landed) { P.landed = true; b.bounce = 1; b.laugh = 1.5; if (vis) { sfx.giggle(1.1); burst(b.ix, b.iy - r * 2, 'heart', 6, { size: 8, speed: 110, up: -60, color: '#ff7aa8' }); } }
+      b.pose = { mood: 'laugh', armL: 1.9 + Math.sin(t * 14) * 0.3, armR: 1.9 + Math.sin(t * 14 + 1) * 0.3 };
+    }
+    if (P.t > 1.1) {
+      P.landed = false;
+      if (P.n < 3) go('walk'); // ещё разок! (до трёх раз)
+      else { free(b); b.iy = clamp(b.iy, L.by0, L.by1); }
     }
   } else if (P.ph === 'walk') { // ползёт обратно к лесенке
-    const lx = s.x - 112 * k, [ex] = chute(L, 1), u = Math.min(1, P.t / 1.4);
-    b.ix = ex + (lx - ex) * u; b.iy = s.y + 6 * k; b.face = -1; b.pose = null;
+    const [lx, ly] = ladderAt(L, 0), [ex] = chute(L, 1), x0 = ex + 38 * k, u = Math.min(1, P.t / 1.6);
+    b.ix = x0 + (lx - x0) * u; b.iy = ly + 8 * k; b.face = -1; b.pose = null;
     if (u >= 1) go('climb');
-  } else if (P.ph === 'climb') { // лезет вверх по лесенке
-    const u = Math.min(1, P.t / 1.1), lx = s.x - 105 * k, [tx, ty] = chute(L, 0);
-    b.ix = lx + (tx - lx) * Math.max(0, u - 0.7) / 0.3; b.iy = s.y + 6 * k + (ty + r * 0.2 - s.y - 6 * k) * u; b.face = 1;
-    const c = Math.sin(P.t * 12);
-    b.pose = { armL: 1.4 + c * 0.4, armR: 1.4 - c * 0.4, legL: c * 0.3, legR: -c * 0.3 };
-    if (vis && Math.floor(P.t * 6) !== P.st) { P.st = Math.floor(P.t * 6); if (P.st % 2 === 0) tone(700 + u * 500, 0.06, { type: 'triangle', vol: 0.05 }); }
+  } else if (P.ph === 'climb') { // лезет вверх по лесенке, перехватывая ручками
+    const u = Math.min(1, P.t / 1.3), [x, y] = ladderAt(L, u); b.ix = x; b.iy = y + 8 * k * (1 - u); b.face = 1;
+    const c = Math.sin(P.t * 11);
+    b.pose = { armL: 2.0 + c * 0.5, armR: 2.0 - c * 0.5, legL: 0.2 + c * 0.25, legR: 0.2 - c * 0.25 };
+    if (vis && Math.floor(P.t * 5) !== P.st) { P.st = Math.floor(P.t * 5); tone(650 + u * 500, 0.06, { type: 'triangle', vol: 0.05 }); }
     if (u >= 1) go('top');
   }
+}
+
+// фоновая игра: малыш без желания сам ползёт к свободному месту
+export function parkAuto(b, h, L) {
+  const opts: any[] = [];
+  for (const k of PLACES) for (let i = 0; i < (k === 'swing' || k === 'sand' ? 2 : 1); i++) if (!spotOf(h, k, i) && !h.occupants().some(o => o.goSpot && o.goSpot.tg.spot === k && o.goSpot.tg.i === i)) opts.push({ spot: k, i });
+  if (opts.length) b.goSpot = { tg: pick(opts), t: 10 };
+}
+/** ползёт к месту; true — пока в пути */
+export function tickGoSpot(b, dt, L, h) {
+  const G0 = b.goSpot; G0.t -= dt;
+  if (G0.t <= 0 || spotOf(h, G0.tg.spot, G0.tg.i)) { b.goSpot = null; return false; }
+  const [x, y0] = approach(L, G0.tg), y = clamp(y0, L.by0, L.by1), dx = x - b.ix, dy = y - b.iy, d = Math.hypot(dx, dy);
+  if (d < 10 * S) { b.goSpot = null; startSpot(b, h, G0.tg, true); return true; }
+  const sp = Math.min(60 * S * dt, d); b.ix += dx / d * sp; b.iy += dy / d * sp; if (Math.abs(dx) > 2) b.face = Math.sign(dx);
+  return true;
 }
 
 function splash(x, y, n, col) {
@@ -239,38 +291,31 @@ function drawGate(L, hover) {
 function drawSwing(L, h, hv) {
   const k = S, s = L.swing, R = h.room, top = s.y - SW_TOP * k - 4 * k;
   if (hv != null) glowSpot(s.x + (hv ? 1 : -1) * SW_DX * k, s.y - 70 * k, 80 * k, 0.6);
-  ctx.fillStyle = 'rgba(30,90,80,0.18)'; ell(s.x, s.y + 2 * k, 145 * k, 10 * k);
+  ctx.fillStyle = 'rgba(30,90,80,0.18)'; ell(s.x, s.y + 2 * k, 160 * k, 11 * k);
+  // боковые стойки: ножки расставлены вперёд-назад, поэтому спереди видны как «Л»
   ctx.strokeStyle = '#ff7aa8'; ctx.lineWidth = 11 * k; ctx.lineCap = 'round';
-  for (const sx of [-1, 1]) { ctx.beginPath(); ctx.moveTo(s.x + sx * 140 * k, s.y); ctx.lineTo(s.x + sx * 112 * k, top); ctx.moveTo(s.x + sx * 84 * k, s.y); ctx.lineTo(s.x + sx * 112 * k, top); ctx.stroke(); }
-  ctx.strokeStyle = '#ffd166'; ctx.lineWidth = 13 * k; ctx.beginPath(); ctx.moveTo(s.x - 125 * k, top); ctx.lineTo(s.x + 125 * k, top); ctx.stroke();
-  ctx.fillStyle = '#fff'; circle(s.x - 125 * k, top, 7 * k); circle(s.x + 125 * k, top, 7 * k);
+  for (const sx of [-1, 1]) { ctx.beginPath(); ctx.moveTo(s.x + sx * 150 * k, s.y + 4 * k); ctx.lineTo(s.x + sx * 125 * k, top); ctx.lineTo(s.x + sx * 104 * k, s.y - 4 * k); ctx.stroke(); }
+  ctx.strokeStyle = '#ffd166'; ctx.lineWidth = 13 * k; ctx.beginPath(); ctx.moveTo(s.x - 135 * k, top); ctx.lineTo(s.x + 135 * k, top); ctx.stroke();
+  ctx.fillStyle = '#fff'; circle(s.x - 135 * k, top, 7 * k); circle(s.x + 135 * k, top, 7 * k);
   for (let i = 0; i < 2; i++) {
-    const [px, py] = pivot(L, i), sw = R.swings[i], b = spotOf(h, 'swing', i);
-    ctx.save(); ctx.translate(px, py); ctx.rotate(-sw.a);
+    const [px, py] = pivot(L, i), sw = R.swings[i], f = swingProj(sw), b = spotOf(h, 'swing', i), sy = py + f.y, w = 34 * k * f.sc;
+    ctx.fillStyle = '#7a8bb0'; circle(px - 30 * k, py + 3 * k, 4 * k); circle(px + 30 * k, py + 3 * k, 4 * k);
     ctx.strokeStyle = '#c9d3e8'; ctx.lineWidth = 3.5 * k;
-    ctx.beginPath(); ctx.moveTo(-30 * k, 0); ctx.lineTo(-30 * k, SW_LEN * k); ctx.moveTo(30 * k, 0); ctx.lineTo(30 * k, SW_LEN * k); ctx.stroke();
-    ctx.fillStyle = i ? '#4cc9f0' : '#06d6a0'; ctx.beginPath(); ctx.roundRect(-38 * k, SW_LEN * k - 4 * k, 76 * k, 12 * k, 6 * k); ctx.fill();
-    ctx.restore();
+    ctx.beginPath(); ctx.moveTo(px - 30 * k, py); ctx.lineTo(px - w, sy); ctx.moveTo(px + 30 * k, py); ctx.lineTo(px + w, sy); ctx.stroke();
+    // сиденье: видно и верх (на краях качания), и торец
+    const tilt = Math.abs(Math.sin(sw.a)), c = i ? '#4cc9f0' : '#06d6a0';
+    ctx.fillStyle = c; ctx.beginPath(); ctx.ellipse(px, sy, w + 4 * k, (3 + tilt * 9) * k * f.sc, 0, 0, TAU); ctx.fill();
+    ctx.fillStyle = 'rgba(0,0,0,0.15)'; ctx.beginPath(); ctx.roundRect(px - w - 4 * k, sy, 2 * (w + 4 * k), 7 * k * f.sc, 3 * k); ctx.fill();
+    ctx.fillStyle = c; ctx.beginPath(); ctx.roundRect(px - w - 4 * k, sy - 1 * k, 2 * (w + 4 * k), 6 * k * f.sc, 3 * k); ctx.fill();
     if (b) drawRoomBabyAt(b, b.ix, b.iy, false);
   }
 }
 
-function drawSlide(L, h, hv) {
-  const k = S, s = L.slide, R = h.room, wob = Math.sin(R.slide.wob * 20) * R.slide.wob * 4 * k;
-  if (hv) glowSpot(s.x, s.y - 100 * k, 150 * k, 0.6);
+function slideBody(L, wob) {
+  const k = S, s = L.slide, [mx, my] = chute(L, 0.55), [tx, ty] = chute(L, 0);
   ctx.fillStyle = 'rgba(30,90,80,0.18)'; ell(s.x + 20 * k, s.y + 2 * k, 150 * k, 10 * k);
-  // лесенка
-  const lx = s.x - 112 * k, [tx, ty] = chute(L, 0);
-  ctx.strokeStyle = '#ffd166'; ctx.lineWidth = 8 * k; ctx.lineCap = 'round';
-  ctx.beginPath(); ctx.moveTo(lx - 14 * k, s.y); ctx.lineTo(tx - 22 * k, ty + 6 * k); ctx.moveTo(lx + 14 * k, s.y); ctx.lineTo(tx + 6 * k, ty + 6 * k); ctx.stroke();
-  ctx.lineWidth = 5 * k; for (let i = 1; i < 5; i++) { const u = i / 5, x = lx + (tx - 8 * k - lx) * u, y = s.y + (ty + 6 * k - s.y) * u; ctx.beginPath(); ctx.moveTo(x - 14 * k, y); ctx.lineTo(x + 14 * k, y); ctx.stroke(); }
-  // площадка наверху с флажком
-  ctx.fillStyle = '#b388ff'; ctx.beginPath(); ctx.roundRect(tx - 30 * k, ty + 2 * k, 40 * k, 10 * k, 4 * k); ctx.fill();
-  ctx.strokeStyle = '#fff'; ctx.lineWidth = 3 * k; ctx.beginPath(); ctx.moveTo(tx - 26 * k, ty + 2 * k); ctx.lineTo(tx - 26 * k, ty - 50 * k); ctx.stroke();
-  ctx.fillStyle = '#ff6b6b'; ctx.beginPath(); ctx.moveTo(tx - 26 * k, ty - 50 * k); ctx.lineTo(tx - 26 * k + (22 + Math.sin(t * 5) * 3) * k, ty - 43 * k); ctx.lineTo(tx - 26 * k, ty - 36 * k); ctx.fill();
-  // опора и скат
-  const [mx, my] = chute(L, 0.55);
-  ctx.strokeStyle = '#8a7ac9'; ctx.lineWidth = 7 * k; ctx.beginPath(); ctx.moveTo(mx, my); ctx.lineTo(mx, s.y); ctx.stroke();
+  ctx.strokeStyle = '#8a7ac9'; ctx.lineWidth = 7 * k; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(mx, my); ctx.lineTo(mx, s.y); ctx.moveTo(tx - 8 * k, ty + 8 * k); ctx.lineTo(tx - 8 * k, s.y); ctx.stroke();
   ctx.save(); ctx.translate(0, wob);
   for (const [w, c] of [[30, '#ff9ec7'], [18, '#ffc4dd']] as [number, string][]) {
     ctx.strokeStyle = c; ctx.lineWidth = w * k; ctx.beginPath();
@@ -278,7 +323,34 @@ function drawSlide(L, h, hv) {
     ctx.stroke();
   }
   ctx.restore();
-  const b = spotOf(h, 'slide'); if (b) drawRoomBabyAt(b, b.ix, b.iy, b.spot.ph === 'walk' || b.spot.ph === 'land');
+  // площадка наверху с флажком
+  ctx.fillStyle = '#b388ff'; ctx.beginPath(); ctx.roundRect(tx - 34 * k, ty + 4 * k, 46 * k, 11 * k, 5 * k); ctx.fill();
+  ctx.strokeStyle = '#fff'; ctx.lineWidth = 3 * k; ctx.beginPath(); ctx.moveTo(tx - 30 * k, ty + 4 * k); ctx.lineTo(tx - 30 * k, ty - 50 * k); ctx.stroke();
+  ctx.fillStyle = '#ff6b6b'; ctx.beginPath(); ctx.moveTo(tx - 30 * k, ty - 50 * k); ctx.lineTo(tx - 30 * k + (22 + Math.sin(t * 5) * 3) * k, ty - 43 * k); ctx.lineTo(tx - 30 * k, ty - 36 * k); ctx.fill();
+}
+function slideLadder(L) {
+  const k = S, [x0, y0] = ladderAt(L, 0), [x1, y1] = ladderAt(L, 1);
+  ctx.strokeStyle = '#ffd166'; ctx.lineWidth = 8 * k; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(x0 - 16 * k, y0); ctx.lineTo(x1 - 16 * k, y1); ctx.moveTo(x0 + 16 * k, y0); ctx.lineTo(x1 + 16 * k, y1); ctx.stroke();
+  ctx.lineWidth = 5 * k; for (let i = 1; i < 6; i++) { const [x, y] = ladderAt(L, i / 6); ctx.beginPath(); ctx.moveTo(x - 16 * k, y); ctx.lineTo(x + 16 * k, y); ctx.stroke(); }
+}
+function slideRail(L, wob) { // передний бортик ската — малыш сидит «в» горке
+  const k = S; ctx.save(); ctx.translate(0, wob + 9 * k);
+  ctx.strokeStyle = '#ff85b3'; ctx.lineWidth = 10 * k; ctx.lineCap = 'round'; ctx.beginPath();
+  for (let i = 0; i <= 20; i++) { const [x, y] = chute(L, i / 20); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }
+  ctx.stroke(); ctx.restore();
+}
+
+function drawSlide(L, h, hv) {
+  const k = S, s = L.slide, R = h.room, wob = Math.sin(R.slide.wob * 20) * R.slide.wob * 4 * k;
+  if (hv) glowSpot(s.x, s.y - 100 * k, 150 * k, 0.6);
+  const b = spotOf(h, 'slide'), ph = b && b.spot.ph;
+  slideBody(L, wob);
+  if (ph === 'climb') { drawRoomBabyAt(b, b.ix, b.iy, false); slideLadder(L); slideRail(L, wob); return; } // лесенка перед малышом
+  slideLadder(L);
+  if (b && ph !== 'top' && ph !== 'down') { slideRail(L, wob); drawRoomBabyAt(b, b.ix, b.iy, ph === 'walk' || (ph === 'land' && b.spot.landed)); return; }
+  if (b) drawRoomBabyAt(b, b.ix, b.iy, false);
+  slideRail(L, wob);
 }
 
 function drawSand(L, h, hv, part) {
@@ -288,14 +360,15 @@ function drawSand(L, h, hv, part) {
     ctx.fillStyle = '#c98b5a'; ctx.beginPath(); ctx.roundRect(s.x - w / 2 - 8 * k, s.y - d - 8 * k, w + 16 * k, d + 16 * k, 14 * k); ctx.fill();
     ctx.fillStyle = '#f3d79a'; ctx.beginPath(); ctx.roundRect(s.x - w / 2, s.y - d, w, d, 10 * k); ctx.fill();
     ctx.fillStyle = 'rgba(200,150,80,0.3)'; for (let i = 0; i < 12; i++) { const q = smallStars[30 + i]; circle(s.x - w / 2 + q.fx * w, s.y - d + q.fy * d, 2 * k); }
-    // ведёрко и лопатка
-    const bh = Math.abs(Math.sin(R.bucket * Math.PI * 3)) * 18 * k, bx = s.x + w / 2 - 22 * k, by = s.y - d + 22 * k - bh;
+    // ведёрко
+    const bh = Math.abs(Math.sin(R.bucket * Math.PI * 3)) * 18 * k, bx = s.x + 2 * k, by = s.y - d + 26 * k - bh;
     ctx.fillStyle = '#4cc9f0'; ctx.beginPath(); ctx.moveTo(bx - 14 * k, by - 18 * k); ctx.lineTo(bx + 14 * k, by - 18 * k); ctx.lineTo(bx + 10 * k, by + 4 * k); ctx.lineTo(bx - 10 * k, by + 4 * k); ctx.closePath(); ctx.fill();
     ctx.strokeStyle = '#2a8fb8'; ctx.lineWidth = 2.5 * k; ctx.beginPath(); ctx.arc(bx, by - 18 * k, 13 * k, Math.PI, TAU); ctx.stroke();
-    ctx.strokeStyle = '#ff6b6b'; ctx.lineWidth = 4 * k; ctx.beginPath(); ctx.moveTo(s.x - w / 2 + 16 * k, s.y - d + 12 * k); ctx.lineTo(s.x - w / 2 + 40 * k, s.y - d + 30 * k); ctx.stroke();
-    ctx.fillStyle = '#ff6b6b'; ell(s.x - w / 2 + 44 * k, s.y - d + 34 * k, 9 * k, 6 * k, 0.6);
-    for (const c of R.cakes) drawCake(c);
+    for (const c of R.cakes) if (c.j === 0) drawCake(c);
   } else {
+    // в песке перед сидящими — горки песка (ножки «в песке»), передние куличики, бортик
+    for (let i = 0; i < 2; i++) if (spotOf(h, 'sand', i)) { const [sx] = sandSlot(L, i); ctx.fillStyle = '#ecc985'; ell(sx, s.y - 12 * k, 40 * k, 12 * k); ctx.fillStyle = '#f3d79a'; ell(sx, s.y - 14 * k, 34 * k, 9 * k); }
+    for (const c of R.cakes) if (c.j !== 0) drawCake(c);
     ctx.fillStyle = '#b07848'; ctx.beginPath(); ctx.roundRect(s.x - w / 2 - 8 * k, s.y - 4 * k, w + 16 * k, 14 * k, 6 * k); ctx.fill();
     ctx.fillStyle = '#ffd166'; for (const dx of [-1, 1]) circle(s.x + dx * (w / 2 + 2 * k), s.y + 3 * k, 8 * k);
   }
@@ -462,13 +535,19 @@ export function parkDropAt(h, L, x, y): any {
   return {};
 }
 
-export function dropInPark(b, h, tg) {
-  if (!tg.spot) return false;
+export function startSpot(b, h, tg, auto) {
   const L = PL();
-  b.spot = { k: tg.spot, i: tg.i || 0, t: 0 }; b.bounce = 1; b.laugh = 1; b.awake = 3;
+  b.spot = { k: tg.spot, i: tg.i || 0, t: 0, life: auto ? rand(9, 15) : 25 }; b.bounce = 1; b.awake = 3; b.goSpot = null;
   if (tg.spot === 'swing') { const sw = h.room.swings[tg.i]; sw.amp = Math.max(sw.amp, 0.35); }
   if (tg.spot === 'tramp') { b.spot.q = 0; h.room.tramp.sag = 1; }
-  tickSpot(b, 0, L); sfx.pick();
+  if (tg.spot === 'slide' && auto) b.spot.ph = 'climb';
+  if (auto) h.room.autoCount++;
+  tickSpot(b, 0, L);
+}
+
+export function dropInPark(b, h, tg) {
+  if (!tg.spot) return false;
+  startSpot(b, h, tg, false); b.laugh = 1; sfx.pick();
   satisfy(b, 'walk', tg.spot);
   return true;
 }
@@ -518,19 +597,52 @@ export function drawPlaceIcon(o, s) {
   ctx.restore();
 }
 
-/** горка-качели на макушке планеты (рисуется в координатах планеты, R — её радиус) */
+/** вход на площадку на макушке планеты: травяная шапочка по изгибу планеты, на ней ворота-радуга,
+ * качели и горка (стоят перпендикулярно поверхности — без щелей); над воротами — сердечко за каждого малыша */
 export function drawParkTop(R, glow) {
-  const k = R / 100, occ = park.occupants(), bh = Math.abs(Math.sin(park.bounce * Math.PI * 3)) * 6 * k;
-  ctx.save(); ctx.translate(0, -R * 0.97 - bh);
-  if (glow > 0) glowSpot(0, -22 * k, 70 * k, glow);
-  ctx.strokeStyle = '#ff7aa8'; ctx.lineWidth = 4.5 * k; ctx.lineCap = 'round';
-  ctx.beginPath(); ctx.moveTo(-50 * k, 4 * k); ctx.lineTo(-38 * k, -44 * k); ctx.lineTo(-26 * k, 4 * k); ctx.moveTo(-8 * k, 6 * k); ctx.lineTo(-20 * k, -44 * k); ctx.stroke();
-  ctx.strokeStyle = '#ffd166'; ctx.beginPath(); ctx.moveTo(-42 * k, -44 * k); ctx.lineTo(-14 * k, -44 * k); ctx.stroke();
-  const a = Math.sin(t * 2.3) * (occ.length ? 0.45 : 0.15);
-  ctx.save(); ctx.translate(-28 * k, -44 * k); ctx.rotate(a); ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5 * k; ctx.beginPath(); ctx.moveTo(-5 * k, 0); ctx.lineTo(-5 * k, 30 * k); ctx.moveTo(5 * k, 0); ctx.lineTo(5 * k, 30 * k); ctx.stroke();
-  ctx.fillStyle = '#06d6a0'; ctx.fillRect(-8 * k, 29 * k, 16 * k, 4 * k); ctx.restore();
-  ctx.strokeStyle = '#ffd166'; ctx.lineWidth = 3.5 * k; ctx.beginPath(); ctx.moveTo(14 * k, 8 * k); ctx.lineTo(18 * k, -40 * k); ctx.stroke();
-  ctx.strokeStyle = '#ff9ec7'; ctx.lineWidth = 8 * k; ctx.beginPath(); ctx.moveTo(20 * k, -38 * k); ctx.quadraticCurveTo(26 * k, 4 * k, 56 * k, 4 * k); ctx.stroke();
-  ctx.fillStyle = '#ff6b6b'; ctx.beginPath(); ctx.moveTo(18 * k, -40 * k); ctx.lineTo(18 * k, -58 * k); ctx.lineTo(32 * k, -53 * k); ctx.closePath(); ctx.fill();
+  const k = R / 100, S0 = S, occ = park.occupants(), bh = Math.abs(Math.sin(park.bounce * Math.PI * 3)) * 5 * k;
+  const on = (a, fn) => { ctx.save(); ctx.rotate(a); ctx.translate(0, -R + 3 * k); fn(); ctx.restore(); };
+  ctx.save(); ctx.translate(0, -bh);
+  if (glow > 0) glowSpot(0, -R - 25 * k, 75 * k, glow);
+  // травка по изгибу
+  const A = 0.9;
+  ctx.lineCap = 'round';
+  ctx.strokeStyle = '#7fd9bd'; ctx.lineWidth = 9 * k; ctx.beginPath(); ctx.arc(0, 0, R - 2 * k, -Math.PI / 2 - A, -Math.PI / 2 + A); ctx.stroke();
+  ctx.strokeStyle = '#9ff0d4'; ctx.lineWidth = 4 * k; ctx.beginPath(); ctx.arc(0, 0, R + 0.5 * k, -Math.PI / 2 - A * 0.97, -Math.PI / 2 + A * 0.97); ctx.stroke();
+  ctx.strokeStyle = '#6cc9ad'; ctx.lineWidth = 2 * k;
+  for (let i = -7; i <= 7; i++) on(i * 0.12, () => { ctx.beginPath(); ctx.moveTo(-2 * k, 0); ctx.lineTo(-3 * k, -5 * k); ctx.moveTo(2 * k, 0); ctx.lineTo(3 * k, -4 * k); ctx.stroke(); });
+  // качели (слева)
+  on(-0.6, () => {
+    ctx.strokeStyle = '#ff7aa8'; ctx.lineWidth = 4 * k;
+    ctx.beginPath(); ctx.moveTo(-20 * k, 0); ctx.lineTo(-16 * k, -40 * k); ctx.lineTo(-12 * k, 0); ctx.moveTo(12 * k, 0); ctx.lineTo(16 * k, -40 * k); ctx.lineTo(20 * k, 0); ctx.stroke();
+    ctx.strokeStyle = '#ffd166'; ctx.beginPath(); ctx.moveTo(-18 * k, -40 * k); ctx.lineTo(18 * k, -40 * k); ctx.stroke();
+    const a = Math.sin(t * 2.3) * (occ.length ? 0.6 : 0.25), sc = 1 + 0.2 * Math.sin(a), y = 28 * k * Math.cos(a);
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5 * k; ctx.beginPath(); ctx.moveTo(-6 * k, -40 * k); ctx.lineTo(-7 * k * sc, -40 * k + y); ctx.moveTo(6 * k, -40 * k); ctx.lineTo(7 * k * sc, -40 * k + y); ctx.stroke();
+    ctx.fillStyle = '#06d6a0'; ctx.beginPath(); ctx.roundRect(-9 * k * sc, -41 * k + y, 18 * k * sc, 4 * k * sc, 2 * k); ctx.fill();
+  });
+  // горка (справа)
+  on(0.6, () => {
+    ctx.strokeStyle = '#ffd166'; ctx.lineWidth = 3.5 * k;
+    ctx.beginPath(); ctx.moveTo(-22 * k, 0); ctx.lineTo(-17 * k, -38 * k); ctx.moveTo(-12 * k, 0); ctx.lineTo(-7 * k, -38 * k); ctx.stroke();
+    ctx.lineWidth = 2.5 * k; for (let i = 1; i < 4; i++) { const y = -i * 9.5 * k; ctx.beginPath(); ctx.moveTo(-22 * k + i * 1.2 * k, y); ctx.lineTo(-12 * k + i * 1.2 * k, y); ctx.stroke(); }
+    ctx.strokeStyle = '#ff9ec7'; ctx.lineWidth = 8 * k; ctx.beginPath(); ctx.moveTo(-10 * k, -38 * k); ctx.quadraticCurveTo(0, -2 * k, 26 * k, -3 * k); ctx.stroke();
+    ctx.fillStyle = '#ff6b6b'; ctx.beginPath(); ctx.moveTo(-15 * k, -38 * k); ctx.lineTo(-15 * k, -56 * k); ctx.lineTo(-2 * k, -51 * k); ctx.closePath(); ctx.fill();
+  });
+  // ворота-радуга посередине — «заходи»
+  on(0, () => {
+    const w = 15 * k, hh = 40 * k;
+    ctx.save(); ctx.beginPath(); ctx.moveTo(-w, 0); ctx.lineTo(-w, -hh + w); ctx.arc(0, -hh + w, w, Math.PI, TAU); ctx.lineTo(w, 0); ctx.closePath(); ctx.clip();
+    ctx.fillStyle = '#1a1450'; ctx.fillRect(-w, -hh, 2 * w, hh);
+    ctx.fillStyle = '#fff'; for (let i = 0; i < 6; i++) { const q = smallStars[80 + i]; circle(-w + q.fx * 2 * w, -hh + q.fy * hh, q.s * 0.9 * k); }
+    const p = 1 + Math.sin(t * 4) * 0.2; ctx.translate(0, -hh * 0.45); ctx.scale(p, p); ctx.rotate(t); ctx.fillStyle = '#ffe27a'; starPath(5, 6.5 * k, 2.8 * k); ctx.fill();
+    ctx.restore();
+    ['#ff6b6b', '#ffd166', '#06d6a0', '#4cc9f0', '#b388ff'].forEach((c, i) => {
+      const rr = w + (1.5 + i * 2.6) * k; ctx.strokeStyle = c; ctx.lineWidth = 2.8 * k; ctx.lineCap = 'butt';
+      ctx.beginPath(); ctx.moveTo(-rr, 1 * k); ctx.lineTo(-rr, -hh + w); ctx.arc(0, -hh + w, rr, Math.PI, TAU); ctx.lineTo(rr, 1 * k); ctx.stroke();
+    });
+  });
   ctx.restore();
+  // сердечки — сколько малышей гуляет (с первого)
+  const n = Math.min(occ.length, 10), hs = Math.max(6, 8 * S0), sp = hs * 2.3, hy = -R - 58 * k - hs;
+  for (let i = 0; i < n; i++) { ctx.save(); ctx.translate((i - (n - 1) / 2) * sp, hy + Math.sin(t * 3 + i) * 2 * S0); ctx.fillStyle = '#ff7aa8'; heartPath(hs); ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke(); ctx.fill(); ctx.restore(); }
 }

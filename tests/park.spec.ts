@@ -19,7 +19,7 @@ for (const vp of [{ width: 1280, height: 800 }, { width: 390, height: 844 }]) {
       out.onPlanet = A.park.occupants().length;
       // тап по горке на макушке — заходим
       g.babies.filter((b: any) => !b.home).forEach((b: any) => { b.x = 30; b.y = 30; }); // чтобы никто не пролетал над горкой
-      const tx = P.x, ty = P.y - P.r * 1.08; const hres = A.hit(tx, ty); out.hitPark = hres && hres.k;
+      const tx = P.x, ty = P.y - P.r * 1.22; const hres = A.hit(tx, ty); out.hitPark = hres && hres.k;
       A.onTap(tx, ty, hres); g.step(1.2); out.scene = g.G.scene; out.kind = g.G.curHouse && g.G.curHouse.kind;
       return out;
     });
@@ -55,7 +55,8 @@ for (const vp of [{ width: 1280, height: 800 }, { width: 390, height: 844 }]) {
     await shot(page, `park-play-${vp.width}`);
     const r4 = await page.evaluate(() => {
       const g = window.__game, A = g.api, out: any = {}; g.pause(false);
-      g.step(8); const kids = A.park.occupants();
+      const kids = A.park.occupants(); kids.forEach((b: any) => { b.iwT = 999; b.goSpot = null; }); // без фоновой игры
+      g.step(8);
       out.puddleLeft = !kids.some((b: any) => b.spot && b.spot.k === 'puddle');
       out.mudBaby = kids.some((b: any) => b.mud > 0.5);
       // выход через ворота

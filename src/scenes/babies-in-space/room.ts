@@ -217,7 +217,8 @@ export function hitRoom(x, y) {
   const occ = h.occupants().filter(b => !b.dragged).sort((a, b) => b.iy - a.iy);
   for (const b of occ) {
     const [hx, hy] = roomHead(b), r = RB();
-    if (b.crib || b.chair || b.tub || isRider(b) ? dist(x, y, hx, hy + r * 0.3) < r * 1.3 : dist(x, y, b.ix, b.iy - r * 1.4) < r * 1.5) return { k: 'baby', o: b };
+    const pdy = (b.pose && b.pose.dy) || 0; // малыш в прыжке (батут, лужа) ловится там, где его видно
+    if (b.crib || b.chair || b.tub || isRider(b) ? dist(x, y, hx, hy + r * 0.3) < r * 1.3 : dist(x, y, b.ix, b.iy + pdy - r * 1.4) < r * 1.6) return { k: 'baby', o: b };
   }
   if (h.kind === 'park') return hitPark(x, y);
   const res = h.kind === 'canteen' ? hitCanteen(x, y) : h.kind === 'bath' ? hitBath(x, y) : hitNursery(x, y);
@@ -299,7 +300,7 @@ export function startDrag(b) {
   b.dragged = true; b.target = null; b.ifall = false; b.pose = null;
   if (b.toy) { const z = b.toy; z.held = null; z.released = true; z.vx = rand(-60, 60) * S; z.vy = -50 * S; b.toy = null; }
   if (b.tub) b.wet = 40; // из ванны — мокрый, капает (вытереть полотенцем)
-  b.crib = null; b.chair = null; b.tub = null; b.potty = null; b.towel = null; b.spot = null; b.play = null; b.pose = null; b.eat = null; b.eatPending = false;
+  b.crib = null; b.chair = null; b.tub = null; b.potty = null; b.towel = null; b.spot = null; b.goSpot = null; b.play = null; b.pose = null; b.eat = null; b.eatPending = false;
   sfx.pick();
 }
 
@@ -321,7 +322,7 @@ export function dropBaby(b, x, y) {
   }
   const h = G.curHouse, L = LAY(h), d = L.door, tg = roomDropAt(x, y);
   if (tg.door) {
-    b.home = null; b.crib = null; b.chair = null; b.tub = null; b.potty = null; b.towel = null; b.spot = null; b.pose = null; b.play = null; b.eat = null;
+    b.home = null; b.crib = null; b.chair = null; b.tub = null; b.potty = null; b.towel = null; b.spot = null; b.goSpot = null; b.pose = null; b.play = null; b.eat = null;
     b.x = h.x; b.y = h.cy() + (h === park ? -40 : 40) * S; const a = rand(0, TAU); b.vx = Math.cos(a) * 320 * S; b.vy = Math.sin(a) * 320 * S;
     b.wTimer = 1.2; b.born = t; b.laugh = 1.2; b.awake = 3;
     h.room.doorOpen = 1; whoosh(0.7, 0.2); sfx.yay(); burst(d.x + d.w / 2, d.y + d.h / 2, 'spark', 18, { size: 8, speed: 200, color: '#fff7c2' });
