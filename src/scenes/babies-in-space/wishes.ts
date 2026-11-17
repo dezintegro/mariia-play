@@ -8,12 +8,13 @@ import { drawBathIcon, drawPottyIcon } from './bath';
 import { drawToy } from './toys';
 import { BLOCK_COLORS, TOYS4, drawHorseShape } from './nursery';
 import { FOODS, drawFood } from './canteen';
+import { PLACES, drawPlaceIcon } from './park';
 import { heartPath } from '../../core/draw';
 
 // ---------------- ЖЕЛАНИЯ МАЛЫШЕЙ ----------------
-export const WISHES = ['sleep', 'play', 'eat', 'potty', 'bath'], WISH_LIFE = 90, MAX_WISHES = 2;
+export const WISHES = ['sleep', 'play', 'eat', 'potty', 'bath', 'walk'], WISH_LIFE = 90, MAX_WISHES = 2;
 // какое здание исполняет желание
-export const WISH_HOUSE = { sleep: 'nursery', play: 'nursery', eat: 'canteen', potty: 'bath', bath: 'bath' };
+export const WISH_HOUSE = { sleep: 'nursery', play: 'nursery', eat: 'canteen', potty: 'bath', bath: 'bath', walk: 'park' };
 
 export function headPos(b) { return b.home ? roomHead(b) : [b.x, b.y]; }
 
@@ -36,10 +37,11 @@ export function updateWishes(dt) {
     b.wishT -= dt; if (b.wishT > 0) continue;
     if (active >= MAX_WISHES || b.sleeping() || b.love > 0) { b.wishT = rand(3, 7); continue; }
     // горшок и купание появляются, только когда построена ванная
-    const opts = WISHES.filter(k => !(k === 'play' && b.play) && !(k === 'eat' && b.eat) && !(k === 'bath' && b.tub) && !(k === 'potty' && b.potty) && (WISH_HOUSE[k] !== 'bath' || builtKind('bath')));
+    const opts = WISHES.filter(k => !(k === 'play' && b.play) && !(k === 'eat' && b.eat) && !(k === 'bath' && b.tub) && !(k === 'potty' && b.potty) && !(k === 'walk' && b.spot) && (WISH_HOUSE[k] !== 'bath' || builtKind('bath')));
+    if (b.mud > 0.3 && builtKind('bath') && !b.tub) opts.push('bath', 'bath'); // испачкался в луже — чаще хочет купаться
     const k = pick(opts);
     // играть и есть — конкретно: какую игрушку, какую еду (рисуется в пузыре)
-    const o = k === 'play' ? pick(TOYS4) : k === 'eat' ? pick(FOODS) : null;
+    const o = k === 'play' ? pick(TOYS4) : k === 'eat' ? pick(FOODS) : k === 'walk' ? pick(PLACES) : null;
     b.wish = { k, o, t: WISH_LIFE, life: WISH_LIFE, no: 0 }; active++;
     sfx.wish();
   }
@@ -51,7 +53,7 @@ export function satisfy(b, k, o?) {
   if (b.wish.o && o && b.wish.o !== o) { b.wish.no = 1; if (b.visible()) sfx.nope(); return false; }
   const vis = b.visible(), [wx, wy] = wishPos(b);
   b.wish = null; b.wishT = rand(60, 100); b.love = 2.8;
-  const seated = b.crib || b.chair || b.tub || b.potty || b.towel || (b.play && b.play.phase === 'do' && (b.play.k === 'horse' || b.play.k === 'xylo'));
+  const seated = b.crib || b.chair || b.tub || b.potty || b.towel || b.spot || (b.play && b.play.phase === 'do' && (b.play.k === 'horse' || b.play.k === 'xylo'));
   if (!seated) b.anim = { k: 'joy', t: 2.4, d: 2.4 };
   if (!vis) return true;
   sfx.tada(); setTimeout(() => sfx.giggle(1.1), 500);
@@ -64,7 +66,8 @@ export function satisfy(b, k, o?) {
 }
 
 export function drawWishIcon(k, s, o?) {
-  ctx.fillStyle = { sleep: '#3b2b80', eat: '#ffc98f', play: '#bfeaff', potty: '#ffe3f0', bath: '#c6ecff' }[k]; circle(0, 0, s * 0.8);
+  ctx.fillStyle = { sleep: '#3b2b80', eat: '#ffc98f', play: '#bfeaff', potty: '#ffe3f0', bath: '#c6ecff', walk: '#d2f5e6' }[k]; circle(0, 0, s * 0.8);
+  if (k === 'walk') { drawPlaceIcon(o || 'swing', s * 0.85); return; }
   if (k === 'potty') { drawPottyIcon(s * 0.85); return; }
   if (k === 'bath') { drawBathIcon(s * 0.78); return; }
   if (k === 'sleep') {

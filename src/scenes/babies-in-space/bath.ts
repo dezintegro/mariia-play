@@ -39,6 +39,7 @@ export const newBathRoom = () => ({
 // малыш в ванне: голова над пеной, ручки плещутся
 export function tickTub(b, dt, L) {
   const r = RB(), T = L.tub;
+  if (b.mud > 0) b.mud = Math.max(0, b.mud - dt * 0.3); // ванна смывает грязь из лужи
   b.ix = tubSlotX(L, b.tub.i); b.iy = T.y - T.h + r * 1.15; b.face = b.tub.i ? -1 : 1;
   b.splashT = (b.splashT ?? rand(1, 3)) - dt;
   if (b.splashT <= 0 && !b.sleeping()) {

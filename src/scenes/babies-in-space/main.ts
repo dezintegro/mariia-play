@@ -4,10 +4,11 @@ import { circle, drawButton } from '../../core/draw';
 import { addP, drawParticles, updateParticles } from '../../core/particles';
 import { PICK_COLOR, flyHouse, flyPos, houseAt, iconHouse, launchHouse, pickIcon, updateFly } from './buildings';
 import { BL } from './bath';
+import { PL, park } from './park';
 import { KL, traySlots } from './canteen';
 import { Baby, tapBaby } from './characters';
 import { RL } from './nursery';
-import { LAY, roomHead, dragWish, drawRoom, drawTrans, dropBaby, enterRoom, exitRoom, hitRoom, hoverTarget, moveDrag, onRoomTap, startDrag, tapRoomBaby, updateRoom, updateTrans } from './room';
+import { LAY, roomHead, dragWish, hintA, drawRoom, drawTrans, dropBaby, enterRoom, exitRoom, hitRoom, hoverTarget, moveDrag, onRoomTap, startDrag, tapRoomBaby, updateRoom, updateTrans } from './room';
 import { sfx, updLullaby } from './sounds';
 import { bgC, bigStars, btn, buildBg, drawAlien, drawPlanet, drawRinged, drawShooting, drawStars, hit, iconMoonSun, iconRocket, iconSound, launchBaby, onTap, planet, ringed, tapPlanet, updateShooting } from './space';
 import { G, MAX_BABIES, MAX_HOUSES, RB, availPicks, babies, houses, picker } from './state';
@@ -66,10 +67,11 @@ function update(dt) {
   placePicks(); updateFly(dt);
   planet.blinkT -= dt; if (planet.blinkT <= 0) { planet.blink = 0.18; planet.blinkT = rand(2.5, 5); } planet.blink = Math.max(0, planet.blink - dt);
   ringed.spinT = Math.max(0, ringed.spinT - dt * 0.8);
+  park.bounce = Math.max(0, park.bounce - dt * 1.5); park.door = Math.max(0, park.door - dt);
   if (G.scene === 'room') {
     updateRoom(dt);
     // малыши в комнате не слипаются
-    const rb = G.curHouse.occupants().filter(b => !b.dragged && !b.crib && !b.chair && !b.tub && !b.potty && !b.towel && !b.ifall && !(b.play && b.play.phase === 'do' && (b.play.k === 'horse' || b.play.k === 'xylo' || b.play.k === 'tower'))), Lr = LAY(G.curHouse), m = RB() * 1.9;
+    const rb = G.curHouse.occupants().filter(b => !b.dragged && !b.crib && !b.chair && !b.tub && !b.potty && !b.towel && !b.spot && !b.ifall && !(b.play && b.play.phase === 'do' && (b.play.k === 'horse' || b.play.k === 'xylo' || b.play.k === 'tower'))), Lr = LAY(G.curHouse), m = RB() * 1.9;
     for (let i = 0; i < rb.length; i++) for (let j = i + 1; j < rb.length; j++) {
       const a = rb[i], b = rb[j], dx = b.ix - a.ix, dy = (b.iy - a.iy) * 2, d = Math.hypot(dx, dy) || 1;
       if (d < m) { const f = (m - d) * 2 * dt; a.ix -= dx / d * f; b.ix += dx / d * f; a.iy -= dy / d * f * 0.5; b.iy += dy / d * f * 0.5; }
@@ -85,13 +87,16 @@ function draw() {
   if (G.scene === 'space') {
     ctx.drawImage(bgC, 0, 0, W, H);
     if (G.night > 0.01) { ctx.fillStyle = `rgba(5,3,25,${G.night * 0.45})`; ctx.fillRect(0, 0, W, H); }
-    drawStars(); drawShooting(); drawRinged(); drawAlien(); drawPlanet();
+    drawStars(); drawShooting(); drawRinged(); drawAlien();
     const hv = hoverTarget().house, wk = dragWish();
+    drawPlanet(hv === park ? 0.6 : wk && WISH_HOUSE[wk] === 'park' ? hintA() : 0);
     for (const h of houses) h.draw(h === hv, wk && WISH_HOUSE[wk] === h.kind);
     for (const b of babies) if (!b.home && !b.dragged) b.draw();
     drawToys(); drawParticles();
     for (const b of babies) if (!b.home && b.dragged) b.draw();
     for (const b of babies) if (!b.home && b.wish) drawWish(b, ...(wishPos(b) as [number, number]));
+    // желания тех, кто гуляет на планете, видны над ней
+    park.occupants().filter(b => b.wish).slice(0, 2).forEach((b, i) => drawWish(b, planet.x + planet.r * 0.8 + 30 * S, planet.y - planet.r * 1.15 - i * 48 * S, 0.6));
     drawButton(btn.night, G.nightTarget ? '#ffb84d' : '#5b4bb7', iconMoonSun, false);
     drawButton(btn.house, houses.length < MAX_HOUSES ? '#2ec4b6' : '#5f7d8c', iconHouse, houses.length < MAX_HOUSES && !picker.open && !picker.fly);
     if (picker.open) {
@@ -206,6 +211,6 @@ requestAnimationFrame(frame);
   audio() { return AC ? AC.state : 'none'; },
   suspendAudio() { AC && AC.suspend(); },
   start() { G.started = true; document.getElementById('start')!.classList.add('hide'); },
-  api: { launchBaby, launchHouse, flyHouse, BL, enterRoom, exitRoom, tapBaby, tapPlanet, tapRoomBaby, onTap, onRoomTap, hit, hitRoom,
+  api: { launchBaby, launchHouse, flyHouse, BL, PL, park, enterRoom, exitRoom, tapBaby, tapPlanet, tapRoomBaby, onTap, onRoomTap, hit, hitRoom,
     startDrag, moveDrag, dropBaby, RL, KL, traySlots, houseAt, roomHead },
 };

@@ -12,6 +12,7 @@ import { G, RB } from './state';
 import { satisfy } from './wishes';
 import { riderHead } from './anim/horse';
 import { bedHead, startBedtime } from './anim/crib';
+import { PL, drawPark, dropInPark, hitPark, onParkTap, park, parkAt, parkDropAt, updatePark } from './park';
 import { BL, bathDropAt, drawBathRoom, dropInBath, hitBath, onBathTap, splashAt, updateBath } from './bath';
 
 export function roomHead(b) {
@@ -23,7 +24,7 @@ export function roomHead(b) {
   return [b.ix, b.iy - r * 2.4];
 }
 
-export const LAY = (h): any => h && h.kind === 'canteen' ? KL() : h && h.kind === 'bath' ? BL() : RL();
+export const LAY = (h): any => h && h.kind === 'canteen' ? KL() : h && h.kind === 'bath' ? BL() : h && h.kind === 'park' ? PL() : RL();
 
 export function drawBubbles(R) {
   for (const q of R.bubbles) {
@@ -56,7 +57,7 @@ export function updateRoom(dt) {
   R.starT = Math.max(0, R.starT - dt); R.doorOpen = Math.max(0, R.doorOpen - dt * 1.5); R.lampSwing = Math.max(0, R.lampSwing - dt * 0.6);
   for (const q of R.bubbles) { q.y += q.vy * dt; q.x += Math.sin(t * 2 + q.ph) * 25 * S * dt; q.life -= dt; }
   R.bubbles = R.bubbles.filter(q => q.life > 0 && q.y > -q.r);
-  if (h.kind === 'canteen') updateCanteen(dt, h); else if (h.kind === 'bath') updateBath(dt, h); else updateNursery(dt, h);
+  if (h.kind === 'canteen') updateCanteen(dt, h); else if (h.kind === 'bath') updateBath(dt, h); else if (h.kind === 'park') updatePark(dt, h); else updateNursery(dt, h);
 }
 
 export function drawRoomBg(L, h) {
@@ -175,6 +176,7 @@ export function roomDropAt(x, y): any {
     return {};
   }
   if (h.kind === 'bath') return bathDropAt(h, L, x, y);
+  if (h.kind === 'park') return parkDropAt(h, L, x, y);
   for (let i = 0; i < 2; i++) { const c = L.cribs[i]; if (Math.abs(x - c.x) < L.cw / 2 && y > c.y - 140 * S && y < c.y && !cribOf(h, i)) return { crib: i }; }
   const k = toyAt(x, y, L, h); if (k && !toyBusy(h, k)) return { toy: k };
   return {};
@@ -182,13 +184,14 @@ export function roomDropAt(x, y): any {
 
 export function hoverTarget(): any {
   if (!G.drag || !G.drag.moved) return {};
-  if (G.scene === 'space') return { house: houseAt(pointer.x, pointer.y) };
+  if (G.scene === 'space') return { house: houseAt(pointer.x, pointer.y) || parkAt(pointer.x, pointer.y) };
   return roomDropAt(pointer.x, pointer.y);
 }
 
 export function drawRoom(h) {
   if (h.kind === 'canteen') { drawCanteen(h); return; }
   if (h.kind === 'bath') { drawBathRoom(h); return; }
+  if (h.kind === 'park') { drawPark(h); return; }
   const L = RL(), R = h.room, hv = hoverTarget(), wk = dragWish(), wo = dragWishO();
   drawRoomBg(L, h); drawWindow(L, h); drawShelf(L, h); drawDoor(L, h, hv.door); drawLamp(L, h);
   // подсказки: куда можно положить малыша
@@ -216,6 +219,7 @@ export function hitRoom(x, y) {
     const [hx, hy] = roomHead(b), r = RB();
     if (b.crib || b.chair || b.tub || isRider(b) ? dist(x, y, hx, hy + r * 0.3) < r * 1.3 : dist(x, y, b.ix, b.iy - r * 1.4) < r * 1.5) return { k: 'baby', o: b };
   }
+  if (h.kind === 'park') return hitPark(x, y);
   const res = h.kind === 'canteen' ? hitCanteen(x, y) : h.kind === 'bath' ? hitBath(x, y) : hitNursery(x, y);
   if (res) return res;
   if (dist(x, y, L.lamp.x, L.lamp.y - 5 * k) < 50 * k) return { k: 'lamp' };
@@ -230,6 +234,7 @@ export function onRoomTap(x, y, hres) {
     tone(500, 0.25, { slide: 900, vol: 0.08 }); return;
   }
   if (h.kind === 'bath' && onBathTap(h, hres)) return;
+  if (h.kind === 'park' && onParkTap(h, hres, x, y)) return;
   switch (hres.k) {
     case 'btn': btn.sound.press = 1; if (toggleSound()) sfx.pop(); break;
     case 'bubble': { const q = R.bubbles.splice(hres.o, 1)[0]; sfx.pop(); burst(q.x, q.y, 'spark', 8, { size: 6, speed: 110, color: '#e6f4ff' }); break; }
@@ -250,7 +255,7 @@ export function onRoomTap(x, y, hres) {
 }
 
 export function tapRoomBaby(b) {
-  const n = b.tapN++ % 3, [hx, hy] = roomHead(b), seat = b.crib || b.chair || b.tub || b.potty || b.towel || isRider(b);
+  const n = b.tapN++ % 3, [hx, hy] = roomHead(b), seat = b.crib || b.chair || b.tub || b.potty || b.towel || b.spot || isRider(b);
   b.bounce = 1; b.awake = 3;
   if (b.tub) { splashAt(hx, hy + RB() * 0.9, 10); sfx.splash(); }
   if (n === 0) {
@@ -285,7 +290,7 @@ export function enterRoom(h) {
 }
 
 export function exitRoom() {
-  const h = G.curHouse, d = RL().door; h.room.doorOpen = 1;
+  const h = G.curHouse, d = LAY(h).door; h.room.doorOpen = 1;
   tone(300, 0.4, { type: 'triangle', slide: 520, vol: 0.12 });
   goTo('space', null, d.x + d.w / 2, d.y + d.h / 2, h.x, h.cy()); G.trans.house0 = h;
 }
@@ -294,7 +299,7 @@ export function startDrag(b) {
   b.dragged = true; b.target = null; b.ifall = false; b.pose = null;
   if (b.toy) { const z = b.toy; z.held = null; z.released = true; z.vx = rand(-60, 60) * S; z.vy = -50 * S; b.toy = null; }
   if (b.tub) b.wet = 40; // из ванны — мокрый, капает (вытереть полотенцем)
-  b.crib = null; b.chair = null; b.tub = null; b.potty = null; b.towel = null; b.play = null; b.pose = null; b.eat = null; b.eatPending = false;
+  b.crib = null; b.chair = null; b.tub = null; b.potty = null; b.towel = null; b.spot = null; b.play = null; b.pose = null; b.eat = null; b.eatPending = false;
   sfx.pick();
 }
 
@@ -306,23 +311,24 @@ export function moveDrag(b, x, y) {
 export function dropBaby(b, x, y) {
   b.dragged = false;
   if (G.scene === 'space') {
-    const h = houseAt(x, y);
+    const h = houseAt(x, y) || parkAt(x, y);
     if (h) {
       b.home = h; b.crib = null; b.target = null;
-      const L = RL(); b.ix = L.door.x + L.door.w + rand(40, 120) * S; b.iy = L.fy + rand(70, 140) * S; b.iwT = 0; b.ifall = false;
+      const L = LAY(h); b.ix = L.door.x + L.door.w + rand(40, 120) * S; b.iy = L.fy + rand(70, 140) * S; b.iwT = 0; b.ifall = false;
       h.bounce = 1; h.door = 1; sfx.dingdong(); burst(h.x, h.cy(), 'heart', 10, { size: 9, speed: 140, up: -60, color: '#ff7aa8' });
     } else { b.vx = 0; b.vy = 0; b.wTimer = 0.6; b.bounce = 1; sfx.boop(); }
     return;
   }
   const h = G.curHouse, L = LAY(h), d = L.door, tg = roomDropAt(x, y);
   if (tg.door) {
-    b.home = null; b.crib = null; b.chair = null; b.tub = null; b.potty = null; b.towel = null; b.pose = null; b.play = null; b.eat = null;
-    b.x = h.x; b.y = h.cy() + 40 * S; const a = rand(0, TAU); b.vx = Math.cos(a) * 320 * S; b.vy = Math.sin(a) * 320 * S;
+    b.home = null; b.crib = null; b.chair = null; b.tub = null; b.potty = null; b.towel = null; b.spot = null; b.pose = null; b.play = null; b.eat = null;
+    b.x = h.x; b.y = h.cy() + (h === park ? -40 : 40) * S; const a = rand(0, TAU); b.vx = Math.cos(a) * 320 * S; b.vy = Math.sin(a) * 320 * S;
     b.wTimer = 1.2; b.born = t; b.laugh = 1.2; b.awake = 3;
     h.room.doorOpen = 1; whoosh(0.7, 0.2); sfx.yay(); burst(d.x + d.w / 2, d.y + d.h / 2, 'spark', 18, { size: 8, speed: 200, color: '#fff7c2' });
     return;
   }
   if (h.kind === 'bath' && dropInBath(b, h, tg)) return;
+  if (h.kind === 'park' && dropInPark(b, h, tg)) return;
   if (tg.crib != null) { const i = tg.crib; b.crib = h.room.cribs[i]; startBedtime(b); h.room.cribs[i].spinV = 1.5; sfx.musicBox(); satisfy(b, 'sleep'); return; }
   if (tg.chair != null) {
     const i = tg.chair, c = L.chairs[i]; b.chair = h.room.chairs[i]; b.ix = c.x; b.iy = c.y; h.room.chairs[i].wob = 0.6;

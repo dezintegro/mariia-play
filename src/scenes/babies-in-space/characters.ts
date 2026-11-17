@@ -11,6 +11,7 @@ import { tickBed } from './anim/crib';
 import { tickEat } from './anim/eat';
 import { satisfy } from './wishes';
 import { dripWet, tickPotty, tickTowel, tickTub } from './bath';
+import { drawMud, tickSpot } from './park';
 
 // ---------------- МАЛЫШИ ----------------
 export const SKINS = ['#ffdcbf', '#f6c7a0', '#e5ad7f', '#c98d62', '#ffe6d1'];
@@ -73,6 +74,7 @@ export class Baby {
     if (this.tub) { tickTub(this, dt, L); return; }
     if (this.potty) { tickPotty(this, dt, L); return; }
     if (this.towel) { tickTowel(this, dt, L); return; }
+    if (this.spot) { tickSpot(this, dt, L); return; }
     if (this.ifall) {
       this.ivy += 1500 * S * dt; this.iy += this.ivy * dt;
       if (this.iy >= this.ifloor) { this.iy = this.ifloor; this.ifall = false; this.bounce = 1; if (this.visible()) sfx.boop(); }
@@ -386,7 +388,7 @@ export function drawRoomBabyAt(b, ox, oy, shadow) {
   else if (sleep) { wl = wr = 0.15; }
   else { const near = dist(pointer.x, pointer.y, ox, hy) < 150 * S; wr = near ? 1.7 + Math.sin(t * 11) * 0.5 : 0.3 + Math.sin(t * 2 + b.phase) * 0.2; wl = 0.3 + Math.sin(t * 2 + b.phase + 1) * 0.2; }
   if (shadow) { ctx.fillStyle = 'rgba(80,40,20,0.18)'; ell(ox, oy, r * 0.9, r * 0.22); }
-  const still = sleep || b.dragged || b.chair || b.tub || b.potty || b.towel || b.eat || isRider(b);
+  const still = sleep || b.dragged || b.chair || b.tub || b.potty || b.towel || (b.spot && b.spot.ph !== 'walk') || b.eat || isRider(b);
   const crawl = !still ? Math.abs(Math.sin(t * 5 + b.phase)) * 3 * S : 0;
   if (b.love > 0) halo(ox, hy + r * 0.6, r * 2.6, b.love);
   const X = animXf(b);
@@ -399,11 +401,11 @@ export function drawRoomBabyAt(b, ox, oy, shadow) {
     ctx.translate(P.dx || 0, P.dy || 0); ctx.rotate(P.lean || 0);
   }
   if (P && P.back) P.back(r);
-  drawBody(r, b, wl, wr, false, P || {});
+  drawBody(r, b, wl, wr, false, P || {}); drawMud(r, b, 'body');
   if (P && P.front) P.front(r); // перед телом, но за головой (например, предмет в руках у груди)
   ctx.save(); if (P && P.headTilt) ctx.rotate(P.headTilt);
   drawHead(r, b, (P && P.mood) || mood, look, { noHair: b.type === 'rocket' || b.type === 'moon', paci: b.type === 'bubble' && mood !== 'laugh', ...(P && P.face) });
-  drawAccessory(r, b);
+  drawAccessory(r, b); drawMud(r, b, 'head');
   ctx.restore();
   if (P && P.top) P.top(r); // поверх всего (предмет у рта, ладошки на глазах)
   if (b.eat && !(P && P.ownsFood)) { const pr = 1 - b.eat.t / b.eat.d; ctx.save(); ctx.translate(0, r * 0.7); const q = Math.max(0.05, 1 - pr * 0.85); ctx.scale(q, q); drawFood(b.eat.k, r * 0.42); ctx.restore(); }

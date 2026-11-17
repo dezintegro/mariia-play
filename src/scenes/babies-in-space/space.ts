@@ -5,6 +5,7 @@ import { addP, burst } from '../../core/particles';
 import { flyHouse, houseAt } from './buildings';
 import { Baby } from './characters';
 import { enterRoom } from './room';
+import { drawParkTop, park, parkDoorHit } from './park';
 import { PENTA, sfx } from './sounds';
 import { G, MAX_BABIES, MAX_HOUSES, availPicks, babies, houses, picker } from './state';
 import { spawnToy } from './toys';
@@ -130,7 +131,7 @@ export function drawAlien() {
   ctx.restore();
 }
 
-export function drawPlanet() {
+export function drawPlanet(glow = 0) {
   const P = planet, R = P.r;
   let sx = 1 + Math.sin(t * 22) * 0.07 * P.wob, sy = 1 - Math.sin(t * 22) * 0.07 * P.wob, hy = 0;
   if (P.hop > 0) {
@@ -182,6 +183,7 @@ export function drawPlanet() {
   else if (sleep) { ctx.fillStyle = '#b8344f'; circle(0, R * 0.27, R * 0.045); }
   else { ctx.beginPath(); ctx.arc(0, R * 0.16, R * 0.15, 0.2 * Math.PI, 0.8 * Math.PI); ctx.stroke(); }
   if (G.night > 0) { ctx.fillStyle = `rgba(20,10,70,${G.night * 0.25})`; circle(0, 0, R); }
+  drawParkTop(R, glow); // детская площадка на макушке — вход на планету
   ctx.restore();
 }
 
@@ -239,6 +241,7 @@ export function hit(x, y) {
   for (const s of shooting) if (dist(x, y, s.x, s.y) < 50 * S) return { k: 'shoot', o: s };
   for (const s of bigStars) if (dist(x, y, s.x, s.y) < 28 * S) return { k: 'star', o: s };
   if (dist(x, y, ringed.x, ringed.y) < ringed.r * 1.6) return { k: 'ringed' };
+  if (parkDoorHit(x, y)) return { k: 'park' };
   if (dist(x, y, planet.x, planet.y) < planet.r) return { k: 'planet' };
   return null;
 }
@@ -268,6 +271,7 @@ export function onTap(x, y, h) {
   } else if (h.k === 'pick') {
     flyHouse(h.o);
   } else if (h.k === 'planet') tapPlanet();
+  else if (h.k === 'park') { planet.wob = 0.5; enterRoom(park); }
 }
 
 // три разные реакции планеты — по кругу
