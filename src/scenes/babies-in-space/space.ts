@@ -238,10 +238,10 @@ export function hit(x, y) {
   for (const k of ['sound', 'night', 'house', 'launch']) { const b = btn[k]; if (dist(x, y, b.x, b.y) < b.r * 1.1) return { k: 'btn', o: k }; }
   for (let i = babies.length - 1; i >= 0; i--) { const b = babies[i]; if (b.home) continue; if (dist(x, y, b.x, b.y) < b.hitR()) return { k: 'baby', o: b }; }
   const h = houseAt(x, y); if (h) return { k: 'house', o: h };
+  if (parkDoorHit(x, y)) return { k: 'park' }; // вход на площадку важнее пролетающей звезды
   for (const s of shooting) if (dist(x, y, s.x, s.y) < 50 * S) return { k: 'shoot', o: s };
   for (const s of bigStars) if (dist(x, y, s.x, s.y) < 28 * S) return { k: 'star', o: s };
   if (dist(x, y, ringed.x, ringed.y) < ringed.r * 1.6) return { k: 'ringed' };
-  if (parkDoorHit(x, y)) return { k: 'park' };
   if (dist(x, y, planet.x, planet.y) < planet.r) return { k: 'planet' };
   return null;
 }
