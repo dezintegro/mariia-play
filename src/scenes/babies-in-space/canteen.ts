@@ -3,7 +3,7 @@ import { circle, ell, heartPath, starPath } from '../../core/draw';
 import { addP, burst } from '../../core/particles';
 import { drawRoomBaby, drawRoomBabyAt } from './characters';
 import { CHAIR_SEAT } from './nursery';
-import { dragWish, drawBubbles, drawDark, drawDoor, drawLamp, drawRoomBg, drawWindow, hintA, hoverTarget, roomHead } from './room';
+import { dragWish, drawBubbles, glowSpot, drawDark, drawDoor, drawLamp, drawRoomBg, drawWindow, hintA, hoverTarget, roomHead } from './room';
 import { sfx } from './sounds';
 import { G, RB } from './state';
 import { drawToy } from './toys';
@@ -57,16 +57,17 @@ export function drawFood(kind, s) {
 
 export function mouthPos(b) { const [hx, hy] = roomHead(b); return [hx, hy + RB() * 0.4]; }
 
-export function pickEater(h) {
+export function pickEater(h, k?) {
   const c = h.occupants().filter(b => !b.dragged && !b.eat && !b.eatPending && !b.ifall);
-  const score = b => (b.wish && b.wish.k === 'eat' ? 10 : 0) + (b.chair ? 5 : 0) + Math.random();
+  // сначала тот, кто хочет именно эту еду, потом сидящие на стульчиках, потом голодные «вообще»
+  const score = b => (b.wish && b.wish.k === 'eat' ? (!b.wish.o || b.wish.o === k ? 20 : 2) : 0) + (b.chair ? 5 : 0) + Math.random();
   c.sort((a, b) => score(b) - score(a)); return c[0] || null;
 }
 
 export function feedFrom(h, i) {
   const R = h.room, L = KL(), f = R.foods[i], sl = traySlots(L)[i];
   if (f.gone > 0) { sfx.boop(); return; }
-  const b = pickEater(h);
+  const b = pickEater(h, f.k);
   if (!b) { f.hop = 1; sfx.boing(); burst(sl.x, sl.y, 'spark', 8, { size: 7, speed: 120, color: '#fff7c2' }); return; }
   f.gone = 1.8; b.eatPending = true; b.awake = 3;
   R.flying.push({ k: f.k, x0: sl.x, y0: sl.y, b, p: 0 });
@@ -165,6 +166,7 @@ export function drawChair(L, i, h, glow) {
 
 export function drawTray(L, h) {
   const k = S, p = L.tray, R = h.room;
+  const wanted = new Set(h.occupants().filter(b => b.wish && b.wish.k === 'eat' && b.wish.o && !b.eat && !b.eatPending).map(b => b.wish.o));
   ctx.fillStyle = 'rgba(80,40,20,0.15)'; ell(p.x, p.y + 30 * k, p.w * 0.55, 9 * k);
   ctx.fillStyle = '#a66f45'; for (const dx of [-0.42, 0.42]) ctx.fillRect(p.x + p.w * dx - 7 * k, p.y, 14 * k, 30 * k);
   ctx.fillStyle = '#c98b5a'; ctx.beginPath(); ctx.roundRect(p.x - p.w / 2 - 12 * k, p.y - 14 * k, p.w + 24 * k, 22 * k, 9 * k); ctx.fill();
@@ -173,7 +175,9 @@ export function drawTray(L, h) {
     const f = R.foods[i];
     ctx.fillStyle = '#fff'; ell(sl.x, p.y - 15 * k, Math.min(38 * k, p.w / 10.5), 10 * k);
     if (f.gone > 0.4) return;
-    const sc = f.gone > 0 ? Math.max(0.01, easeOutBack(1 - f.gone / 0.4)) : 1, hop = f.hop > 0 ? Math.abs(Math.sin(f.hop * Math.PI * 3)) * 26 * k : 0;
+    // эту еду кто-то в столовой хочет — она подсвечена и подпрыгивает
+    if (wanted.has(f.k)) { glowSpot(sl.x, sl.y, 46 * k, hintA()); }
+    const sc = f.gone > 0 ? Math.max(0.01, easeOutBack(1 - f.gone / 0.4)) : 1, hop = f.hop > 0 ? Math.abs(Math.sin(f.hop * Math.PI * 3)) * 26 * k : wanted.has(f.k) ? Math.abs(Math.sin(t * 4)) * 9 * k : 0;
     ctx.save(); ctx.translate(sl.x, sl.y - hop + Math.sin(t * 2 + i) * 2 * k); ctx.rotate(f.hop > 0 ? Math.sin(t * 20) * 0.2 : 0); ctx.scale(sc, sc); drawFood(f.k, 32 * k); ctx.restore();
   });
 }

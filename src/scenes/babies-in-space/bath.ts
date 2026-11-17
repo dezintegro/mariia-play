@@ -22,6 +22,7 @@ export function BL() {
     win: { x: W * 0.5, y: H * 0.25, w: 240 * k, h: 175 * k }, lamp: { x: W * 0.3, y: H * 0.17 },
     potties: [{ x: W * 0.36, y: H - 50 * k }, { x: W * 0.54, y: H - 50 * k }],
     towel: { x: W - 95 * k, y: fy - 165 * k },
+    wrap: { x: W - 85 * k, y: H - 48 * k }, // где малыша вытирают полотенцем (полотенце слетает с крючка)
     bx0: door.x + doorW + 40 * k, bx1: W - 50 * k, by0: fy + 70 * k, by1: H - 30 * k,
   };
 }
@@ -29,6 +30,7 @@ export function BL() {
 export const tubSlotX = (L, i) => L.tub.x + (i ? 1 : -1) * L.tub.w * 0.22;
 export const tubOf = (h, i) => h.occupants().find(b => b.tub && b.tub.i === i && !b.dragged);
 export const pottyOf = (h, i) => h.occupants().find(b => b.potty && b.potty.i === i && !b.dragged);
+export const towelOf = h => h.occupants().find(b => b.towel && !b.dragged);
 export const newBathRoom = () => ({
   tubs: [{ i: 0 }, { i: 1 }], potties: [{ i: 0, wob: 0 }, { i: 1, wob: 0 }], duck: { hop: 0, x: 0 },
   faucet: 0, sink: 0, towel: 0, bubT: 0, light: true, starT: 0, bubbles: [], doorOpen: 0, lampSwing: 0,
@@ -72,6 +74,92 @@ export function tickPotty(b, dt, L) {
       if (b.visible()) sfx.boop();
     }
   }
+}
+
+// малыш в полотенце: полотенце слетает с крючка и укутывает → трём-трём (пар, смех) → блестит чистый → вылезает
+const WRAP = 0.4, RUB = 3.4, OUT = 4.8;
+export function tickTowel(b, dt, L) {
+  const P = b.towel, r = RB(), w = L.wrap;
+  P.t += dt; b.ix = w.x; b.iy = w.y; b.face = -1;
+  const col = b.home ? b.home.roof : '#ff7aa8';
+  if (P.t < WRAP) { b.pose = towelPose(col, P.t / WRAP, 0); return; }
+  if (P.t < RUB) {
+    const rub = Math.sin(P.t * 13);
+    b.pose = { ...towelPose(col, 1, rub), mood: 'laugh', lean: rub * 0.1, headTilt: -rub * 0.08, armL: 0.2, armR: 0.2 };
+    P.s = (P.s ?? 0) - dt;
+    if (P.s <= 0) {
+      P.s = 0.42; b.laugh = Math.max(b.laugh, 0.6);
+      if (b.visible()) {
+        sfx.rub();
+        const [hx, hy] = [b.ix, b.iy - r * 2.4];
+        // пар и капельки разлетаются (если был мокрый — больше)
+        const n = b.wet > 0 ? 4 : 2;
+        for (let i = 0; i < n; i++) addP({ kind: b.wet > 0 && i % 2 ? 'spark' : 'smoke', x: hx + rand(-1.2, 1.2) * r, y: hy + rand(-0.5, 1.2) * r, vx: rand(-60, 60) * S, vy: -rand(40, 90) * S, life: rand(0.6, 1), size: rand(5, 9) * S, color: i % 2 ? '#bfe9ff' : '#fff', rot: 0, vr: 0, g: 0 });
+      }
+    }
+    return;
+  }
+  if (!P.done) {
+    P.done = true; b.wet = 0; b.shine = 6; b.laugh = 2; b.bounce = 1;
+    if (b.visible()) { sfx.sparkle(); burst(b.ix, b.iy - r * 2.2, 'spark', 16, { size: 8, speed: 170, color: '#fff7c2' }); }
+  }
+  // распахнулся: ручки вверх, «та-да!»
+  const q = Math.min(1, (P.t - RUB) / 0.3);
+  b.pose = { ...towelPose(col, 1, 0, q), mood: 'laugh', armL: 1.9 + Math.sin(t * 14) * 0.3, armR: 1.9 + Math.sin(t * 14 + 1) * 0.3 };
+  if (P.t > OUT) {
+    b.towel = null; b.pose = null; b.ix = clamp(w.x - 80 * S, L.bx0, L.bx1); b.iy = clamp(w.y - 20 * S, L.by0, L.by1); b.bounce = 1; b.iwT = 1.5;
+    if (b.home) b.home.room.towel = 1.2; // полотенце вернулось на крючок и качается
+    if (b.visible()) whoosh(0.4, 0.12);
+  }
+}
+
+/** поза «в полотенце»: накидка с капюшоном-ушками. q — накинулось (0..1), rub — трём, open — распахнулось (0..1) */
+function towelPose(col, q, rub, open = 0) {
+  const drop = (1 - q) * 2.2; // падает сверху
+  return {
+    back(r) {
+      ctx.save(); ctx.translate(0, -drop * r); ctx.globalAlpha = Math.min(1, q * 2);
+      ctx.fillStyle = col; ctx.beginPath(); ctx.roundRect(-1.12 * r, -1.0 * r, 2.24 * r, 3.45 * r, [1.1 * r, 1.1 * r, 0.3 * r, 0.3 * r]); ctx.fill();
+      ctx.restore();
+    },
+    front(r) {
+      if (open >= 1) return;
+      ctx.save(); ctx.translate(0, -drop * r); ctx.globalAlpha = Math.min(1, q * 2);
+      const sp = open * 0.9 * r; // распахивается в стороны
+      for (const s of [-1, 1]) {
+        ctx.save(); ctx.translate(s * sp, 0); ctx.rotate(s * open * 0.4 + rub * 0.06);
+        ctx.fillStyle = col; ctx.beginPath(); ctx.roundRect(s < 0 ? -1.05 * r : -0.02 * r, 0.65 * r, 1.07 * r, 1.8 * r, s < 0 ? [0.25 * r, 0, 0, 0.3 * r] : [0, 0.25 * r, 0.3 * r, 0]); ctx.fill();
+        ctx.fillStyle = 'rgba(255,255,255,0.7)'; ctx.fillRect(s < 0 ? -1.05 * r : -0.02 * r, 1.95 * r, 1.07 * r, 0.12 * r); ctx.fillRect(s < 0 ? -1.05 * r : -0.02 * r, 2.15 * r, 1.07 * r, 0.06 * r);
+        ctx.restore();
+      }
+      ctx.fillStyle = 'rgba(0,0,0,0.08)'; ctx.fillRect(-0.03 * r, 0.7 * r, 0.06 * r, 1.7 * r);
+      ctx.fillStyle = '#fff'; ctx.save(); ctx.translate(-0.5 * r - sp, 1.35 * r); heartPath(0.16 * r); ctx.restore();
+      ctx.restore();
+    },
+    top(r) {
+      // капюшон с ушками поверх волос
+      ctx.save(); ctx.translate(0, -drop * r); ctx.globalAlpha = Math.min(1, q * 2); ctx.rotate(rub * 0.05);
+      ctx.fillStyle = col;
+      circle(-0.72 * r, -0.92 * r, 0.26 * r); circle(0.72 * r, -0.92 * r, 0.26 * r);
+      ctx.fillStyle = 'rgba(255,255,255,0.55)'; circle(-0.72 * r, -0.92 * r, 0.13 * r); circle(0.72 * r, -0.92 * r, 0.13 * r);
+      ctx.strokeStyle = col; ctx.lineWidth = 0.32 * r; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.arc(0, 0, 1.0 * r, Math.PI * 1.05, Math.PI * 1.95); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(-1.0 * r, -0.2 * r); ctx.lineTo(-0.98 * r, 0.6 * r); ctx.moveTo(1.0 * r, -0.2 * r); ctx.lineTo(0.98 * r, 0.6 * r); ctx.stroke();
+      ctx.restore();
+    },
+  };
+}
+
+/** мокрый малыш (после ванны): капельки падают, пока не вытрут полотенцем или не высохнет сам */
+export function dripWet(b, dt) {
+  if (b.shine > 0) { // вытерли — блестит чистенький
+    b.shine -= dt;
+    if (b.visible() && Math.random() < dt * 2.5) { const r = RB(); addP({ kind: 'spark', x: b.ix + rand(-1, 1) * r, y: b.iy - r * rand(0.6, 3), vx: 0, vy: -20 * S, life: 0.7, size: rand(4, 7) * S, color: '#fff7c2', rot: 0, vr: 2, g: 0 }); }
+  }
+  if (!(b.wet > 0)) return;
+  b.wet -= dt; if (!b.visible() || b.towel || Math.random() > dt * 3) return;
+  const r = RB(), [x, y] = [b.ix + rand(-0.8, 0.8) * r, b.iy - r * rand(0.8, 2.6)];
+  addP({ kind: 'spark', x, y, vx: 0, vy: 30 * S, life: 0.6, size: rand(3.5, 5.5) * S, color: '#9ed8ff', rot: 0, vr: 0, g: 500 });
 }
 
 export function splashAt(x, y, n = 10) {
@@ -176,9 +264,11 @@ function drawSink(L, h) {
   ctx.fillStyle = '#9b7be0'; ctx.fillRect(s.x - 35 * k, s.y - 112 * k, 8 * k, 8 * k);
 }
 
-function drawTowel(L, h) {
+function drawTowel(L, h, glow = 0) {
   const k = S, w = L.towel, R = h.room, sw = Math.sin(t * 6) * 0.25 * R.towel;
   ctx.fillStyle = '#c9d3e8'; ctx.beginPath(); ctx.roundRect(w.x - 55 * k, w.y - 6 * k, 110 * k, 10 * k, 5 * k); ctx.fill();
+  if (towelOf(h)) return; // полотенце сейчас на малыше
+  if (glow) glowSpot(w.x, w.y + 60 * k, 85 * k, glow);
   ctx.save(); ctx.translate(w.x, w.y); ctx.rotate(sw);
   ctx.fillStyle = h.roof; ctx.beginPath(); ctx.roundRect(-42 * k, 0, 84 * k, 120 * k, [4 * k, 4 * k, 12 * k, 12 * k]); ctx.fill();
   ctx.fillStyle = 'rgba(255,255,255,0.7)'; ctx.fillRect(-42 * k, 85 * k, 84 * k, 8 * k); ctx.fillRect(-42 * k, 99 * k, 84 * k, 4 * k);
@@ -188,7 +278,8 @@ function drawTowel(L, h) {
 
 export function drawBathRoom(h) {
   const L = BL(), R = h.room, hv = hoverTarget(), wk = dragWish();
-  drawRoomBg(L, h); drawWindow(L, h); drawTowel(L, h); drawSink(L, h); drawDoor(L, h, hv.door); drawLamp(L, h);
+  const dw = G.drag && G.drag.moved ? G.drag.b : null; // мокрого или ждущего купания малыша тянут — полотенце подсказывает
+  drawRoomBg(L, h); drawWindow(L, h); drawTowel(L, h, hv.towel ? 0.6 : dw && dw.wet > 0 ? hintA() : 0); drawSink(L, h); drawDoor(L, h, hv.door); drawLamp(L, h);
   if (wk === 'bath' && hv.tub == null && !(tubOf(h, 0) && tubOf(h, 1))) glowSpot(L.tub.x, L.tub.y - L.tub.h, L.tub.w * 0.7, hintA());
   if (wk === 'potty') L.potties.forEach((p, i) => { if (!pottyOf(h, i) && hv.potty !== i) glowSpot(p.x, p.y - 40 * S, 85 * S, hintA()); });
   const items = [{ y: L.tub.y, d: () => drawTub(L, h, hv.tub != null) }];
@@ -224,7 +315,8 @@ export function onBathTap(h, hres) {
 }
 
 export function bathDropAt(h, L, x, y): any {
-  const T = L.tub;
+  const T = L.tub, w = L.towel, wr = L.wrap;
+  if (!towelOf(h) && ((Math.abs(x - w.x) < 70 * S && y > w.y - 30 * S && y < w.y + 140 * S) || (Math.abs(x - wr.x) < 70 * S && y > wr.y - 190 * S && y < wr.y + 10 * S))) return { towel: true };
   if (Math.abs(x - T.x) < T.w / 2 + 10 * S && y > T.y - T.h - 170 * S && y < T.y + 10 * S) {
     const order = Math.abs(x - tubSlotX(L, 0)) < Math.abs(x - tubSlotX(L, 1)) ? [0, 1] : [1, 0];
     for (const i of order) if (!tubOf(h, i)) return { tub: i };
@@ -239,6 +331,10 @@ export function dropInBath(b, h, tg) {
     b.tub = R.tubs[tg.tub]; b.splashT = 1.2; b.laugh = 1.5; b.bounce = 1;
     tickTub(b, 0, L); sfx.splash(); splashAt(b.ix, L.tub.y - L.tub.h, 14);
     satisfy(b, 'bath'); return true;
+  }
+  if (tg.towel) {
+    b.towel = { t: 0, done: false }; R.towel = 0; b.bounce = 1;
+    tickTowel(b, 0, L); whoosh(0.5, 0.15); return true;
   }
   if (tg.potty != null) {
     b.potty = { i: tg.potty, t: 0, done: false }; R.potties[tg.potty].wob = 0.6; b.bounce = 1;

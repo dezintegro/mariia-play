@@ -48,6 +48,8 @@ export function glowSpot(x, y, r, a) {
 export const hintA = () => 0.3 + Math.sin(t * 6) * 0.18;
 
 export function dragWish() { const b = G.drag && G.drag.moved ? G.drag.b : null; return b && b.wish ? b.wish.k : null; }
+/** что именно хочет перетаскиваемый малыш (игрушка/еда) */
+export function dragWishO() { const b = G.drag && G.drag.moved ? G.drag.b : null; return b && b.wish ? b.wish.o : null; }
 
 export function updateRoom(dt) {
   const h = G.curHouse, R = h.room;
@@ -187,11 +189,11 @@ export function hoverTarget(): any {
 export function drawRoom(h) {
   if (h.kind === 'canteen') { drawCanteen(h); return; }
   if (h.kind === 'bath') { drawBathRoom(h); return; }
-  const L = RL(), R = h.room, hv = hoverTarget(), wk = dragWish();
+  const L = RL(), R = h.room, hv = hoverTarget(), wk = dragWish(), wo = dragWishO();
   drawRoomBg(L, h); drawWindow(L, h); drawShelf(L, h); drawDoor(L, h, hv.door); drawLamp(L, h);
   // подсказки: куда можно положить малыша
   if (wk === 'sleep') L.cribs.forEach((c, i) => { if (!cribOf(h, i) && hv.crib !== i) glowSpot(c.x, c.y - 60 * S, L.cw * 0.8, hintA()); });
-  if (wk === 'play') for (const k of TOYS4) if (!toyBusy(h, k) && hv.toy !== k) { const [x, y, r] = toyCenter(L, k, h); glowSpot(x, y, r, hintA()); }
+  if (wk === 'play') for (const k of TOYS4) if ((!wo || wo === k) && !toyBusy(h, k) && hv.toy !== k) { const [x, y, r] = toyCenter(L, k, h); glowSpot(x, y, r, hintA()); }
   if (hv.toy) { const [x, y, r] = toyCenter(L, hv.toy, h); glowSpot(x, y, r * 1.1, 0.65); }
   const items = [
     { y: L.horse.y, d: () => drawHorse(L, h) },
@@ -248,7 +250,7 @@ export function onRoomTap(x, y, hres) {
 }
 
 export function tapRoomBaby(b) {
-  const n = b.tapN++ % 3, [hx, hy] = roomHead(b), seat = b.crib || b.chair || b.tub || b.potty || isRider(b);
+  const n = b.tapN++ % 3, [hx, hy] = roomHead(b), seat = b.crib || b.chair || b.tub || b.potty || b.towel || isRider(b);
   b.bounce = 1; b.awake = 3;
   if (b.tub) { splashAt(hx, hy + RB() * 0.9, 10); sfx.splash(); }
   if (n === 0) {
@@ -291,7 +293,8 @@ export function exitRoom() {
 export function startDrag(b) {
   b.dragged = true; b.target = null; b.ifall = false; b.pose = null;
   if (b.toy) { const z = b.toy; z.held = null; z.released = true; z.vx = rand(-60, 60) * S; z.vy = -50 * S; b.toy = null; }
-  b.crib = null; b.chair = null; b.tub = null; b.potty = null; b.play = null; b.pose = null; b.eat = null; b.eatPending = false;
+  if (b.tub) b.wet = 40; // из ванны — мокрый, капает (вытереть полотенцем)
+  b.crib = null; b.chair = null; b.tub = null; b.potty = null; b.towel = null; b.play = null; b.pose = null; b.eat = null; b.eatPending = false;
   sfx.pick();
 }
 
@@ -313,7 +316,7 @@ export function dropBaby(b, x, y) {
   }
   const h = G.curHouse, L = LAY(h), d = L.door, tg = roomDropAt(x, y);
   if (tg.door) {
-    b.home = null; b.crib = null; b.chair = null; b.tub = null; b.potty = null; b.pose = null; b.play = null; b.eat = null;
+    b.home = null; b.crib = null; b.chair = null; b.tub = null; b.potty = null; b.towel = null; b.pose = null; b.play = null; b.eat = null;
     b.x = h.x; b.y = h.cy() + 40 * S; const a = rand(0, TAU); b.vx = Math.cos(a) * 320 * S; b.vy = Math.sin(a) * 320 * S;
     b.wTimer = 1.2; b.born = t; b.laugh = 1.2; b.awake = 3;
     h.room.doorOpen = 1; whoosh(0.7, 0.2); sfx.yay(); burst(d.x + d.w / 2, d.y + d.h / 2, 'spark', 18, { size: 8, speed: 200, color: '#fff7c2' });

@@ -107,7 +107,7 @@ export function startPlay(b, k) {
   else if (k === 'xylo') { [b.ix, b.iy] = toyApproach(L, 'xylo', h); xyloStart(b, L); }
   else if (k === 'tower') towerStart(b, L);
   if (b.visible()) sfx.pick();
-  satisfy(b, 'play');
+  satisfy(b, 'play', k);
 }
 
 export function endPlay(b, L) {
@@ -230,22 +230,27 @@ export function drawHorse(L, h) {
   const k = S, p = L.horse, a = Math.sin(t * 7) * 0.28 * h.room.horse;
   ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(a);
   ctx.fillStyle = 'rgba(80,40,20,0.15)'; ell(0, 2 * k, 70 * k, 8 * k);
+  drawHorseShape(k, h.roof);
+  ctx.restore();
+  const rider = h.occupants().find(isRider);
+  if (rider) drawHorseRider(rider, L, h); // наездник со своей позой (anim/horse.ts)
+}
+
+/** лошадка-качалка; k — масштаб (S в комнате), начало координат — середина полозьев */
+export function drawHorseShape(k, mane) {
   ctx.strokeStyle = '#c0705a'; ctx.lineWidth = 9 * k; ctx.lineCap = 'round';
   ctx.beginPath(); ctx.arc(0, -240 * k, 238 * k, Math.PI / 2 - 0.3, Math.PI / 2 + 0.3); ctx.stroke();
   ctx.strokeStyle = '#e39a6f'; ctx.lineWidth = 8 * k;
   for (const s of [-1, 1]) { ctx.beginPath(); ctx.moveTo(s * 30 * k, -58 * k); ctx.lineTo(s * 40 * k, -8 * k); ctx.stroke(); }
-  ctx.fillStyle = h.roof; ell(-50 * k, -78 * k, 12 * k, 22 * k, -0.6);
+  ctx.fillStyle = mane; ell(-50 * k, -78 * k, 12 * k, 22 * k, -0.6);
   ctx.fillStyle = '#ffb38a'; ell(0, -70 * k, 50 * k, 24 * k);
   ctx.save(); ctx.translate(38 * k, -88 * k); ctx.rotate(-0.5); ctx.fillRect(-10 * k, -30 * k, 22 * k, 40 * k); ctx.restore();
   ell(52 * k, -118 * k, 26 * k, 17 * k, 0.35);
-  ctx.fillStyle = h.roof; for (let i = 0; i < 4; i++) circle(28 * k + i * 4 * k, -128 * k + i * 12 * k, 8 * k);
+  ctx.fillStyle = mane; for (let i = 0; i < 4; i++) circle(28 * k + i * 4 * k, -128 * k + i * 12 * k, 8 * k);
   ell(-2 * k, -92 * k, 22 * k, 9 * k);
   ctx.fillStyle = '#2a1b3d'; circle(56 * k, -124 * k, 3.5 * k);
   ctx.fillStyle = '#ffb38a'; ell(36 * k, -136 * k, 5 * k, 10 * k, -0.3);
   ctx.fillStyle = 'rgba(255,110,140,0.5)'; circle(66 * k, -112 * k, 5 * k);
-  ctx.restore();
-  const rider = h.occupants().find(isRider);
-  if (rider) drawHorseRider(rider, L, h); // наездник со своей позой (anim/horse.ts)
 }
 
 export function drawBlock(p) {

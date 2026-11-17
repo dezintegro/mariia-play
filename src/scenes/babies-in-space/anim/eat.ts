@@ -99,7 +99,7 @@ export function tickEat(b: any, dt: number) {
   if (ph.name === 'tummy' && !E.yum && ph.p * TUMMY > 0.55) { E.yum = true; if (vis) sfx.yum(); }
   if (ph.done) {
     b.eat = null; b.pose = null;
-    if (!satisfy(b, 'eat')) { b.laugh = 1; b.bounce = 1; if (vis) burst(hx, hy, 'heart', 5, { size: 8, speed: 100, up: -60, color: '#ff7aa8' }); }
+    if (!satisfy(b, 'eat', E.k)) { b.laugh = 1; b.bounce = 1; if (vis) burst(hx, hy, 'heart', 5, { size: 8, speed: 100, up: -60, color: '#ff7aa8' }); }
     return;
   }
   b.pose = eatPose(b, ph.name, ph.p);

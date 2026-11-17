@@ -10,7 +10,7 @@ import { G, RB } from './state';
 import { tickBed } from './anim/crib';
 import { tickEat } from './anim/eat';
 import { satisfy } from './wishes';
-import { tickPotty, tickTub } from './bath';
+import { dripWet, tickPotty, tickTowel, tickTub } from './bath';
 
 // ---------------- МАЛЫШИ ----------------
 export const SKINS = ['#ffdcbf', '#f6c7a0', '#e5ad7f', '#c98d62', '#ffe6d1'];
@@ -67,10 +67,12 @@ export class Baby {
     this.tick(dt);
     if (this.dragged) return;
     const h = this.home, L = LAY(h);
+    if (this.wet > 0 || this.shine > 0) dripWet(this, dt);
     if (this.crib) { const c = L.cribs[this.crib.i]; this.ix = c.x - L.cw * 0.18; this.iy = c.y - 38 * S; return; }
     if (this.chair) { const c = L.chairs[this.chair.i]; this.ix = c.x; this.iy = c.y; return; }
     if (this.tub) { tickTub(this, dt, L); return; }
     if (this.potty) { tickPotty(this, dt, L); return; }
+    if (this.towel) { tickTowel(this, dt, L); return; }
     if (this.ifall) {
       this.ivy += 1500 * S * dt; this.iy += this.ivy * dt;
       if (this.iy >= this.ifloor) { this.iy = this.ifloor; this.ifall = false; this.bounce = 1; if (this.visible()) sfx.boop(); }
@@ -128,7 +130,7 @@ export class Baby {
       const toy = this.target; toy.held = this; this.toy = toy; this.target = null;
       this.happy = 4; this.laugh = 1.2; this.bounce = 1; this.awake = 5;
       if (G.scene === 'space') { sfx.yay(); burst(this.x, this.y, 'heart', 7, { size: 9, speed: 120, up: -60, color: '#ff7aa8' }); }
-      satisfy(this, 'play');
+      if (!this.wish || !this.wish.o || this.wish.o === toy.kind) satisfy(this, 'play', toy.kind); // в космосе — только если это та самая игрушка
     }
   }
   tilt() { return clamp(Math.atan2(this.vy, Math.abs(this.vx) + 1), -0.6, 0.6); }
@@ -365,10 +367,6 @@ export function drawAccessory(r, b) {
     ctx.fillStyle = '#c9a7ff'; ctx.beginPath(); ctx.moveTo(-r * 0.95, -r * 0.35); ctx.quadraticCurveTo(0, -r * 1.35, r * 0.95, -r * 0.35);
     ctx.quadraticCurveTo(r * 0.9, -r * 1.9, r * 1.9, -r * 1.3); ctx.quadraticCurveTo(r * 0.2, -r * 1.5, -r * 0.95, -r * 0.35); ctx.fill();
     ctx.fillStyle = '#fff'; circle(r * 1.9, -r * 1.3, r * 0.22);
-  } else if (b.type === 'ufo') {
-    ctx.strokeStyle = '#7be08a'; ctx.lineWidth = r * 0.1; ctx.lineCap = 'round';
-    for (const s of [-1, 1]) { ctx.beginPath(); ctx.moveTo(s * r * 0.4, -r * 0.85); ctx.lineTo(s * r * 0.65, -r * 1.45); ctx.stroke(); }
-    ctx.fillStyle = '#ffd66b'; circle(-r * 0.65, -r * 1.45, r * 0.15); circle(r * 0.65, -r * 1.45, r * 0.15);
   }
   // suit: в комнате шлем снят — антенна была на шлеме, поэтому на голове её нет
 }
@@ -388,7 +386,7 @@ export function drawRoomBabyAt(b, ox, oy, shadow) {
   else if (sleep) { wl = wr = 0.15; }
   else { const near = dist(pointer.x, pointer.y, ox, hy) < 150 * S; wr = near ? 1.7 + Math.sin(t * 11) * 0.5 : 0.3 + Math.sin(t * 2 + b.phase) * 0.2; wl = 0.3 + Math.sin(t * 2 + b.phase + 1) * 0.2; }
   if (shadow) { ctx.fillStyle = 'rgba(80,40,20,0.18)'; ell(ox, oy, r * 0.9, r * 0.22); }
-  const still = sleep || b.dragged || b.chair || b.tub || b.potty || b.eat || isRider(b);
+  const still = sleep || b.dragged || b.chair || b.tub || b.potty || b.towel || b.eat || isRider(b);
   const crawl = !still ? Math.abs(Math.sin(t * 5 + b.phase)) * 3 * S : 0;
   if (b.love > 0) halo(ox, hy + r * 0.6, r * 2.6, b.love);
   const X = animXf(b);

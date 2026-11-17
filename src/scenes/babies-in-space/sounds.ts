@@ -43,6 +43,8 @@ Object.assign(sfx, {
   wish() { tone(660, 0.18, { type: 'triangle', vol: 0.08 }); tone(880, 0.3, { type: 'triangle', vol: 0.08, delay: 0.16 }); },
   dance() { [784, 659, 784, 988, 880, 1047].forEach((f, i) => tone(f, 0.16, { type: 'triangle', vol: 0.12, delay: i * 0.13 })); },
   splash() { whoosh(0.35, 0.14); for (let i = 0; i < 4; i++) tone(rand(700, 1300), 0.09, { type: 'sine', slide: rand(300, 500), vol: 0.07, delay: i * 0.05 }); },
+  nope() { tone(587, 0.14, { type: 'triangle', slide: 523, vol: 0.09 }); tone(587, 0.22, { type: 'triangle', slide: 440, vol: 0.09, delay: 0.2 }); },
+  rub() { whoosh(0.22, 0.07); },
   hmm() { tone(196, 0.32, { type: 'triangle', slide: 175, vol: 0.06, attack: 0.05 }); },
   tinkle() { [1568, 1319, 1568, 2093].forEach((f, i) => tone(f, 0.25, { type: 'sine', vol: 0.08, delay: i * 0.09 })); },
   wheee() { tone(300, 0.6, { type: 'triangle', slide: 1200, vol: 0.13 }); },
