@@ -8,7 +8,7 @@ import { btn, planet } from './space';
 import { G, MAX_BABIES, babies, babyPicker, picker } from './state';
 
 // ---------------- ВЫБОР МАЛЫША ----------------
-// Тап по ракете раскрывает веер дугой над ней: скафандр, пузырь, тарелка, ракета и подарок-«сюрприз».
+// Тап по ракете раскрывает веер дугой над ней: скафандр, пузырь, тарелка, ракета и «?» — случайный малыш.
 // В кнопке — живой малыш-превью (моргает, следит за пальцем); тап — он выпрыгивает из кнопки в космос,
 // а в кнопке появляется новый. Веер остаётся открытым, чтобы запускать подряд.
 
@@ -80,18 +80,17 @@ function babyIcon(o) {
   };
 }
 
-// подарок с бантом: подпрыгивает и покачивается — внутри случайный малыш
+// большой знак вопроса (рисуется линией): покачивается и подпрыгивает — внутри случайный малыш
 function iconSurprise(R) {
   const j = Math.max(0, Math.sin(t * 3.2)) ** 6;
-  ctx.translate(0, R * 0.1 - j * R * 0.12); ctx.rotate(Math.sin(t * 9) * 0.12 * j);
-  ctx.fillStyle = '#ffd66b'; ctx.beginPath(); ctx.roundRect(-R * 0.4, -R * 0.12, R * 0.8, R * 0.55, R * 0.07); ctx.fill();
-  ctx.fillStyle = '#fff3b0'; ctx.beginPath(); ctx.roundRect(-R * 0.47, -R * 0.3, R * 0.94, R * 0.22, R * 0.06); ctx.fill();
-  ctx.fillStyle = '#5b8def'; ctx.fillRect(-R * 0.08, -R * 0.3, R * 0.16, R * 0.73);
-  for (const s of [-1, 1]) { ctx.beginPath(); ctx.ellipse(s * R * 0.17, -R * 0.4, R * 0.17, R * 0.1, s * 0.5, 0, TAU); ctx.fill(); }
-  ctx.fillStyle = '#3f6fd6'; circle(0, -R * 0.36, R * 0.07);
+  ctx.translate(0, -j * R * 0.1); ctx.rotate(Math.sin(t * 2.2) * 0.1 + Math.sin(t * 9) * 0.1 * j);
+  ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  const q = () => { ctx.beginPath(); ctx.arc(0, -R * 0.22, R * 0.24, Math.PI * 1.05, Math.PI * 2.3); ctx.quadraticCurveTo(0, -R * 0.02, 0, R * 0.14); };
+  ctx.strokeStyle = 'rgba(120,30,70,0.25)'; ctx.lineWidth = R * 0.2; ctx.save(); ctx.translate(R * 0.03, R * 0.04); q(); ctx.stroke(); ctx.restore();
+  ctx.strokeStyle = '#fff'; ctx.lineWidth = R * 0.17; q(); ctx.stroke();
+  ctx.fillStyle = '#fff'; circle(0, R * 0.38, R * 0.1);
   // искорки вокруг
-  ctx.fillStyle = '#fff';
-  for (let i = 0; i < 3; i++) { const a = t * 1.5 + i * TAU / 3, s = (Math.sin(t * 5 + i * 2) + 1) * 0.5; circle(Math.cos(a) * R * 0.62, Math.sin(a) * R * 0.55 - R * 0.05, R * 0.05 * s + R * 0.01); }
+  for (let i = 0; i < 3; i++) { const a = t * 1.5 + i * TAU / 3, s = (Math.sin(t * 5 + i * 2) + 1) * 0.5; circle(Math.cos(a) * R * 0.66, Math.sin(a) * R * 0.6, R * 0.05 * s + R * 0.01); }
 }
 
 export function drawBabyPicker() {
