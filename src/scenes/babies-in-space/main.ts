@@ -4,7 +4,7 @@ import { circle, drawButton } from '../../core/draw';
 import { addP, drawParticles, updateParticles } from '../../core/particles';
 import { PICK_COLOR, flyHouse, flyPos, houseAt, iconHouse, launchHouse, pickIcon, updateFly } from './buildings';
 import { BL } from './bath';
-import { drawBabyPicker, pickBaby, placeBabyPicks, toggleBabyPicker, updateBabyPicker } from './babypick';
+import { drawBabyPicker, pickBaby, pickLayout, placeBabyPicks, toggleBabyPicker, updateBabyPicker } from './babypick';
 import { PL, park } from './park';
 import { KL, traySlots } from './canteen';
 import { Baby, tapBaby } from './characters';
@@ -219,6 +219,6 @@ requestAnimationFrame(frame);
   audio() { return AC ? AC.state : 'none'; },
   suspendAudio() { AC && AC.suspend(); },
   start() { G.started = true; document.getElementById('start')!.classList.add('hide'); },
-  api: { launchBaby, pickBaby, toggleBabyPicker, launchHouse, flyHouse, BL, PL, park, enterRoom, exitRoom, tapBaby, tapPlanet, tapRoomBaby, onTap, onRoomTap, hit, hitRoom,
+  api: { launchBaby, pickBaby, pickLayout, placeBabyPicks, toggleBabyPicker, launchHouse, flyHouse, BL, PL, park, enterRoom, exitRoom, tapBaby, tapPlanet, tapRoomBaby, onTap, onRoomTap, hit, hitRoom,
     startDrag, moveDrag, dropBaby, RL, KL, traySlots, houseAt, roomHead },
 };

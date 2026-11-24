@@ -1,5 +1,5 @@
 import { tone, whoosh } from '../../core/audio';
-import { H, S, TAU, W, clamp, ctx, easeOutBack, pick, pointer, rand, t } from '../../core/canvas';
+import { H, S, SAFE, TAU, W, clamp, ctx, easeOutBack, pick, pointer, rand, t } from '../../core/canvas';
 import { circle, drawButton } from '../../core/draw';
 import { addP, burst } from '../../core/particles';
 import { Baby, drawBubbleBaby, drawRocketBaby, drawSuitBaby, drawUfoBaby } from './characters';
@@ -15,16 +15,27 @@ import { G, MAX_BABIES, babies, babyPicker, picker } from './state';
 export const BPICK_COLOR = { suit: '#5b8def', bubble: '#a77bff', ufo: '#2ec4b6', rocket: '#ff9f43', surprise: '#ff7aa8' };
 const ICON_K = { suit: 0.4, bubble: 0.36, ufo: 0.36, rocket: 0.34 }; // размер малыша относительно кнопки
 
-export const randomKind = () => pick(['suit', 'suit', 'bubble', 'ufo', 'rocket']);
+// временно: пузырь 40%, остальные по 20% (потом сделать поровну)
+export const randomKind = () => pick(['suit', 'bubble', 'bubble', 'ufo', 'rocket']);
 
 function freshPreview(o) { o.prev = o.k === 'surprise' ? null : new Baby(o.k, 0, 0); if (o.prev) o.prev.born = t; }
 
-// дуга от «вверх» к «влево» вокруг ракеты (ракета — в правом нижнем углу)
+// раскладка веера: в портрете на телефоне — PORTRAIT_LAYOUT, иначе дуга от «вверх» к «влево» вокруг ракеты
+export const pickLayout = { portrait: 'row' as 'arc' | 'row' | 'col' };
 export function placeBabyPicks() {
-  const br = btn.launch.r, R = br * 4.8, n = babyPicker.opts.length;
+  const L = btn.launch, br = L.r, n = babyPicker.opts.length;
+  const mode = H > W ? pickLayout.portrait : 'arc';
   babyPicker.opts.forEach((o, i) => {
-    const a = -Math.PI * (0.47 + 0.47 * i / (n - 1));
-    Object.assign(o, { x: btn.launch.x + Math.cos(a) * R, y: btn.launch.y + Math.sin(a) * R, r0: br * 0.8 });
+    if (mode === 'row') { // строкой над нижними кнопками, во всю ширину
+      const x0 = SAFE.l + 12, x1 = W - SAFE.r - 12, step = (x1 - x0) / n;
+      Object.assign(o, { x: x0 + step * (i + 0.5), y: L.y - br * 2.35, r0: Math.min(br * 0.85, step * 0.46) });
+    } else if (mode === 'col') { // столбиком вверх от ракеты
+      const r0 = br * 0.8;
+      Object.assign(o, { x: L.x, y: L.y - br * 1.3 - r0 - i * r0 * 2.2, r0 });
+    } else {
+      const a = -Math.PI * (0.47 + 0.47 * i / (n - 1)), R = br * 4.8;
+      Object.assign(o, { x: L.x + Math.cos(a) * R, y: L.y + Math.sin(a) * R, r0: br * 0.8 });
+    }
     if (!o.prev && o.k !== 'surprise') freshPreview(o);
   });
 }
