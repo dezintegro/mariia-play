@@ -43,7 +43,7 @@ export function placeBabyPicks() {
 export function toggleBabyPicker() {
   btn.launch.press = 1;
   if (babies.length >= MAX_BABIES) { btn.launch.shake = 1; sfx.boop(); babyPicker.open = false; return; }
-  babyPicker.open = !babyPicker.open; babyPicker.t = 0;
+  babyPicker.open = !babyPicker.open; babyPicker.t = 0; babyPicker.idle = 0;
   if (babyPicker.open) { picker.open = false; sfx.pop(); tone(784, 0.2, { type: 'triangle', vol: 0.1, delay: 0.08 }); }
   else sfx.boop();
 }
@@ -57,7 +57,7 @@ export function pickBaby(o) {
   Object.assign(b, { x: o.x, y: o.y, vx: dx / d * 380 * S, vy: dy / d * 380 * S, wx: tx, wy: ty, wTimer: 1.5, born: t, laugh: 1.2, awake: 3, face: Math.sign(dx) || 1 });
   babies.push(b);
   freshPreview(o);
-  o.press = 1; babyPicker.t = 0;
+  o.press = 1; babyPicker.idle = 0; // t не сбрасываем — иначе весь ряд заново «вырастает» (мигает)
   whoosh(); sfx.yay(); planet.laugh = 0.6;
   if (o.k === 'surprise') { [523, 659, 784, 1047].forEach((f, i) => tone(f, 0.18, { type: 'triangle', vol: 0.1, delay: i * 0.07 })); burst(o.x, o.y, 'spark', 12, { size: 10, speed: 220, color: '#ffe27a' }); }
   for (let i = 0; i < 8; i++) addP({ kind: 'smoke', x: o.x, y: o.y, vx: rand(-80, 80) * S, vy: rand(-80, 40) * S, life: rand(0.5, 0.9), size: rand(8, 14) * S, color: '#fff', rot: 0, vr: 0, g: 0 });
@@ -66,7 +66,7 @@ export function pickBaby(o) {
 }
 
 export function updateBabyPicker(dt) {
-  if (babyPicker.open) { babyPicker.t += dt; if (babyPicker.t > 10 || G.scene !== 'space') babyPicker.open = false; }
+  if (babyPicker.open) { babyPicker.t += dt; babyPicker.idle += dt; if (babyPicker.idle > 10 || G.scene !== 'space') babyPicker.open = false; }
   for (const o of babyPicker.opts) {
     const p = o.prev; if (!p) continue;
     p.blinkT -= dt; if (p.blinkT <= 0) { p.blink = 0.15; p.blinkT = rand(2, 5); }

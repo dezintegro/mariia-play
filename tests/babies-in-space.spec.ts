@@ -119,6 +119,7 @@ test('выбор малыша: веер над ракетой, выбранны�
         g.step(0.2);
       }
       out.got = got; out.stillOpen = g.babyPicker.open;
+      out.noBlink = g.babyPicker.t > 1 && g.babyPicker.idle < 0.5; // выбор не перезапускает анимацию раскрытия ряда
       const s = g.babyPicker.opts.find((q: any) => q.k === 'surprise'); A.onTap(s.x, s.y, A.hit(s.x, s.y));
       out.surprise = ['suit', 'bubble', 'ufo', 'rocket'].includes(g.babies[g.babies.length - 1].type);
       out.added = g.babies.length - n0;
@@ -135,7 +136,7 @@ test('выбор малыша: веер над ракетой, выбранны�
       return out;
     });
     expect(r).toEqual({ open: true, kinds: ['suit', 'bubble', 'ufo', 'rocket', 'surprise'], onScreen: true, bigEnough: true, noOverlap: true,
-      got: ['ufo', 'rocket', 'bubble', 'suit'], stillOpen: true, surprise: true, added: 5, closedByRocket: true, reopened: true, swap: true, full: true });
+      got: ['ufo', 'rocket', 'bubble', 'suit'], stillOpen: true, noBlink: true, surprise: true, added: 5, closedByRocket: true, reopened: true, swap: true, full: true });
     noErrors(errors);
   }
 });

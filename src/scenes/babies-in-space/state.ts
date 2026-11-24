@@ -24,6 +24,6 @@ export const availPicks = () => picker.opts.filter(o => !builtKind(o.k) && !(pic
 // выбор малыша: веер над кнопкой-ракетой — 4 вида + «сюрприз» (случайный); виды не кончаются.
 // prev — живой малыш-превью в кнопке: именно он и вылетает, на его место встаёт новый
 export const BABY_KINDS = ['suit', 'bubble', 'ufo', 'rocket'];
-export const babyPicker = { open: false, t: 0, opts: [...BABY_KINDS, 'surprise'].map(k => ({ k, x: 0, y: 0, r: 30, r0: 30, press: 0, shake: 0, prev: null as any })) };
+export const babyPicker = { open: false, t: 0, idle: 0, opts: [...BABY_KINDS, 'surprise'].map(k => ({ k, x: 0, y: 0, r: 30, r0: 30, press: 0, shake: 0, prev: null as any })) };
 
-export const RB =() => BR * 1.2; // размер малыша в комнате
+export const RB = () => BR * 1.2; // размер малыша в комнате
