@@ -97,3 +97,45 @@ test('портрет (планшет): сцена рисуется без оши
   await shot(page, 'canteen-portrait');
   noErrors(errors);
 });
+
+test('выбор малыша: веер над ракетой, выбранный вид вылетает, «сюрприз» — случайный', async ({ page }) => {
+  for (const vp of [{ w: 390, h: 844, n: 'phone' }, { w: 844, h: 390, n: 'land' }, { w: 1280, h: 800, n: 'desk' }]) {
+    await page.setViewportSize({ width: vp.w, height: vp.h });
+    const errors = await openScene(page);
+    await page.evaluate(() => { const g = window.__game, A = g.api, L = g.btn.launch; A.onTap(L.x, L.y, A.hit(L.x, L.y)); g.step(0.6); g.pause(true); });
+    await shot(page, `baby-picker-${vp.n}`);
+    const r = await page.evaluate(() => {
+      const g = window.__game, A = g.api, L = g.btn.launch, out: any = {}; g.pause(false);
+      out.open = g.babyPicker.open; out.kinds = g.babyPicker.opts.map((o: any) => o.k);
+      out.onScreen = g.babyPicker.opts.every((o: any) => o.x - o.r0 >= 0 && o.y - o.r0 >= 0 && o.x + o.r0 <= innerWidth && o.y + o.r0 <= innerHeight);
+      out.bigEnough = g.babyPicker.opts.every((o: any) => o.r0 * 2 >= 60);
+      out.noOverlap = g.babyPicker.opts.every((o: any, i: number, a: any[]) => i === 0 || Math.hypot(o.x - a[i - 1].x, o.y - a[i - 1].y) >= o.r0 * 2);
+      const n0 = g.babies.length, got: string[] = [];
+      for (const k of ['ufo', 'rocket', 'bubble', 'suit']) {
+        const o = g.babyPicker.opts.find((q: any) => q.k === k), prev = o.prev;
+        A.onTap(o.x, o.y, A.hit(o.x, o.y));
+        const b = g.babies[g.babies.length - 1]; got.push(b.type);
+        if (b !== prev || !o.prev || o.prev === prev) out.prevBad = k; // вылетел именно малыш из кнопки, на его месте новый
+        g.step(0.2);
+      }
+      out.got = got; out.stillOpen = g.babyPicker.open;
+      const s = g.babyPicker.opts.find((q: any) => q.k === 'surprise'); A.onTap(s.x, s.y, A.hit(s.x, s.y));
+      out.surprise = ['suit', 'bubble', 'ufo', 'rocket'].includes(g.babies[g.babies.length - 1].type);
+      out.added = g.babies.length - n0;
+      g.step(1.5);
+      // повторный тап по ракете закрывает; тап мимо — тоже
+      A.onTap(L.x, L.y, A.hit(L.x, L.y)); out.closedByRocket = !g.babyPicker.open;
+      A.onTap(L.x, L.y, A.hit(L.x, L.y)); out.reopened = g.babyPicker.open;
+      // открытие домиков закрывает веер малышей
+      A.onTap(g.btn.house.x, g.btn.house.y, A.hit(g.btn.house.x, g.btn.house.y)); out.swap = !g.babyPicker.open && g.picker.open;
+      g.picker.open = false;
+      // до предела: веер закрывается, ракета трясётся
+      while (g.babies.length < 17) A.launchBaby();
+      A.onTap(L.x, L.y, A.hit(L.x, L.y)); out.full = !g.babyPicker.open && g.btn.launch.shake > 0;
+      return out;
+    });
+    expect(r).toEqual({ open: true, kinds: ['suit', 'bubble', 'ufo', 'rocket', 'surprise'], onScreen: true, bigEnough: true, noOverlap: true,
+      got: ['ufo', 'rocket', 'bubble', 'suit'], stillOpen: true, surprise: true, added: 5, closedByRocket: true, reopened: true, swap: true, full: true });
+    noErrors(errors);
+  }
+});

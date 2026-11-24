@@ -4,10 +4,11 @@ import { circle, ell, starPath } from '../../core/draw';
 import { addP, burst } from '../../core/particles';
 import { flyHouse, houseAt } from './buildings';
 import { Baby } from './characters';
+import { pickBaby, randomKind, toggleBabyPicker } from './babypick';
 import { enterRoom } from './room';
 import { drawParkTop, park, parkDoorHit } from './park';
 import { PENTA, sfx } from './sounds';
-import { G, MAX_BABIES, MAX_HOUSES, availPicks, babies, houses, picker } from './state';
+import { G, MAX_BABIES, MAX_HOUSES, availPicks, babies, babyPicker, houses, picker } from './state';
 import { spawnToy } from './toys';
 
 // ---------------- МИР ----------------
@@ -219,12 +220,13 @@ export function iconSound(R) {
 }
 
 // ---------------- ДЕЙСТВИЯ В КОСМОСЕ ----------------
-export function launchBaby() {
+// случайный малыш прямо с планеты (для тестов и сценариев; игрок запускает через веер — babypick.ts)
+export function launchBaby(type = null) {
   const b0 = btn.launch; b0.press = 1;
   if (babies.length >= MAX_BABIES) { b0.shake = 1; sfx.boop(); return; }
   const a = rand(-Math.PI * 0.85, -Math.PI * 0.15);
   const x = planet.x + Math.cos(a) * planet.r, y = planet.y + Math.sin(a) * planet.r;
-  const b = new Baby(pick(['suit', 'suit', 'bubble', 'ufo', 'rocket']), x, y);
+  const b = new Baby(type || randomKind(), x, y);
   b.vx = Math.cos(a) * 420 * S; b.vy = Math.sin(a) * 420 * S; b.wTimer = 1.3; b.born = t; b.laugh = 1.2; b.awake = 3;
   [b.wx, b.wy] = [x + Math.cos(a) * 250 * S, y + Math.sin(a) * 250 * S];
   babies.push(b);
@@ -234,6 +236,7 @@ export function launchBaby() {
 }
 
 export function hit(x, y) {
+  if (babyPicker.open) for (const o of babyPicker.opts) if (dist(x, y, o.x, o.y) < o.r0 * 1.1) return { k: 'bpick', o };
   if (picker.open) for (const o of availPicks()) if (dist(x, y, o.x, o.y) < o.r0 * 1.1) return { k: 'pick', o };
   for (const k of ['sound', 'night', 'house', 'launch']) { const b = btn[k]; if (dist(x, y, b.x, b.y) < b.r * 1.1) return { k: 'btn', o: k }; }
   for (let i = babies.length - 1; i >= 0; i--) { const b = babies[i]; if (b.home) continue; if (dist(x, y, b.x, b.y) < b.hitR()) return { k: 'baby', o: b }; }
@@ -249,11 +252,11 @@ export function hit(x, y) {
 export function onTap(x, y, h) {
   if (!h) { spawnToy(x, y); return; }
   if (h.k === 'btn') {
-    if (h.o === 'launch') launchBaby();
+    if (h.o === 'launch') toggleBabyPicker();
     else if (h.o === 'house') {
       btn.house.press = 1;
       if (houses.length >= MAX_HOUSES || picker.fly || !availPicks().length) { btn.house.shake = 1; sfx.boop(); }
-      else { picker.open = !picker.open; picker.t = 0; if (picker.open) { sfx.pop(); tone(660, 0.2, { type: 'triangle', vol: 0.1, delay: 0.08 }); } else sfx.boop(); }
+      else { picker.open = !picker.open; picker.t = 0; if (picker.open) { babyPicker.open = false; sfx.pop(); tone(660, 0.2, { type: 'triangle', vol: 0.1, delay: 0.08 }); } else sfx.boop(); }
     }
     else if (h.o === 'night') {
       btn.night.press = 1; G.nightTarget = G.nightTarget ? 0 : 1;
@@ -268,7 +271,8 @@ export function onTap(x, y, h) {
     const s = h.o; s.pop = 1; sfx.chime(s.note); burst(s.x, s.y, 'spark', 10, { size: 7, speed: 120, color: '#ffe27a' });
   } else if (h.k === 'ringed') {
     ringed.hue = (ringed.hue + rand(70, 140)) % 360; ringed.spinT = 1; sfx.boing(); burst(ringed.x, ringed.y, 'spark', 12, { size: 7, speed: 140, color: `hsl(${ringed.hue},90%,80%)` });
-  } else if (h.k === 'pick') {
+  } else if (h.k === 'bpick') pickBaby(h.o);
+  else if (h.k === 'pick') {
     flyHouse(h.o);
   } else if (h.k === 'planet') tapPlanet();
   else if (h.k === 'park') { planet.wob = 0.5; enterRoom(park); }
