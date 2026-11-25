@@ -554,11 +554,11 @@ export function dropInPark(b, h, tg) {
 
 // ---------------- ГРЯЗЬ ПОСЛЕ ЛУЖИ ----------------
 /** пятнышки грязи на малыше (рисуется в координатах головы); part: 'body' | 'head' */
-export function drawMud(r, b, part) {
+export function drawMud(r, b, part, k = 1) {
   const m = b.mud || 0; if (m <= 0.02) return;
   ctx.fillStyle = `rgba(150,100,55,${0.75 * Math.min(1, m * 1.5)})`;
   const pts = part === 'body' ? [[-0.35, 1.5, 0.16], [0.3, 1.75, 0.13], [0.05, 1.25, 0.1], [-0.15, 2.05, 0.12], [0.45, 2.15, 0.1]] : [[0.5, 0.35, 0.12], [-0.45, -0.35, 0.09], [0.2, -0.6, 0.07]];
-  pts.slice(0, Math.ceil(pts.length * Math.min(1, m * 1.3))).forEach(([x, y, s]) => { ell(x * r, y * r, s * r * 1.2, s * r); });
+  pts.slice(0, Math.ceil(pts.length * Math.min(1, m * 1.3))).forEach(([x, y, s]) => { ell(x * r, y * r, s * k * r * 1.2, s * k * r); });
 }
 
 // значки для желания «гулять»

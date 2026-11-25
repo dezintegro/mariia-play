@@ -120,6 +120,11 @@ export class Baby {
     if (this.y < m) this.vy += (m - this.y) * 6 * dt; if (this.y > H - m) this.vy -= (this.y - H + m) * 6 * dt;
     this.x += this.vx * dt; this.y += this.vy * dt;
     if (Math.abs(this.vx) > 8 * S) this.face = Math.sign(this.vx);
+    // в космосе тоже видно, кто мокрый (капает) и кто грязный (падают комочки грязи); мокрость тут не сохнет
+    if (G.scene === 'space') {
+      if (this.wet > 0 && Math.random() < dt * 4) addP({ kind: 'spark', x: this.x + rand(-0.8, 0.8) * BR, y: this.y + BR * rand(0.3, 1), vx: 0, vy: 30 * S, life: 0.7, size: rand(6, 9) * S, color: '#9ed8ff', rot: 0, vr: 0, g: 400 });
+      if ((this.mud || 0) > 0.2 && Math.random() < dt * 1.5) addP({ kind: 'smoke', x: this.x + rand(-0.7, 0.7) * BR, y: this.y + BR * rand(0.5, 1.2), vx: 0, vy: 20 * S, life: 0.8, size: rand(3, 5) * S, color: '#9a6a3c', rot: 0, vr: 0, g: 300 });
+    }
     if (this.type === 'rocket' && G.scene === 'space') {
       this.trailT -= dt;
       if (this.trailT <= 0) {
@@ -163,6 +168,7 @@ export class Baby {
     else if (T === 'ufo') { ctx.rotate(Math.sin(t * 2 + this.phase) * 0.07 + this.spin); drawUfoBaby(r, this, mood, look); }
     else if (T === 'bubble') { ctx.rotate(Math.sin(t * 0.9 + this.phase) * 0.12 + this.spin); drawBubbleBaby(r, this, mood, look); }
     else if (T === 'moon') { ctx.rotate(Math.sin(t * 1.2) * 0.1 + Math.sin(this.rockT * 12) * this.rockT * 0.25); drawMoonBaby(r, this, mood, look); }
+    drawSpaceStatus(r, this);
     ctx.restore();
   }
 }
@@ -219,6 +225,45 @@ export function drawHead(r, b, mood, look, o: any = {}) {
     ctx.fillStyle = '#c93d5c'; circle(0, r * 0.4, r * 0.07);
   } else {
     ctx.strokeStyle = '#3a2540'; ctx.beginPath(); ctx.arc(0, r * 0.28, r * 0.2, 0.2 * Math.PI, 0.8 * Math.PI); ctx.stroke();
+  }
+  // грязь и мокрость видны везде, где видна голова: в космосе, в окошках домов, в комнатах
+  drawMud(r, b, 'head'); drawWetHead(r, b);
+}
+
+/** в космосе малыш мелкий — грязь и мокрость рисуем крупно поверх всего (и транспорта) */
+const MUD_SPOTS = [[-0.95, 0.55, 0.27], [0.9, 0.4, 0.24], [0.15, 1.05, 0.22], [-1.1, -0.35, 0.18], [1.0, -0.55, 0.17], [-0.45, 1.15, 0.15]]; // по краям, не на лице
+export function drawSpaceStatus(r, b) {
+  const m = b.mud || 0;
+  if (m > 0.02) {
+    const n = Math.ceil(MUD_SPOTS.length * Math.min(1, m * 1.3));
+    MUD_SPOTS.slice(0, n).forEach(([x, y, s], i) => {
+      ctx.fillStyle = '#8a5a30'; ell(x * r, y * r, s * r * 1.25, s * r, i);
+      ctx.fillStyle = '#a8743f'; ell(x * r - s * r * 0.25, y * r - s * r * 0.2, s * r * 0.5, s * r * 0.35, i);
+      ctx.fillStyle = '#8a5a30'; circle(x * r + s * r * 1.5, y * r + s * r * 0.6, s * r * 0.3);
+    });
+  }
+  if (b.wet > 0) {
+    for (let i = 0; i < 4; i++) {
+      const p = (t * 0.5 + i / 4 + (b.phase || 0)) % 1, a = -2.4 + i * 1.1, R = r * 1.55;
+      const x = Math.cos(a) * R, y = Math.sin(a) * R + p * r * 0.8, d = r * 0.27;
+      ctx.globalAlpha = Math.min(1, (1 - p) * 3, p * 6);
+      ctx.fillStyle = '#6cc6ff'; ctx.beginPath(); ctx.arc(x, y, d, 0, Math.PI); ctx.lineTo(x, y - d * 2.2); ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = '#fff'; ctx.lineWidth = r * 0.05; ctx.stroke();
+      ctx.fillStyle = '#fff'; circle(x - d * 0.35, y - d * 0.1, d * 0.25);
+      ctx.globalAlpha = 1;
+    }
+  }
+}
+
+/** мокрый малыш: капельки сползают по голове (до полотенца) */
+export function drawWetHead(r, b) {
+  if (!(b.wet > 0)) return;
+  for (let i = 0; i < 3; i++) {
+    const p = (t * 0.45 + i / 3 + (b.phase || 0)) % 1, x = r * [-0.62, 0.15, 0.7][i], y = -r * 0.75 + p * r * 1.2;
+    ctx.globalAlpha = Math.min(1, (1 - p) * 3);
+    ctx.fillStyle = '#7fd0ff'; ctx.beginPath(); ctx.arc(x, y, r * 0.11, 0, Math.PI); ctx.lineTo(x, y - r * 0.24); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#fff'; circle(x - r * 0.035, y - r * 0.02, r * 0.03);
+    ctx.globalAlpha = 1;
   }
 }
 
@@ -408,7 +453,7 @@ export function drawRoomBabyAt(b, ox, oy, shadow) {
   if (P && P.front) P.front(r); // перед телом, но за головой (например, предмет в руках у груди)
   ctx.save(); if (P && P.headTilt) ctx.rotate(P.headTilt);
   drawHead(r, b, (P && P.mood) || mood, look, { noHair: b.type === 'rocket' || b.type === 'moon', paci: b.type === 'bubble' && mood !== 'laugh', ...(P && P.face) });
-  drawAccessory(r, b); drawMud(r, b, 'head');
+  drawAccessory(r, b);
   ctx.restore();
   if (P && P.top) P.top(r); // поверх всего (предмет у рта, ладошки на глазах)
   if (b.eat && !(P && P.ownsFood)) { const pr = 1 - b.eat.t / b.eat.d; ctx.save(); ctx.translate(0, r * 0.7); const q = Math.max(0.05, 1 - pr * 0.85); ctx.scale(q, q); drawFood(b.eat.k, r * 0.42); ctx.restore(); }

@@ -140,3 +140,21 @@ test('выбор малыша: веер над ракетой, выбранны�
     noErrors(errors);
   }
 });
+
+test('в космосе видно, кто грязный и кто мокрый', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const errors = await openScene(page);
+  const r = await page.evaluate(() => {
+    const g = window.__game, A = g.api;
+    A.launchBaby('suit'); A.launchBaby('bubble'); A.launchBaby('ufo'); g.step(3);
+    const n = g.babies.length, [a, b, c] = g.babies.slice(n - 3);
+    a.mud = 1; b.wet = 30; c.mud = 0.6; c.wet = 30;
+    [a, b, c].forEach((q: any, i: number) => { q.x = innerWidth * (0.25 + i * 0.25); q.y = innerHeight * 0.78; q.vx = q.vy = 0; q.wx = q.x; q.wy = q.y; q.wTimer = 99; });
+    const wet0 = b.wet; g.step(1.5);
+    return { wetKept: b.wet === wet0, mudKept: a.mud === 1 };
+  });
+  await page.evaluate(() => window.__game.pause(true));
+  await page.screenshot({ path: 'test-results/shots/space-mud-wet.png', clip: { x: 0, y: 560, width: 390, height: 180 } });
+  expect(r).toEqual({ wetKept: true, mudKept: true });
+  noErrors(errors);
+});
