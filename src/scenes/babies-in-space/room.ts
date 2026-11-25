@@ -4,7 +4,7 @@ import { circle, ell, starPath } from '../../core/draw';
 import { burst, particles } from '../../core/particles';
 import { houseAt } from './buildings';
 import { KL, chairOf, drawCanteen, feedFrom, hitCanteen, updateCanteen } from './canteen';
-import { danceFx, drawRoomBaby, jumpFx } from './characters';
+import { danceFx, drawRoomBaby, jumpFx, messyFx } from './characters';
 import { CHAIR_SEAT, HORSE_SEAT, RL, TOYS4, cribOf, drawBall, drawCrib, drawHorse, drawShelf, drawTower, drawXylo, hitNursery, hitXylo, horseAng, isRider, knockTower, startPlay, toyApproach, toyAt, toyBusy, toyCenter, updateNursery } from './nursery';
 import { sfx } from './sounds';
 import { btn, smallStars } from './space';
@@ -257,6 +257,7 @@ export function onRoomTap(x, y, hres) {
 
 export function tapRoomBaby(b) {
   const n = b.tapN++ % 3, [hx, hy] = roomHead(b), seat = b.crib || b.chair || b.tub || b.potty || b.towel || b.spot || isRider(b);
+  if (messyFx(b, hx, hy, !seat)) return;
   b.bounce = 1; b.awake = 3;
   if (b.tub) { splashAt(hx, hy + RB() * 0.9, 10); sfx.splash(); }
   if (n === 0) {

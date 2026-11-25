@@ -454,7 +454,19 @@ export function legFoot(r, side: -1 | 1, legA = 0): [number, number] {
 }
 
 // три разные реакции малыша на тап — по кругу: кувырок, танец, прыжок
+/** грязный/мокрый малыш на тап отряхивается: из грязного летят комочки грязи, из мокрого — капли (вместо обычных реакций) */
+export function messyFx(b, x, y, wiggle = true) {
+  const mud = (b.mud || 0) > 0.02, wet = b.wet > 0; if (b.tub || b.towel || (!mud && !wet)) return false; // в ванне и в полотенце — свои реакции
+  b.bounce = 1; b.laugh = 1.4; b.awake = 3; if (wiggle) b.anim = { k: 'shake', t: 0.8, d: 0.8 };
+  sfx.giggle(1.1);
+  const fan = (n, f) => { for (let i = 0; i < n; i++) { const a = -Math.PI / 2 + rand(-1.3, 1.3), sp = rand(160, 300) * S; f(Math.cos(a) * sp, Math.sin(a) * sp); } };
+  if (mud) { sfx.squish(); fan(Math.round(5 + 5 * Math.min(1, b.mud)), (vx, vy) => addP({ kind: 'blob', x: x + rand(-10, 10) * S, y: y + rand(-6, 14) * S, vx, vy, life: rand(0.7, 1.1), size: rand(4, 7) * S, color: pick(['#8a5a30', '#9c6a3a', '#7a4f2a']), rot: rand(0, TAU), vr: rand(-6, 6), g: 650 })); }
+  if (wet) { sfx.splash(); fan(12, (vx, vy) => addP({ kind: 'drop', x: x + rand(-10, 10) * S, y: y + rand(-6, 14) * S, vx, vy, life: rand(0.6, 1.0), size: rand(3.5, 5.5) * S, color: pick(['#8fd3ff', '#6cc6ff', '#bfe9ff']), rot: 0, vr: 0, g: 700 })); }
+  return true;
+}
+
 export function tapBaby(b) {
+  if (messyFx(b, b.x, b.y)) return;
   const n = b.tapN++ % 3;
   b.bounce = 1; b.laugh = 1.6; b.awake = 3;
   if (n === 0) {
@@ -482,6 +494,7 @@ export function animXf(b) {
   const o = { dy: 0, rot: 0, sx: 1, sy: 1 }, A = b.anim; if (!A) return o;
   const p = clamp(1 - A.t / A.d, 0, 1), s = Math.sin(p * Math.PI);
   if (A.k === 'flip') { o.rot = p * p * (3 - 2 * p) * TAU; o.dy = -s * 45 * S; }
+  else if (A.k === 'shake') { o.rot = Math.sin(p * Math.PI * 12) * 0.22 * (1 - p); } // отряхивается, как щенок
   else if (A.k === 'dance') { o.rot = Math.sin(p * Math.PI * 8) * 0.32; o.dy = -Math.abs(Math.sin(p * Math.PI * 8)) * 12 * S; }
   else if (A.k === 'jump') {
     o.dy = -s * 85 * S;

@@ -1,7 +1,7 @@
 import { AC, initAudio } from '../../core/audio';
 import { H, S, SAFE, TAU, W, advance, clamp, ctx, cv, dist, easeOutBack, pick, pointer, rand, resizeCanvas, t } from '../../core/canvas';
 import { circle, drawButton } from '../../core/draw';
-import { addP, drawParticles, updateParticles } from '../../core/particles';
+import { addP, drawParticles, particles, updateParticles } from '../../core/particles';
 import { PICK_COLOR, flyHouse, flyPos, houseAt, iconHouse, launchHouse, pickIcon, updateFly } from './buildings';
 import { BL } from './bath';
 import { drawBabyPicker, pickBaby, pickLayout, placeBabyPicks, toggleBabyPicker, updateBabyPicker } from './babypick';
@@ -213,7 +213,7 @@ requestAnimationFrame(frame);
 
 // Ручка для автотестов (tests/*.spec.ts): шаг симуляции без реального времени и доступ к модулям.
 (window as any).__game = {
-  G, babies, houses, picker, babyPicker, planet, btn, paused: false,
+  G, babies, houses, picker, babyPicker, planet, btn, particles, paused: false,
   step(sec: number) { for (let i = 0; i < Math.round(sec * 60); i++) { advance(1 / 60); update(1 / 60); } draw(); },
   pause(on = true) { paused = on; },
   audio() { return AC ? AC.state : 'none'; },

@@ -151,10 +151,18 @@ test('в космосе видно, кто грязный и кто мокрый
     a.mud = 1; b.wet = 30; c.mud = 0.6; c.wet = 30;
     [a, b, c].forEach((q: any, i: number) => { q.x = innerWidth * (0.25 + i * 0.25); q.y = innerHeight * 0.78; q.vx = q.vy = 0; q.wx = q.x; q.wy = q.y; q.wTimer = 99; });
     const wet0 = b.wet; g.step(1.5);
-    return { wetKept: b.wet === wet0, mudKept: a.mud === 1 };
+    // тап: грязный — летят комочки грязи, мокрый — капли; чистый — обычная реакция
+    const kinds = () => g.particles.map((p: any) => p.kind);
+    const n0 = a.tapN; A.tapBaby(a); const mudTap = kinds().includes('blob') && a.tapN === n0 && a.anim?.k === 'shake'; g.step(1.2);
+    A.tapBaby(b); const wetTap = kinds().includes('drop') && !kinds().includes('blob'); g.step(0.3);
+    g.particles.length = 0; A.tapBaby(c); const both = kinds().includes('drop') && kinds().includes('blob');
+    const clean = g.babies.find((q: any) => !q.home && !q.mud && !q.wet && q.type !== 'moon'); g.step(1.2); g.particles.length = 0;
+    A.tapBaby(clean); const cleanTap = !kinds().includes('drop') && !kinds().includes('blob');
+    g.step(0.15);
+    return { wetKept: b.wet === wet0, mudKept: a.mud === 1, mudTap, wetTap, both, cleanTap };
   });
   await page.evaluate(() => window.__game.pause(true));
   await page.screenshot({ path: 'test-results/shots/space-mud-wet.png', clip: { x: 0, y: 560, width: 390, height: 180 } });
-  expect(r).toEqual({ wetKept: true, mudKept: true });
+  expect(r).toEqual({ wetKept: true, mudKept: true, mudTap: true, wetTap: true, both: true, cleanTap: true });
   noErrors(errors);
 });

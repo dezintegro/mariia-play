@@ -23,6 +23,15 @@ export function drawParticles() {
     else if (p.kind === 'spark') { ctx.rotate(p.rot); starPath(4, p.size, p.size * 0.35); ctx.fill(); }
     else if (p.kind === 'smoke') { ctx.globalAlpha = a * 0.45; circle(0, 0, p.size * (1 + (1 - a) * 1.5)); }
     else if (p.kind === 'bigheart') { const g = 1 + (1 - a) * 0.7; ctx.scale(g, g); heartPath(p.size); ctx.strokeStyle = '#fff'; ctx.lineWidth = 3 * S; ctx.stroke(); }
+    else if (p.kind === 'drop') { // капля: острым концом против движения
+      ctx.rotate(Math.atan2(p.vy, p.vx) - Math.PI / 2); const d = p.size;
+      ctx.beginPath(); ctx.arc(0, d * 0.4, d, 0, Math.PI); ctx.lineTo(0, -d * 1.6); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,0.8)'; circle(-d * 0.35, d * 0.3, d * 0.28);
+    }
+    else if (p.kind === 'blob') { // комочек грязи: сплющивается в полёте
+      ctx.rotate(p.rot); const d = p.size; ctx.beginPath(); ctx.ellipse(0, 0, d * 1.2, d * 0.85, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = 'rgba(255,230,190,0.25)'; circle(-d * 0.35, -d * 0.25, d * 0.35);
+    }
     else if (p.kind === 'confetti') { ctx.rotate(p.rot); ctx.fillRect(-p.size * 0.5, -p.size * 0.25, p.size, p.size * 0.5); }
     else if (p.kind === 'z' || p.kind === 'note') { ctx.font = `bold ${p.size}px "Comic Sans MS", "Chalkboard SE", sans-serif`; ctx.textAlign = 'center'; ctx.fillText(p.kind === 'z' ? 'z' : (p.n || (p.n = pick(['♪', '♫']))), 0, 0); }
     ctx.restore();
